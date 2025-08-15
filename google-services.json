@@ -1,0 +1,29 @@
+{
+    "project_info": {
+        "project_number": "617075367726",
+        "project_id": "pokket-fd558",
+        "storage_bucket": "pokket-fd558.firebasestorage.app"
+    },
+    "client": [
+        {
+            "client_info": {
+                "mobilesdk_app_id": "1:617075367726:android:38074eae1ae8777653e4bf",
+                "android_client_info": {
+                    "package_name": "live.arkitekt.pokket"
+                }
+            },
+            "oauth_client": [],
+            "api_key": [
+                {
+                    "current_key": "AIzaSyBJM4kXI7nSOvzKl_3kx8Beb98iQD5PDFI"
+                }
+            ],
+            "services": {
+                "appinvite_service": {
+                    "other_platform_oauth_client": []
+                }
+            }
+        }
+    ],
+    "configuration_version": "1"
+}

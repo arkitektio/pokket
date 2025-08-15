@@ -1,75 +1,76 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import { ScrollView, Text, View } from 'react-native';
 
+import { NotConnected } from '@/components/Connect';
+import { Disconnect } from '@/components/Disconnect';
 import { HelloWave } from '@/components/HelloWave';
-import ParallaxScrollView from '@/components/ParallaxScrollView';
+import { Notifier } from '@/components/Notifier';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { IconSymbol } from '@/components/ui/IconSymbol';
+import { App, Guard } from '@/lib/app/App';
+
+export const NotLoggedInView = () => {
+  return (
+    <ThemedView className="flex-1 justify-center items-center p-6">
+      <IconSymbol name="person.circle" size={80} color="#666" />
+      <ThemedText className="text-xl font-semibold mt-4 mb-2">Welcome to Pokket</ThemedText>
+      <ThemedText className="text-center text-gray-600 mb-6">
+        Please connect to get started with your Arkitekt services
+      </ThemedText>
+      <NotConnected/>
+    </ThemedView>
+  );
+};
 
 export default function HomeScreen() {
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+      <ScrollView className="flex-1">
+        {/* Main Content */}
+        <View className="flex-1 px-4">
+          <App.Guard notConnectedFallback={<NotLoggedInView />}>
+            {/* Status Card */}
+            <Card className="mb-4 shadow-lg">
+              <CardHeader className="pb-3">
+                <View className="flex-row items-center">
+                  <IconSymbol name="checkmark.circle.fill" size={24} color="#10B981" />
+                  <CardTitle className="text-green-600"><Guard.Lok>
+            <HelloWave />
+            </Guard.Lok></CardTitle>
+                </View>
+              </CardHeader>
+              <CardContent>
+                <Notifier />
+                <View className="mt-3">
+                  <Disconnect />
+                </View>
+              </CardContent>
+            </Card>
+
+
+            {/* Info Card */}
+            <Card className="shadow-lg">
+              <CardHeader>
+                <CardTitle className="flex-row items-center">
+                  <IconSymbol name="info.circle" size={20} color="#6B7280" />
+                  <Text className="ml-2">About Pokket</Text>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Text className="text-gray-600 leading-6">
+                  Pokket is your mobile gateway to the Arkitekt ecosystem. Currently its only
+                  here to act as a notification hub and a way to connect to your Arkitekt services.
+                </Text>
+                <View className="mt-4 p-3 bg-gray-50 rounded-lg">
+                  <Text className="text-sm text-gray-500">
+                    💡 Tip: Soon you will be able to access your microscopy data and run analysis workflows directly from Pokket.
+                  </Text>
+                </View>
+              </CardContent>
+            </Card>
+          </App.Guard>
+        </View>
+      </ScrollView>
   );
 }
 
-const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
-  },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
-  },
-});

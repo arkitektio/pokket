@@ -1,0 +1,8 @@
+mutation RegisterComChannel($input: RegisterComChannelInput!) {
+  registerComChannel(input: $input) {
+    id
+    user {
+        id
+    }
+  }
+}

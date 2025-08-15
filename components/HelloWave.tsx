@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
-import { StyleSheet } from 'react-native';
-import Animated, {
+import { View } from 'react-native';
+import {
   useAnimatedStyle,
   useSharedValue,
   withRepeat,
@@ -8,9 +8,14 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
-import { ThemedText } from '@/components/ThemedText';
+import { useMeQuery } from '@/lib/lok/api/graphql';
+import { Text } from './ui/text';
 
 export function HelloWave() {
+
+  const { data} = useMeQuery({})
+
+
   const rotationAnimation = useSharedValue(0);
 
   useEffect(() => {
@@ -25,16 +30,12 @@ export function HelloWave() {
   }));
 
   return (
-    <Animated.View style={animatedStyle}>
-      <ThemedText style={styles.text}>👋</ThemedText>
-    </Animated.View>
+    <View className='flex-row items-center'>
+    <Text className='text-3xl font-semibold'>
+
+      Hi {data?.me?.username} :) 
+    </Text>
+    </View>
   );
 }
 
-const styles = StyleSheet.create({
-  text: {
-    fontSize: 28,
-    lineHeight: 32,
-    marginTop: -6,
-  },
-});
