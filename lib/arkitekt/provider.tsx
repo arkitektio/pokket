@@ -434,21 +434,27 @@ export const ConnectedGuard = ({
 };
 
 export declare type StorageProvider = {
-    set(key: string, value: string): Promise<void>;
-    get(key: string): Promise<string | null>;
-    remove(key: string): Promise<void>;
+  set(key: string, value: string): Promise<void>;
+  get(key: string): Promise<string | null>;
+  remove(key: string): Promise<void>;
 };
 
 
 
 export const buildArkitektProvider =
-  (options: ArkitektBuilderOptions) =>
-  ({ children }: { children: ReactNode }) => {
-    return (
-      <ArkitektProvider
-        {...options}
-      >
-        {children}
-      </ArkitektProvider>
-    );
+  (options: ArkitektBuilderOptions) => {
+
+
+
+    const MappedProvider = ({ children }: { children: ReactNode }) => {
+      return (
+        <ArkitektProvider
+          {...options}
+        >
+          {children}
+        </ArkitektProvider>
+      );
+    };
+
+    return MappedProvider;
   };

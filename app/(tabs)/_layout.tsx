@@ -2,6 +2,7 @@ import { Tabs } from 'expo-router';
 import React from 'react';
 
 import { Bluetooth } from '@/lib/icons/Bluetooth';
+import { Bug } from '@/lib/icons/Bug';
 import { Sun } from '@/lib/icons/Sun';
 
 export default function TabLayout() {
@@ -20,6 +21,13 @@ export default function TabLayout() {
         options={{
           title: "Provision",
           tabBarIcon: ({ color }) => <Bluetooth size={28} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="debug"
+        options={{
+          title: "Debug",
+          tabBarIcon: ({ color }) => <Bug size={28} color={color} />,
         }}
       />
     </Tabs>

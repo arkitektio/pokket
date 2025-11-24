@@ -1,19 +1,6 @@
-mutation CreateClient(
-  $identifier: String!
-  $version: String!
-  $scopes: [String!]!
-  $logo: String
-) {
-  createDevelopmentalClient(
-    input: {
-      manifest: {
-        identifier: $identifier
-        version: $version
-        scopes: $scopes
-        logo: $logo
-      }
-    }
-  ) {
+mutation CreateClient($input: DevelopmentClientInput!) {
+  createDevelopmentalClient(input: $input) {
     id
+    token
   }
 }

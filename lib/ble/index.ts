@@ -11,13 +11,13 @@ export type { DeviceService, UseBLEDeviceResult } from './useBleDevice';
 export { useImprovProvisioning } from './useImprovProvisioning';
 export type { DeviceManifest, ProvisioningConfig, UseImprovProvisioningResult } from './useImprovProvisioning';
 
-// Improv Protocol
+// Arkitekt Provisioning Protocol
 export {
-    ARKITEKT_MANIFEST_UUID, ARKITEKT_SERVICE_UUID,
-    ARKITEKT_TOKEN_UUID, IMPROV_CAPABILITIES_UUID, IMPROV_ERROR_UUID,
+    ARKITEKT_MANIFEST_UUID, ARKITEKT_SERVICE_UUID, ARKITEKT_TOKEN_UUID, BASE_URL_UUID, IMPROV_CAPABILITIES_UUID, IMPROV_ERROR_UUID,
     IMPROV_RPC_COMMAND_UUID,
     IMPROV_RPC_RESULT_UUID, IMPROV_SERVICE_UUID,
-    IMPROV_STATUS_UUID, ImprovCommand, ImprovError, ImprovStatus, buildArkitektTokenPayload, buildImprovWifiPayload, buildManifestRequestPayload,
-    decodeResponse, parseImprovError, parseImprovStatus, parseManifest
+    IMPROV_STATUS_UUID, ImprovCommand, ImprovError, ImprovStatus, REDEEM_TOKEN_UUID,
+    STATUS_UUID, WIFI_PASSWORD_UUID, WIFI_SSID_UUID, buildArkitektTokenPayload, buildBaseURLPayload, buildImprovWifiPayload,
+    buildManifestRequestPayload, buildRedeemTokenPayload, buildWifiPasswordPayload, buildWifiSSIDPayload, decodeResponse, parseImprovError, parseImprovStatus, parseStatus
 } from './improvProtocol';
 

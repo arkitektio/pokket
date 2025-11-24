@@ -1,18 +1,21 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Device } from 'react-native-ble-plx';
 import {
-    ARKITEKT_MANIFEST_UUID,
     ARKITEKT_SERVICE_UUID,
-    ARKITEKT_TOKEN_UUID,
-    buildArkitektTokenPayload,
-    buildImprovWifiPayload,
-    IMPROV_RPC_COMMAND_UUID,
-    IMPROV_SERVICE_UUID,
-    IMPROV_STATUS_UUID,
-    ImprovStatus,
-    parseImprovStatus,
+    BASE_URL_UUID,
+    buildBaseURLPayload,
+    buildFaktsTokenPayload,
+    buildWifiPasswordPayload,
+    buildWifiSSIDPayload,
+    FAKTS_TOKEN_UUID,
+    MANIFEST_UUID,
     parseManifest,
+    parseStatus,
+    STATUS_UUID,
+    WIFI_PASSWORD_UUID,
+    WIFI_SSID_UUID,
 } from './improvProtocol';
-import { useBLEDevice } from './useBleDevice';
+import { bleManager } from './manager';
 
 export interface DeviceManifest {
   identifier: string;
@@ -26,6 +29,8 @@ export interface ProvisioningConfig {
   ssid: string;
   password: string;
   arkitektToken?: string;
+  displayName?: string;
+  baseUrl?: string;
 }
 
 export interface UseImprovProvisioningResult {
@@ -33,153 +38,238 @@ export interface UseImprovProvisioningResult {
   status: string | null;
   error: string | null;
   manifest: DeviceManifest | null;
-  provision: (config: ProvisioningConfig) => Promise<void>;
-  getManifest: () => Promise<DeviceManifest | null>;
+  provision: (deviceId: string, config: ProvisioningConfig) => Promise<void>;
+  getManifest: (deviceId: string) => Promise<DeviceManifest | null>;
+  getStatus: (deviceId: string) => Promise<string | null>;
   reset: () => void;
 }
 
 /**
- * Hook for Improv Wi-Fi provisioning with Arkitekt integration
+ * Hook for Arkitekt ESP32 provisioning via BLE
  * 
- * This hook combines:
- * 1. Standard Improv Wi-Fi provisioning (SSID + Password)
- * 2. Custom Arkitekt token transfer via side-channel BLE characteristic
- * 3. Device manifest retrieval
+ * Handles complete provisioning flow:
+ * 1. Connect to device when deviceId is provided to methods
+ * 2. Read device manifest
+ * 3. Write WiFi credentials, base URL, and fakts token
+ * 4. Monitor provisioning status
  */
-export function useImprovProvisioning(deviceId?: string): UseImprovProvisioningResult {
-  const bleDevice = useBLEDevice();
+export function useImprovProvisioning(): UseImprovProvisioningResult {
   const [isProvisioning, setIsProvisioning] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [manifest, setManifest] = useState<DeviceManifest | null>(null);
+  const deviceRef = useRef<Map<string, Device>>(new Map());
+
+  // Cleanup on unmount
+  useEffect(() => {
+    const devices = deviceRef.current;
+    return () => {
+      devices.forEach((device) => {
+        device.cancelConnection().catch(() => {});
+      });
+      devices.clear();
+    };
+  }, []);
 
   const reset = useCallback(() => {
     setIsProvisioning(false);
     setStatus(null);
     setError(null);
     setManifest(null);
+    deviceRef.current.forEach((device) => {
+      device.cancelConnection().catch(() => {});
+    });
+    deviceRef.current.clear();
   }, []);
 
   /**
-   * Get device manifest from custom characteristic
+   * Ensure device is connected
    */
-  const getManifest = useCallback(async (): Promise<DeviceManifest | null> => {
+  const ensureConnected = useCallback(async (deviceId: string): Promise<Device> => {
+    if (!deviceId) {
+      throw new Error('No device ID provided');
+    }
+
+    // If already connected, return existing device
+    const existingDevice = deviceRef.current.get(deviceId);
+    if (existingDevice?.isConnected) {
+      return existingDevice;
+    }
+
+    // Connect to device
+    const device = await bleManager.connectToDevice(deviceId);
+    await device.discoverAllServicesAndCharacteristics();
+    deviceRef.current.set(deviceId, device);
+    return device;
+  }, []);
+
+  /**
+   * Read a characteristic value
+   */
+  const readCharacteristic = useCallback(async (
+    deviceId: string,
+    serviceUUID: string,
+    characteristicUUID: string
+  ): Promise<string | null> => {
+    const device = await ensureConnected(deviceId);
+    const characteristic = await device.readCharacteristicForService(
+      serviceUUID,
+      characteristicUUID
+    );
+    return characteristic.value;
+  }, [ensureConnected]);
+
+  /**
+   * Write to a characteristic
+   */
+  const writeCharacteristic = useCallback(async (
+    deviceId: string,
+    serviceUUID: string,
+    characteristicUUID: string,
+    value: string
+  ): Promise<void> => {
+    const device = await ensureConnected(deviceId);
+    await device.writeCharacteristicWithResponseForService(
+      serviceUUID,
+      characteristicUUID,
+      value
+    );
+  }, [ensureConnected]);
+
+  /**
+   * Get device status from STATUS characteristic
+   */
+  const getStatus = useCallback(async (deviceId: string): Promise<string | null> => {
+    try {
+      console.log('Getting device status for deviceId:', deviceId);
+      
+      const statusData = await readCharacteristic(
+        deviceId,
+        ARKITEKT_SERVICE_UUID,
+        STATUS_UUID
+      );
+
+      return parseStatus(statusData);
+    } catch (err) {
+      console.error('Failed to get status:', err);
+      return null;
+    }
+  }, [readCharacteristic]);
+
+  /**
+   * Get device manifest from MANIFEST characteristic
+   */
+  const getManifest = useCallback(async (deviceId: string): Promise<DeviceManifest | null> => {
     try {
       setError(null);
       setStatus('Reading device manifest...');
-
-      // First check if we're connected
-      if (!bleDevice.isConnected && deviceId) {
-        await bleDevice.connect(deviceId);
-        await bleDevice.discoverServices();
-      }
-
-      // Check if device has Arkitekt service
-      const hasArkitektService = bleDevice.services.some(
-        (s) => s.uuid.toLowerCase() === ARKITEKT_SERVICE_UUID.toLowerCase()
-      );
-
-      if (!hasArkitektService) {
-        setError('Device does not support Arkitekt service');
-        return null;
-      }
-
-      // Read manifest characteristic
-      const manifestData = await bleDevice.readCharacteristic(
+      console.log('Getting device manifest for deviceId:', deviceId);
+      
+      // Read manifest from MANIFEST_UUID (returns JSON)
+      const manifestData = await readCharacteristic(
+        deviceId,
         ARKITEKT_SERVICE_UUID,
-        ARKITEKT_MANIFEST_UUID
+        MANIFEST_UUID
       );
+
+      console.log('Raw manifest data:', manifestData);
 
       const parsedManifest = parseManifest(manifestData);
-      setManifest(parsedManifest);
-      setStatus('Manifest retrieved successfully');
       
+      if (!parsedManifest) {
+        // Fallback to basic manifest if parsing fails
+        const basicManifest: DeviceManifest = {
+          identifier: 'error-unknown-device',
+          version: 'ERROR',
+        };
+        setManifest(basicManifest);
+        return basicManifest;
+      }
+      
+      setManifest(parsedManifest);
+      setStatus('Manifest received');
       return parsedManifest;
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Failed to get manifest';
       setError(errorMsg);
-      return null;
+      // Return basic manifest as fallback
+      const basicManifest: DeviceManifest = {
+        identifier: 'FAULTY-DEVICE',
+        version:  errorMsg
+      };
+      setManifest(basicManifest);
+      return basicManifest;
     }
-  }, [bleDevice, deviceId]);
+  }, [readCharacteristic]);
 
   /**
-   * Full provisioning flow:
+   * Full provisioning flow matching Arduino implementation:
    * 1. Connect to device
    * 2. Discover services
-   * 3. Get device manifest (optional, for token creation)
-   * 4. Send Arkitekt token via custom characteristic
-   * 5. Send Wi-Fi credentials via Improv protocol
+   * 3. Write WiFi SSID to WIFI_SSID_UUID
+   * 4. Write WiFi Password to WIFI_PASSWORD_UUID
+   * 5. Write Base URL to BASE_URL_UUID (optional)
+   * 6. Write Fakts Token to FAKTS_TOKEN_UUID (triggers config save)
    */
-  const provision = useCallback(async (config: ProvisioningConfig) => {
+  const provision = useCallback(async (deviceId: string, config: ProvisioningConfig) => {
     setIsProvisioning(true);
     setError(null);
     setStatus('Starting provisioning...');
 
     try {
-      // Step 1: Connect to device
-      if (!bleDevice.isConnected && deviceId) {
-        setStatus('Connecting to device...');
-        await bleDevice.connect(deviceId);
-      }
+      // Ensure connected (connection happens in ensureConnected)
+      setStatus('Connecting to device...');
+      await ensureConnected(deviceId);
 
-      // Step 2: Discover services
       setStatus('Discovering services...');
-      await bleDevice.discoverServices();
+      // Services are already discovered in ensureConnected
 
-      // Verify Improv service exists
-      const hasImprovService = bleDevice.services.some(
-        (s) => s.uuid.toLowerCase() === IMPROV_SERVICE_UUID.toLowerCase()
+      // Step 3: Write WiFi SSID
+      setStatus('Sending WiFi SSID...');
+      const ssidPayload = buildWifiSSIDPayload(config.ssid);
+      await writeCharacteristic(
+        deviceId,
+        ARKITEKT_SERVICE_UUID,
+        WIFI_SSID_UUID,
+        ssidPayload
       );
 
-      if (!hasImprovService) {
-        throw new Error('Device does not support Improv Wi-Fi');
-      }
+      // Step 4: Write WiFi Password
+      setStatus('Sending WiFi password...');
+      const passwordPayload = buildWifiPasswordPayload(config.password);
+      await writeCharacteristic(
+        deviceId,
+        ARKITEKT_SERVICE_UUID,
+        WIFI_PASSWORD_UUID,
+        passwordPayload
+      );
 
-      // Step 3: Send Arkitekt token (if provided and service available)
-      if (config.arkitektToken) {
-        const hasArkitektService = bleDevice.services.some(
-          (s) => s.uuid.toLowerCase() === ARKITEKT_SERVICE_UUID.toLowerCase()
+      // Step 5: Write Base URL (if provided)
+      if (config.baseUrl) {
+        setStatus('Sending base URL...');
+        const baseUrlPayload = buildBaseURLPayload(config.baseUrl);
+        await writeCharacteristic(
+          deviceId,
+          ARKITEKT_SERVICE_UUID,
+          BASE_URL_UUID,
+          baseUrlPayload
         );
-
-        if (hasArkitektService) {
-          setStatus('Sending Arkitekt token...');
-          const tokenPayload = buildArkitektTokenPayload(config.arkitektToken);
-          
-          await bleDevice.writeCharacteristic(
-            ARKITEKT_SERVICE_UUID,
-            ARKITEKT_TOKEN_UUID,
-            tokenPayload
-          );
-          
-          setStatus('Arkitekt token sent successfully');
-        } else {
-          console.warn('Device does not support Arkitekt service, skipping token');
-        }
       }
 
-      // Step 4: Check Improv status
-      setStatus('Checking device status...');
-      const statusData = await bleDevice.readCharacteristic(
-        IMPROV_SERVICE_UUID,
-        IMPROV_STATUS_UUID
-      );
-      
-      const improvStatus = parseImprovStatus(statusData);
-      if (improvStatus !== ImprovStatus.READY && improvStatus !== ImprovStatus.PROVISIONED) {
-        throw new Error(`Device not ready for provisioning (status: ${improvStatus})`);
+      // Step 6: Write Fakts Token (this triggers config save on Arduino)
+      if (config.arkitektToken) {
+        setStatus('Sending fakts token...');
+        const tokenPayload = buildFaktsTokenPayload(config.arkitektToken);
+        await writeCharacteristic(
+          deviceId,
+          ARKITEKT_SERVICE_UUID,
+          FAKTS_TOKEN_UUID,
+          tokenPayload
+        );
+        setStatus('Fakts token sent - configuration saved on device');
       }
 
-      // Step 5: Send Wi-Fi credentials
-      setStatus('Sending Wi-Fi credentials...');
-      const wifiPayload = buildImprovWifiPayload(config.ssid, config.password);
-      
-      await bleDevice.writeCharacteristic(
-        IMPROV_SERVICE_UUID,
-        IMPROV_RPC_COMMAND_UUID,
-        wifiPayload
-      );
-
-      setStatus('Provisioning complete! Device is connecting to Wi-Fi...');
+      setStatus('Provisioning complete! Device is connecting to Wi-Fi and Arkitekt...');
       setIsProvisioning(false);
 
     } catch (err) {
@@ -189,7 +279,7 @@ export function useImprovProvisioning(deviceId?: string): UseImprovProvisioningR
       setIsProvisioning(false);
       throw err;
     }
-  }, [bleDevice, deviceId]);
+  }, [ensureConnected, writeCharacteristic]);
 
   return {
     isProvisioning,
@@ -198,6 +288,7 @@ export function useImprovProvisioning(deviceId?: string): UseImprovProvisioningR
     manifest,
     provision,
     getManifest,
+    getStatus,
     reset,
   };
 }

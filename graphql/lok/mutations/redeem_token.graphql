@@ -1,0 +1,6 @@
+mutation CreateRedeemToken($input: RedeemTokenInput!) {
+  createRedeemToken(input: $input) {
+    id
+    token
+  }
+}

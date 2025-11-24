@@ -1,22 +1,23 @@
 /**
- * Improv Wi-Fi Protocol Constants
- * https://www.improv-wifi.com/serial/
+ * Arkitekt ESP32 Provisioning Protocol
+ * Custom BLE service for provisioning ESP32 devices with WiFi and Arkitekt credentials
  */
 
-// Improv Wi-Fi Service UUID
-export const IMPROV_SERVICE_UUID = '00467768-6228-2272-4663-277478268000';
+// Arkitekt Provisioning Service UUID (matches Arduino code)
+export const ARKITEKT_SERVICE_UUID = '4fafc201-1fb5-459e-8fcc-c5c9c331914b';
 
-// Improv Wi-Fi Characteristics
-export const IMPROV_STATUS_UUID = '00467768-6228-2272-4663-277478268001';
-export const IMPROV_ERROR_UUID = '00467768-6228-2272-4663-277478268002';
-export const IMPROV_RPC_COMMAND_UUID = '00467768-6228-2272-4663-277478268003';
-export const IMPROV_RPC_RESULT_UUID = '00467768-6228-2272-4663-277478268004';
-export const IMPROV_CAPABILITIES_UUID = '00467768-6228-2272-4663-277478268005';
+// Characteristic UUIDs (matches Arduino code)
+export const WIFI_SSID_UUID = 'beb5483e-36e1-4688-b7f5-ea07361b26a8';
+export const WIFI_PASSWORD_UUID = 'beb5483e-36e1-4688-b7f5-ea07361b26a9';
+export const BASE_URL_UUID = 'beb5483e-36e1-4688-b7f5-ea07361b26aa';
+export const FAKTS_TOKEN_UUID = 'beb5483e-36e1-4688-b7f5-ea07361b26ab';
+export const STATUS_UUID = 'beb5483e-36e1-4688-b7f5-ea07361b26ac';
+export const MANIFEST_UUID = 'beb5483e-36e1-4688-b7f5-ea07361b26ad';
 
-// Custom UUIDs for Arkitekt Token (You can replace these with your own generated UUIDs)
-export const ARKITEKT_SERVICE_UUID = '12345678-1234-1234-1234-1234567890AB';
-export const ARKITEKT_TOKEN_UUID = '12345678-1234-1234-1234-1234567890AC';
-export const ARKITEKT_MANIFEST_UUID = '12345678-1234-1234-1234-1234567890AD';
+// Legacy aliases for backward compatibility
+export const REDEEM_TOKEN_UUID = FAKTS_TOKEN_UUID;
+export const ARKITEKT_TOKEN_UUID = FAKTS_TOKEN_UUID;
+export const ARKITEKT_MANIFEST_UUID = MANIFEST_UUID;
 
 // Command Types
 export enum ImprovCommand {
@@ -45,7 +46,49 @@ export enum ImprovError {
 }
 
 /**
- * Build Improv Wi-Fi provisioning payload
+ * Build WiFi SSID payload - simple string encoding
+ */
+export function buildWifiSSIDPayload(ssid: string): string {
+  return btoa(ssid);
+}
+
+/**
+ * Build WiFi Password payload - simple string encoding
+ */
+export function buildWifiPasswordPayload(password: string): string {
+  return btoa(password);
+}
+
+/**
+ * Build Base URL payload - simple string encoding
+ */
+export function buildBaseURLPayload(baseUrl: string): string {
+  return btoa(baseUrl);
+}
+
+/**
+ * Build Fakts Token payload - simple string encoding
+ */
+export function buildFaktsTokenPayload(token: string): string {
+  return btoa(token);
+}
+
+/**
+ * Build Redeem Token payload (alias for backward compatibility)
+ */
+export function buildRedeemTokenPayload(token: string): string {
+  return buildFaktsTokenPayload(token);
+}
+
+/**
+ * Build Arkitekt token payload (alias for backward compatibility)
+ */
+export function buildArkitektTokenPayload(token: string): string {
+  return buildFaktsTokenPayload(token);
+}
+
+/**
+ * Build Improv Wi-Fi provisioning payload (legacy support)
  */
 export function buildImprovWifiPayload(ssid: string, password: string): string {
   const encoder = new TextEncoder();
@@ -82,14 +125,6 @@ export function buildImprovWifiPayload(ssid: string, password: string): string {
 }
 
 /**
- * Build Arkitekt token payload
- */
-export function buildArkitektTokenPayload(token: string): string {
-  // Simply encode the token as base64
-  return btoa(token);
-}
-
-/**
  * Build Arkitekt manifest request payload
  * This can be used to request the device manifest
  */
@@ -111,6 +146,13 @@ export function decodeResponse(base64Value: string | null): string | null {
     console.error('Failed to decode response:', err);
     return null;
   }
+}
+
+/**
+ * Read status from device
+ */
+export function parseStatus(base64Value: string | null): string | null {
+  return decodeResponse(base64Value);
 }
 
 /**
@@ -147,7 +189,7 @@ export function parseImprovError(base64Value: string | null): ImprovError | null
 
 /**
  * Parse device manifest from response
- * Assuming the manifest is returned as JSON string
+ * The manifest is returned as JSON string from MANIFEST_UUID
  */
 export function parseManifest(base64Value: string | null): any | null {
   const decoded = decodeResponse(base64Value);

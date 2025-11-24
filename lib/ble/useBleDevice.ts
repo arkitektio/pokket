@@ -56,12 +56,14 @@ export function useBLEDevice(): UseBLEDeviceResult {
     
     try {
       // Disconnect from any existing device
+      console.log('Connecting to device:', deviceId);
       if (device) {
         await disconnect();
       }
 
       // Connect to new device
       const connectedDevice = await bleManager.connectToDevice(deviceId);
+      console.log('Connected to device:', connectedDevice.id);
       setDevice(connectedDevice);
       setIsConnected(true);
 
@@ -76,9 +78,10 @@ export function useBLEDevice(): UseBLEDeviceResult {
       });
 
     } catch (err) {
+    console.error('Connection error:', err);
       setError(err instanceof Error ? err.message : 'Connection failed');
       setIsConnected(false);
-      setDevice(null);
+      throw err;
     }
   }, [device, disconnect]);
 

@@ -4,9 +4,12 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Text } from '@/components/ui/text';
 import { App } from '@/lib/app/App';
-import { IMPROV_SERVICE_UUID, useBLEScanner, useImprovProvisioning } from '@/lib/ble';
-import React, { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, TextInput, View } from 'react-native';
+import { ARKITEKT_SERVICE_UUID, useBLEScanner, useImprovProvisioning } from '@/lib/ble';
+import { CreateClientDocument } from '@/lib/lok/api/graphql';
+import { useMutation } from '@/lib/lok/funcs';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import React, { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, ScrollView, TextInput, TouchableOpacity, View } from 'react-native';
 import { Device } from 'react-native-ble-plx';
 
 enum ProvisioningStep {
@@ -21,24 +24,87 @@ enum ProvisioningStep {
  * BLE Device Provisioning Component
  * 
  * Complete flow for provisioning ESP32 devices with:
- * - Wi-Fi credentials via Improv protocol
- * - Arkitekt token via custom BLE characteristic
+ * - Wi-Fi credentials
+ * - Arkitekt base URL and redeem token
  */
 export function BleProvisioning() {
     const [step, setStep] = useState<ProvisioningStep>(ProvisioningStep.SCANNING);
     const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
     const [wifiSSID, setWifiSSID] = useState('');
     const [wifiPassword, setWifiPassword] = useState('');
+    const [displayName, setDisplayName] = useState('');
+    const [baseUrl, setBaseUrl] = useState('');
     const [showPassword, setShowPassword] = useState(false);
+    const [saveConfig, setSaveConfig] = useState(true);
+    const [savedConfigs, setSavedConfigs] = useState<{ ssid: string, password: string }[]>([]);
+    const [showSavedConfigs, setShowSavedConfigs] = useState(false);
 
     // Get token from Arkitekt connection
     const token = App.useToken();
+    const fakts = App.useFakts();
 
-    // Scan for devices with Improv service
-    const scanner = useBLEScanner([IMPROV_SERVICE_UUID]);
+    // Scan for devices with Arkitekt service
+    const scanner = useBLEScanner([ARKITEKT_SERVICE_UUID]);
 
     // Provisioning hook
-    const provisioning = useImprovProvisioning(selectedDevice?.id);
+    const provisioning = useImprovProvisioning();
+
+    // GraphQL mutation to create client and get fakts-token
+    const [createClient] = useMutation(CreateClientDocument);
+
+    // Load saved WiFi configurations on mount
+    useEffect(() => {
+        loadSavedConfigs();
+    }, []);
+
+    const loadSavedConfigs = async () => {
+        try {
+            const stored = await AsyncStorage.getItem('wifi_configs');
+            if (stored) {
+                setSavedConfigs(JSON.parse(stored));
+            }
+        } catch (err) {
+            console.error('Failed to load WiFi configs:', err);
+        }
+    };
+
+    const saveWifiConfig = useCallback(async (ssid: string, password: string) => {
+        try {
+            // Check if config already exists
+            const exists = savedConfigs.some(c => c.ssid === ssid);
+            if (exists) {
+                // Update existing
+                const updated = savedConfigs.map(c =>
+                    c.ssid === ssid ? { ssid, password } : c
+                );
+                setSavedConfigs(updated);
+                await AsyncStorage.setItem('wifi_configs', JSON.stringify(updated));
+            } else {
+                // Add new
+                const updated = [...savedConfigs, { ssid, password }];
+                setSavedConfigs(updated);
+                await AsyncStorage.setItem('wifi_configs', JSON.stringify(updated));
+            }
+        } catch (err) {
+            console.error('Failed to save WiFi config:', err);
+        }
+    }, [savedConfigs]);
+
+    const deleteSavedConfig = useCallback(async (ssid: string) => {
+        try {
+            const updated = savedConfigs.filter(c => c.ssid !== ssid);
+            setSavedConfigs(updated);
+            await AsyncStorage.setItem('wifi_configs', JSON.stringify(updated));
+        } catch (err) {
+            console.error('Failed to delete WiFi config:', err);
+        }
+    }, [savedConfigs]);
+
+    const loadSavedConfig = useCallback((config: { ssid: string, password: string }) => {
+        setWifiSSID(config.ssid);
+        setWifiPassword(config.password);
+        setShowSavedConfigs(false);
+    }, []);
 
     const handleStartScan = useCallback(() => {
         scanner.clearDevices();
@@ -58,7 +124,7 @@ export function BleProvisioning() {
 
         // Try to get device manifest
         try {
-            await provisioning.getManifest();
+            await provisioning.getManifest(device.id);
         } catch (err) {
             console.warn('Could not retrieve manifest:', err);
         }
@@ -74,6 +140,8 @@ export function BleProvisioning() {
         setSelectedDevice(null);
         setWifiSSID('');
         setWifiPassword('');
+        setDisplayName('');
+        setBaseUrl('');
         scanner.clearDevices();
         provisioning.reset();
     }, [scanner, provisioning]);
@@ -91,11 +159,45 @@ export function BleProvisioning() {
 
         setStep(ProvisioningStep.PROVISIONING);
 
+        // Save WiFi config if checkbox is checked
+        if (saveConfig && wifiSSID && wifiPassword) {
+            await saveWifiConfig(wifiSSID, wifiPassword);
+        }
+
+        // Get base URL from fakts or use custom one
+        const provisionBaseUrl = 'https://go.arkitekt.live';
+
         try {
-            await provisioning.provision({
+            // Step 1: Create a client with the device manifest to get fakts-token
+            const deviceName = displayName || selectedDevice?.name || 'Unnamed Device';
+            const manifest = await provisioning.getManifest(selectedDevice.id);
+
+            const { data } = await createClient({
+                variables: {
+                    input: {
+                        manifest: {
+                            identifier: manifest?.identifier || `esp32-${selectedDevice?.id.substring(0, 8)}`,
+                            version: manifest?.version || '1.0.0',
+                            scopes: manifest?.scopes || ['read', 'write'],
+                        }
+                    }
+                }
+            });
+
+            if (!data?.createDevelopmentalClient?.token) {
+                throw new Error('Failed to create client token');
+            }
+
+            const faktsToken = data.createDevelopmentalClient.token;
+            console.log('Obtained fakts-token:', faktsToken);
+
+            // Step 2: Provision device with WiFi and fakts-token
+            await provisioning.provision(selectedDevice.id, {
                 ssid: wifiSSID,
                 password: wifiPassword,
-                arkitektToken: token,
+                arkitektToken: faktsToken,
+                displayName: deviceName,
+                baseUrl: provisionBaseUrl,
             });
 
             setStep(ProvisioningStep.COMPLETE);
@@ -122,7 +224,7 @@ export function BleProvisioning() {
                 [{ text: 'Try Again' }]
             );
         }
-    }, [selectedDevice, wifiSSID, wifiPassword, token, provisioning, handleReset]);
+    }, [selectedDevice, wifiSSID, wifiPassword, displayName, baseUrl, fakts, token, provisioning, createClient, handleReset, saveConfig, saveWifiConfig]);
 
     const renderScanningStep = () => (
         <Card className="mb-4">
@@ -135,7 +237,7 @@ export function BleProvisioning() {
             <CardContent>
                 <Button
                     onPress={handleStartScan}
-                    disabled={scanner.isScanning}
+                    disabled={scanner.isScanning || provisioning.isProvisioning}
                     className="mb-4"
                 >
                     <Text>
@@ -239,12 +341,14 @@ export function BleProvisioning() {
                         variant="outline"
                         onPress={handleReset}
                         className="flex-1"
+                        disabled={provisioning.isProvisioning}
                     >
                         <Text>Back</Text>
                     </Button>
                     <Button
                         onPress={handleContinueToCredentials}
                         className="flex-1"
+                        disabled={provisioning.isProvisioning}
                     >
                         <Text>Continue</Text>
                     </Button>
@@ -263,9 +367,89 @@ export function BleProvisioning() {
             </CardHeader>
             <CardContent>
                 <View className="space-y-4">
+                    {/* Display Name Input */}
+                    <View>
+                        <ThemedText className="mb-2 font-medium">Device Name</ThemedText>
+                        <TextInput
+                            value={displayName}
+                            onChangeText={setDisplayName}
+                            placeholder={selectedDevice?.name || 'My ESP32 Device'}
+                            autoCapitalize="words"
+                            autoCorrect={false}
+                            className="border border-gray-300 rounded-lg px-4 py-3 bg-white"
+                        />
+                        <ThemedText className="text-xs text-gray-500 mt-1">
+                            Give your device a friendly name (optional)
+                        </ThemedText>
+                    </View>
+
                     {/* SSID Input */}
                     <View>
-                        <ThemedText className="mb-2 font-medium">Network Name (SSID)</ThemedText>
+                        <View className="flex-row justify-between items-center mb-2">
+                            <ThemedText className="font-medium">Network Name (SSID)</ThemedText>
+                            {savedConfigs.length > 0 && (
+                                <Button
+                                    variant="ghost"
+                                    onPress={() => setShowSavedConfigs(!showSavedConfigs)}
+                                    className="py-1"
+                                >
+                                    <Text className="text-xs text-blue-600">
+                                        {showSavedConfigs ? 'Hide' : `Saved (${savedConfigs.length})`}
+                                    </Text>
+                                </Button>
+                            )}
+                        </View>
+
+                        {showSavedConfigs && savedConfigs.length > 0 && (
+                            <View className="mb-2 border border-gray-200 rounded-lg bg-gray-50">
+                                {savedConfigs.map((config, index) => (
+                                    <TouchableOpacity
+                                        key={index}
+                                        onPress={() => loadSavedConfig(config)}
+                                        className="flex-row justify-between items-center p-3 border-b border-gray-200"
+                                    >
+                                        <View className="flex-1">
+                                            <ThemedText className="font-medium">{config.ssid}</ThemedText>
+                                            <ThemedText className="text-xs text-gray-500">••••••••</ThemedText>
+                                        </View>
+                                        <View className="flex-row space-x-2">
+                                            <Button
+                                                variant="ghost"
+                                                onPress={(e) => {
+                                                    e?.stopPropagation();
+                                                    loadSavedConfig(config);
+                                                }}
+                                                className="py-1 px-2"
+                                            >
+                                                <Text className="text-xs text-blue-600">Use</Text>
+                                            </Button>
+                                            <Button
+                                                variant="ghost"
+                                                onPress={(e) => {
+                                                    e?.stopPropagation();
+                                                    Alert.alert(
+                                                        'Delete Configuration',
+                                                        `Remove saved WiFi config for ${config.ssid}?`,
+                                                        [
+                                                            { text: 'Cancel', style: 'cancel' },
+                                                            {
+                                                                text: 'Delete',
+                                                                style: 'destructive',
+                                                                onPress: () => deleteSavedConfig(config.ssid)
+                                                            }
+                                                        ]
+                                                    );
+                                                }}
+                                                className="py-1 px-2"
+                                            >
+                                                <Text className="text-xs text-red-600">Delete</Text>
+                                            </Button>
+                                        </View>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+                        )}
+
                         <TextInput
                             value={wifiSSID}
                             onChangeText={setWifiSSID}
@@ -316,6 +500,24 @@ export function BleProvisioning() {
                         </View>
                     )}
 
+                    {/* Save Configuration Checkbox */}
+                    {wifiSSID && wifiPassword && (
+                        <TouchableOpacity
+                            onPress={() => setSaveConfig(!saveConfig)}
+                            className="flex-row items-center p-3 bg-gray-50 rounded-lg"
+                        >
+                            <View className={`w-5 h-5 border-2 rounded mr-3 items-center justify-center ${saveConfig ? 'bg-blue-600 border-blue-600' : 'border-gray-300 bg-white'
+                                }`}>
+                                {saveConfig && (
+                                    <ThemedText className="text-white text-xs">✓</ThemedText>
+                                )}
+                            </View>
+                            <ThemedText className="text-sm flex-1">
+                                Save this WiFi configuration for future use
+                            </ThemedText>
+                        </TouchableOpacity>
+                    )}
+
                     {/* Action Buttons */}
                     <View className="flex-row space-x-2 mt-4">
                         <Button
@@ -327,10 +529,10 @@ export function BleProvisioning() {
                         </Button>
                         <Button
                             onPress={handleProvision}
-                            disabled={!wifiSSID}
+                            disabled={!wifiSSID || provisioning.isProvisioning}
                             className="flex-1"
                         >
-                            <Text>Provision Device</Text>
+                            <Text>{provisioning.isProvisioning ? 'Provisioning...' : 'Provision Device'}</Text>
                         </Button>
                     </View>
                 </View>
@@ -409,9 +611,9 @@ export function BleProvisioning() {
                         <View key={item.step} className="items-center flex-1">
                             <View
                                 className={`w-8 h-8 rounded-full items-center justify-center ${step === item.step ||
-                                        (step === ProvisioningStep.PROVISIONING && item.step === ProvisioningStep.CREDENTIALS)
-                                        ? 'bg-blue-500'
-                                        : 'bg-gray-300'
+                                    (step === ProvisioningStep.PROVISIONING && item.step === ProvisioningStep.CREDENTIALS)
+                                    ? 'bg-blue-500'
+                                    : 'bg-gray-300'
                                     }`}
                             >
                                 <Text className="text-white font-bold">{index + 1}</Text>

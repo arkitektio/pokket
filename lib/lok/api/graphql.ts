@@ -23,6 +23,11 @@ export type Scalars = {
   ServiceIdentifier: { input: any; output: any; }
   UnsafeChild: { input: any; output: any; }
   Version: { input: any; output: any; }
+  _Any: { input: any; output: any; }
+};
+
+export type AcceptInviteInput = {
+  token: Scalars['String']['input'];
 };
 
 export type AcknowledgeMessageInput = {
@@ -33,6 +38,12 @@ export type AcknowledgeMessageInput = {
 export type AddItemToStashInput = {
   items: Array<StashItemInput>;
   stash: Scalars['ID']['input'];
+};
+
+export type AddUserToOrganizationInput = {
+  organization: Scalars['ID']['input'];
+  roles: Array<Scalars['String']['input']>;
+  user: Scalars['ID']['input'];
 };
 
 /** An App is the Arkitekt equivalent of a Software Application. It is a collection of `Releases` that can be all part of the same application. E.g the App `Napari` could have the releases `0.1.0` and `0.2.0`. */
@@ -59,6 +70,10 @@ export type AppFilter = {
   search?: InputMaybe<Scalars['String']['input']>;
 };
 
+export type CancelInviteInput = {
+  id: Scalars['ID']['input'];
+};
+
 /**
  * A client is a way of authenticating users with a release.
  *  The strategy of authentication is defined by the kind of client. And allows for different authentication flow.
@@ -68,6 +83,8 @@ export type AppFilter = {
 export type Client = {
   __typename?: 'Client';
   id: Scalars['ID']['output'];
+  /** The issue url of the client. This is the url where users can report issues and get more information about the client. */
+  issueUrl?: Maybe<Scalars['String']['output']>;
   /** The configuration of the client. This is the configuration that will be sent to the client. It should never contain sensitive information. */
   kind: ClientKind;
   /** The logo of the release. This should be a url to a logo that can be used to represent the release. */
@@ -76,10 +93,14 @@ export type Client = {
   mappings: Array<ServiceInstanceMapping>;
   /** The name of the client. This is a human readable name of the client. */
   name: Scalars['String']['output'];
+  /** The node this runs on */
+  node?: Maybe<ComputeNode>;
   /** The real oauth2 client that is used to authenticate users with this client. */
   oauth2Client: Oauth2Client;
   /** Is this client public? If a client is public  */
   public: Scalars['Boolean']['output'];
+  /** The public sources of the client. These are the public sources where users can find more information about the client. */
+  publicSources: Array<PublicSource>;
   /** The release that this client belongs to. */
   release: Release;
   /** The user that manages this release. */
@@ -90,7 +111,7 @@ export type Client = {
   user?: Maybe<User>;
 };
 
-/** Client(id, name, release, oauth2_client, kind, user, organization, redirect_uris, public, token, tenant, created_at, requirements_hash, logo) */
+/** Client(id, name, release, oauth2_client, kind, user, organization, redirect_uris, public, token, node, public_sources, tenant, created_at, requirements_hash, logo) */
 export type ClientFilter = {
   AND?: InputMaybe<ClientFilter>;
   DISTINCT?: InputMaybe<Scalars['Boolean']['input']>;
@@ -175,6 +196,32 @@ export type Communication = {
   channel: Scalars['ID']['output'];
 };
 
+/** ComputeNode(id, node_id, name, organization) */
+export type ComputeNode = {
+  __typename?: 'ComputeNode';
+  clients: Array<Client>;
+  id: Scalars['ID']['output'];
+  name?: Maybe<Scalars['String']['output']>;
+  nodeId: Scalars['ID']['output'];
+};
+
+
+/** ComputeNode(id, node_id, name, organization) */
+export type ComputeNodeClientsArgs = {
+  filters?: InputMaybe<ClientFilter>;
+  pagination?: InputMaybe<OffsetPaginationInput>;
+};
+
+/** ComputeNode(id, node_id, name, organization) */
+export type ComputeNodeFilter = {
+  AND?: InputMaybe<ComputeNodeFilter>;
+  DISTINCT?: InputMaybe<Scalars['Boolean']['input']>;
+  NOT?: InputMaybe<ComputeNodeFilter>;
+  OR?: InputMaybe<ComputeNodeFilter>;
+  ids?: InputMaybe<Array<Scalars['ID']['input']>>;
+  search?: InputMaybe<Scalars['String']['input']>;
+};
+
 export type Context = {
   __typename?: 'Context';
   /** Are we acting in the active organization of the user? */
@@ -203,6 +250,12 @@ export type CreateGroupProfileInput = {
   name: Scalars['String']['input'];
 };
 
+export type CreateInviteInput = {
+  expiresInDays?: InputMaybe<Scalars['Int']['input']>;
+  organization?: InputMaybe<Scalars['ID']['input']>;
+  roles?: InputMaybe<Array<Scalars['String']['input']>>;
+};
+
 export type CreateProfileInput = {
   name: Scalars['String']['input'];
   user: Scalars['ID']['input'];
@@ -224,6 +277,10 @@ export type CreateStashInput = {
 
 export type CreateUserInput = {
   name: Scalars['String']['input'];
+};
+
+export type DeclineInviteInput = {
+  token: Scalars['String']['input'];
 };
 
 export type DeleteStashInput = {
@@ -263,13 +320,21 @@ export type DevelopmentClientInput = {
   composition?: InputMaybe<Scalars['ID']['input']>;
   layers?: InputMaybe<Array<Scalars['String']['input']>>;
   manifest: ManifestInput;
-  requirements?: Array<Requirement>;
 };
 
 export type DjangoModelType = {
   __typename?: 'DjangoModelType';
   pk: Scalars['ID']['output'];
 };
+
+export enum Granularity {
+  Day = 'DAY',
+  Hour = 'HOUR',
+  Month = 'MONTH',
+  Quarter = 'QUARTER',
+  Week = 'WEEK',
+  Year = 'YEAR'
+}
 
 /**
  *
@@ -339,6 +404,34 @@ export type InstanceAlias = {
   ssl: Scalars['Boolean']['output'];
 };
 
+/** A single-use magic invite link that allows one person to join an organization. */
+export type Invite = {
+  __typename?: 'Invite';
+  acceptedBy?: Maybe<User>;
+  createdAt: Scalars['DateTime']['output'];
+  createdBy: User;
+  createdFor: Organization;
+  declinedBy?: Maybe<User>;
+  email?: Maybe<Scalars['String']['output']>;
+  expiresAt?: Maybe<Scalars['DateTime']['output']>;
+  id: Scalars['ID']['output'];
+  /** Get the full URL for accepting this invite */
+  inviteUrl: Scalars['String']['output'];
+  respondedAt?: Maybe<Scalars['DateTime']['output']>;
+  roles: Array<Role>;
+  status: Scalars['String']['output'];
+  token: Scalars['String']['output'];
+  /** Check if the invite is still valid and pending */
+  valid: Scalars['Boolean']['output'];
+};
+
+
+/** A single-use magic invite link that allows one person to join an organization. */
+export type InviteRolesArgs = {
+  filters?: InputMaybe<RoleFilter>;
+  pagination?: InputMaybe<OffsetPaginationInput>;
+};
+
 /** A Service is a Webservice that a Client might want to access. It is not the configured instance of the service, but the service itself. */
 export type Layer = {
   __typename?: 'Layer';
@@ -395,11 +488,19 @@ export type LinkingRequestInput = {
 export type ManifestInput = {
   identifier: Scalars['String']['input'];
   logo?: InputMaybe<Scalars['String']['input']>;
+  nodeId?: InputMaybe<Scalars['String']['input']>;
+  publicSources?: InputMaybe<Array<PublicSourceInput>>;
+  requirements?: Array<Requirement>;
   scopes?: Array<Scalars['String']['input']>;
   version: Scalars['String']['input'];
 };
 
-/** MediaStore(id, path, key, bucket, populated, s3store_ptr) */
+/**
+ * Small helper around S3-backed stored objects.
+ *
+ * Provides convenience helpers for generating presigned URLs and
+ * uploading content.
+ */
 export type MediaStore = {
   __typename?: 'MediaStore';
   bucket: Scalars['String']['output'];
@@ -411,7 +512,12 @@ export type MediaStore = {
 };
 
 
-/** MediaStore(id, path, key, bucket, populated, s3store_ptr) */
+/**
+ * Small helper around S3-backed stored objects.
+ *
+ * Provides convenience helpers for generating presigned URLs and
+ * uploading content.
+ */
 export type MediaStorePresignedUrlArgs = {
   host?: InputMaybe<Scalars['String']['input']>;
 };
@@ -466,18 +572,24 @@ export type MentionDescendant = Descendant & {
 
 export type Mutation = {
   __typename?: 'Mutation';
+  acceptInvite: Membership;
   acknowledgeMessage: SystemMessage;
   /** Add items to a stash */
   addItemsToStash: Array<StashItem>;
+  addUserToOrganization: Membership;
+  cancelInvite: Invite;
   createComment: Comment;
   createDevelopmentalClient: Client;
   createGroupProfile: GroupProfile;
   createInstanceAlias: InstanceAlias;
+  createInvite: Invite;
   createProfile: Profile;
+  createRedeemToken: RedeemToken;
   createServiceInstance: ServiceInstance;
   /** Create a new stash */
   createStash: Stash;
   createUser: User;
+  declineInvite: Invite;
   deleteStash: Scalars['ID']['output'];
   /** Delete items from a stash */
   deleteStashItems: Array<Scalars['ID']['output']>;
@@ -487,12 +599,19 @@ export type Mutation = {
   replyTo: Comment;
   requestMediaUpload: PresignedPostCredentials;
   resolveComment: Comment;
+  updateComputeNode: ComputeNode;
   updateGroupProfile: GroupProfile;
   updateInstanceAlias: InstanceAlias;
+  updateOrganization: Organization;
   updateProfile: Profile;
   updateServiceInstance: ServiceInstance;
   /** Update a stash */
   updateStash: Stash;
+};
+
+
+export type MutationAcceptInviteArgs = {
+  input: AcceptInviteInput;
 };
 
 
@@ -503,6 +622,16 @@ export type MutationAcknowledgeMessageArgs = {
 
 export type MutationAddItemsToStashArgs = {
   input: AddItemToStashInput;
+};
+
+
+export type MutationAddUserToOrganizationArgs = {
+  input: AddUserToOrganizationInput;
+};
+
+
+export type MutationCancelInviteArgs = {
+  input: CancelInviteInput;
 };
 
 
@@ -526,8 +655,18 @@ export type MutationCreateInstanceAliasArgs = {
 };
 
 
+export type MutationCreateInviteArgs = {
+  input: CreateInviteInput;
+};
+
+
 export type MutationCreateProfileArgs = {
   input: CreateProfileInput;
+};
+
+
+export type MutationCreateRedeemTokenArgs = {
+  input: RedeemTokenInput;
 };
 
 
@@ -543,6 +682,11 @@ export type MutationCreateStashArgs = {
 
 export type MutationCreateUserArgs = {
   input: CreateUserInput;
+};
+
+
+export type MutationDeclineInviteArgs = {
+  input: DeclineInviteInput;
 };
 
 
@@ -586,6 +730,11 @@ export type MutationResolveCommentArgs = {
 };
 
 
+export type MutationUpdateComputeNodeArgs = {
+  input: UpdateComputeNodeInput;
+};
+
+
 export type MutationUpdateGroupProfileArgs = {
   input: UpdateGroupProfileInput;
 };
@@ -593,6 +742,11 @@ export type MutationUpdateGroupProfileArgs = {
 
 export type MutationUpdateInstanceAliasArgs = {
   input: UpdateServiceInstanceInput;
+};
+
+
+export type MutationUpdateOrganizationArgs = {
+  input: UpdateOrganizationInput;
 };
 
 
@@ -612,7 +766,7 @@ export type MutationUpdateStashArgs = {
 
 export type NotifyUserInput = {
   message: Scalars['String']['input'];
-  title: Scalars['String']['input'];
+  title?: InputMaybe<Scalars['String']['input']>;
   user: Scalars['ID']['input'];
 };
 
@@ -633,12 +787,18 @@ export type Organization = {
   __typename?: 'Organization';
   /** The users that are currently active in the organization */
   activeUsers: Array<User>;
+  /** The logo of the organization */
+  avatar?: Maybe<MediaStore>;
   /** A short description of the organization */
   description?: Maybe<Scalars['String']['output']>;
   id: Scalars['ID']['output'];
-  /** The logo of the organization */
-  logo?: Maybe<MediaStore>;
+  /** the invites for this organization */
+  invites: Array<Invite>;
+  /** the memberships of people */
+  memberships: Array<Membership>;
+  /** The name of this organization */
   name: Scalars['String']['output'];
+  profile: OrganizationProfile;
   /** The roles that are available in the organization */
   roles: Array<Role>;
   slug: Scalars['String']['output'];
@@ -650,6 +810,20 @@ export type Organization = {
 /** An Organization is a group of users that can work together on a project. */
 export type OrganizationActiveUsersArgs = {
   filters?: InputMaybe<UserFilter>;
+  pagination?: InputMaybe<OffsetPaginationInput>;
+};
+
+
+/** An Organization is a group of users that can work together on a project. */
+export type OrganizationInvitesArgs = {
+  filters?: InputMaybe<OrganizationFilter>;
+  pagination?: InputMaybe<OffsetPaginationInput>;
+};
+
+
+/** An Organization is a group of users that can work together on a project. */
+export type OrganizationMembershipsArgs = {
+  filters?: InputMaybe<MembershipFilter>;
   pagination?: InputMaybe<OffsetPaginationInput>;
 };
 
@@ -669,6 +843,23 @@ export type OrganizationFilter = {
   ids?: InputMaybe<Array<Scalars['ID']['input']>>;
   name?: InputMaybe<StrFilterLookup>;
   search?: InputMaybe<Scalars['String']['input']>;
+};
+
+/**
+ *
+ * A Profile of a User. A Profile can be used to display personalied information about a user.
+ *
+ *
+ */
+export type OrganizationProfile = {
+  __typename?: 'OrganizationProfile';
+  /** The avatar of the user */
+  avatar?: Maybe<MediaStore>;
+  /** A short bio of the user */
+  bio?: Maybe<Scalars['String']['output']>;
+  id: Scalars['ID']['output'];
+  /** The name of the user */
+  name?: Maybe<Scalars['String']['output']>;
 };
 
 /** A Paragraph of text */
@@ -712,8 +903,27 @@ export type Profile = {
   name?: Maybe<Scalars['String']['output']>;
 };
 
+export type PublicSource = {
+  __typename?: 'PublicSource';
+  /** The kind of the public source. E.g. 'github' */
+  kind: Scalars['String']['output'];
+  /** The url of the public source */
+  url: Scalars['String']['output'];
+};
+
+export type PublicSourceInput = {
+  kind: PublicSourceKind;
+  url: Scalars['String']['input'];
+};
+
+export enum PublicSourceKind {
+  Github = 'GITHUB',
+  Website = 'WEBSITE'
+}
+
 export type Query = {
   __typename?: 'Query';
+  _service: _Service;
   app: App;
   apps: Array<App>;
   client: Client;
@@ -721,9 +931,12 @@ export type Query = {
   comment: Comment;
   comments: Array<Comment>;
   commentsFor: Array<Comment>;
+  computeNode: ComputeNode;
+  computeNodes: Array<ComputeNode>;
   group: Group;
   groups: Array<Group>;
   hallo: Scalars['String']['output'];
+  invites: Array<Invite>;
   layer: Layer;
   layers: Array<Layer>;
   me: User;
@@ -731,12 +944,18 @@ export type Query = {
   myActiveMessages: Array<SystemMessage>;
   myManagedClients: Client;
   myMentions: Array<Comment>;
+  myRedeemTokens: Array<RedeemToken>;
   myStashes: Array<Stash>;
   mycontext: Context;
   mygroups: Array<Group>;
+  organization: Organization;
+  organizations: Array<Organization>;
+  redeemToken: RedeemToken;
   redeemTokens: Array<RedeemToken>;
   release: Release;
   releases: Array<Release>;
+  role: Role;
+  roles: Array<Role>;
   scopes: Array<Scope>;
   service: Service;
   serviceInstance: ServiceInstance;
@@ -747,6 +966,7 @@ export type Query = {
   stashItems: Array<StashItem>;
   stashes: Array<Stash>;
   user: User;
+  userStats: UserStats;
   users: Array<User>;
 };
 
@@ -787,6 +1007,17 @@ export type QueryCommentsForArgs = {
 };
 
 
+export type QueryComputeNodeArgs = {
+  id: Scalars['ID']['input'];
+};
+
+
+export type QueryComputeNodesArgs = {
+  filters?: InputMaybe<ComputeNodeFilter>;
+  pagination?: InputMaybe<OffsetPaginationInput>;
+};
+
+
 export type QueryGroupArgs = {
   id: Scalars['ID']['input'];
 };
@@ -794,6 +1025,12 @@ export type QueryGroupArgs = {
 
 export type QueryGroupsArgs = {
   filters?: InputMaybe<GroupFilter>;
+  pagination?: InputMaybe<OffsetPaginationInput>;
+};
+
+
+export type QueryInvitesArgs = {
+  filters?: InputMaybe<OrganizationFilter>;
   pagination?: InputMaybe<OffsetPaginationInput>;
 };
 
@@ -819,6 +1056,22 @@ export type QueryMyManagedClientsArgs = {
 };
 
 
+export type QueryOrganizationArgs = {
+  id: Scalars['ID']['input'];
+};
+
+
+export type QueryOrganizationsArgs = {
+  filters?: InputMaybe<OrganizationFilter>;
+  pagination?: InputMaybe<OffsetPaginationInput>;
+};
+
+
+export type QueryRedeemTokenArgs = {
+  id: Scalars['ID']['input'];
+};
+
+
 export type QueryRedeemTokensArgs = {
   filters?: InputMaybe<RedeemTokenFilter>;
   pagination?: InputMaybe<OffsetPaginationInput>;
@@ -830,6 +1083,17 @@ export type QueryReleaseArgs = {
   id?: InputMaybe<Scalars['ID']['input']>;
   identifier?: InputMaybe<Scalars['AppIdentifier']['input']>;
   version?: InputMaybe<Scalars['Version']['input']>;
+};
+
+
+export type QueryRoleArgs = {
+  id: Scalars['ID']['input'];
+};
+
+
+export type QueryRolesArgs = {
+  filters?: InputMaybe<RoleFilter>;
+  pagination?: InputMaybe<OffsetPaginationInput>;
 };
 
 
@@ -882,6 +1146,11 @@ export type QueryUserArgs = {
 };
 
 
+export type QueryUserStatsArgs = {
+  filters?: InputMaybe<UserFilter>;
+};
+
+
 export type QueryUsersArgs = {
   filters?: InputMaybe<UserFilter>;
   pagination?: InputMaybe<OffsetPaginationInput>;
@@ -919,6 +1188,10 @@ export type RedeemTokenFilter = {
   OR?: InputMaybe<RedeemTokenFilter>;
   ids?: InputMaybe<Array<Scalars['ID']['input']>>;
   search?: InputMaybe<Scalars['String']['input']>;
+};
+
+export type RedeemTokenInput = {
+  token?: InputMaybe<Scalars['String']['input']>;
 };
 
 export type RegisterComChannelInput = {
@@ -985,6 +1258,7 @@ export type ResolveCommentInput = {
 /** A Role is a set of permissions that can be assigned to a user. It is used to define what a user can do in the system. */
 export type Role = {
   __typename?: 'Role';
+  description: Scalars['String']['output'];
   id: Scalars['ID']['output'];
   identifier: Scalars['String']['output'];
   organization: Organization;
@@ -1245,10 +1519,34 @@ export type SystemMessage = {
   user: User;
 };
 
+export type TimeBucket = {
+  __typename?: 'TimeBucket';
+  avg?: Maybe<Scalars['Float']['output']>;
+  count: Scalars['Int']['output'];
+  distinctCount: Scalars['Int']['output'];
+  max?: Maybe<Scalars['Float']['output']>;
+  min?: Maybe<Scalars['Float']['output']>;
+  sum?: Maybe<Scalars['Float']['output']>;
+  ts: Scalars['DateTime']['output'];
+};
+
+export type UpdateComputeNodeInput = {
+  id: Scalars['ID']['input'];
+  name?: InputMaybe<Scalars['String']['input']>;
+};
+
 export type UpdateGroupProfileInput = {
   avatar: Scalars['ID']['input'];
   id: Scalars['ID']['input'];
   name: Scalars['String']['input'];
+};
+
+export type UpdateOrganizationInput = {
+  avatar?: InputMaybe<Scalars['ID']['input']>;
+  description?: InputMaybe<Scalars['String']['input']>;
+  id: Scalars['ID']['input'];
+  name?: InputMaybe<Scalars['String']['input']>;
+  slug?: InputMaybe<Scalars['String']['input']>;
 };
 
 export type UpdateProfileInput = {
@@ -1360,6 +1658,11 @@ export type UserMembershipsArgs = {
   pagination?: InputMaybe<OffsetPaginationInput>;
 };
 
+/** Numeric/aggregatable fields of User */
+export enum UserField {
+  CreatedAt = 'CREATED_AT'
+}
+
 /**
  * A User of the System
  *
@@ -1375,6 +1678,66 @@ export type UserFilter = {
   search?: InputMaybe<Scalars['String']['input']>;
   /** Required. 150 characters or fewer. Letters, digits and @/./+/-/_ only. */
   username?: InputMaybe<StrFilterLookup>;
+};
+
+export type UserStats = {
+  __typename?: 'UserStats';
+  /** Average */
+  avg?: Maybe<Scalars['Float']['output']>;
+  /** Total number of items in the selection */
+  count: Scalars['Int']['output'];
+  /** Number of distinct values for the field */
+  distinctCount: Scalars['Int']['output'];
+  /** Maximum */
+  max?: Maybe<Scalars['Float']['output']>;
+  /** Minimum */
+  min?: Maybe<Scalars['Float']['output']>;
+  /** Time-bucketed stats over a datetime field. */
+  series: Array<TimeBucket>;
+  /** Sum */
+  sum?: Maybe<Scalars['Float']['output']>;
+};
+
+
+export type UserStatsAvgArgs = {
+  field: UserField;
+};
+
+
+export type UserStatsDistinctCountArgs = {
+  field: UserField;
+};
+
+
+export type UserStatsMaxArgs = {
+  field: UserField;
+};
+
+
+export type UserStatsMinArgs = {
+  field: UserField;
+};
+
+
+export type UserStatsSeriesArgs = {
+  by: Granularity;
+  field: UserField;
+  timestampField: UserTimestampField;
+};
+
+
+export type UserStatsSumArgs = {
+  field: UserField;
+};
+
+/** Datetime fields of User for bucketing */
+export enum UserTimestampField {
+  CreatedAt = 'CREATED_AT'
+}
+
+export type _Service = {
+  __typename?: '_Service';
+  sdl: Scalars['String']['output'];
 };
 
 export type InstanceAliasFragment = { __typename?: 'InstanceAlias', host?: string | null, port?: number | null, ssl: boolean, challenge: string, kind: string };
@@ -1460,14 +1823,11 @@ export type DetailUserFragment = { __typename?: 'User', id: string, username: st
 export type MeUserFragment = { __typename?: 'User', id: string, username: string, email?: string | null, firstName?: string | null, lastName?: string | null, avatar?: string | null };
 
 export type CreateClientMutationVariables = Exact<{
-  identifier: Scalars['String']['input'];
-  version: Scalars['String']['input'];
-  scopes: Array<Scalars['String']['input']> | Scalars['String']['input'];
-  logo?: InputMaybe<Scalars['String']['input']>;
+  input: DevelopmentClientInput;
 }>;
 
 
-export type CreateClientMutation = { __typename?: 'Mutation', createDevelopmentalClient: { __typename?: 'Client', id: string } };
+export type CreateClientMutation = { __typename?: 'Mutation', createDevelopmentalClient: { __typename?: 'Client', id: string, token: string } };
 
 export type RegisterComChannelMutationVariables = Exact<{
   input: RegisterComChannelInput;
@@ -1542,6 +1902,13 @@ export type UpdateUserProfileMutationVariables = Exact<{
 
 
 export type UpdateUserProfileMutation = { __typename?: 'Mutation', updateProfile: { __typename?: 'Profile', id: string, name?: string | null, avatar?: { __typename?: 'MediaStore', presignedUrl: string } | null } };
+
+export type CreateRedeemTokenMutationVariables = Exact<{
+  input: RedeemTokenInput;
+}>;
+
+
+export type CreateRedeemTokenMutation = { __typename?: 'Mutation', createRedeemToken: { __typename?: 'RedeemToken', id: string, token: string } };
 
 export type CreateStashMutationVariables = Exact<{
   name?: InputMaybe<Scalars['String']['input']>;
@@ -2383,11 +2750,10 @@ export const MeUserFragmentDoc = gql`
 }
     `;
 export const CreateClientDocument = gql`
-    mutation CreateClient($identifier: String!, $version: String!, $scopes: [String!]!, $logo: String) {
-  createDevelopmentalClient(
-    input: {manifest: {identifier: $identifier, version: $version, scopes: $scopes, logo: $logo}}
-  ) {
+    mutation CreateClient($input: DevelopmentClientInput!) {
+  createDevelopmentalClient(input: $input) {
     id
+    token
   }
 }
     `;
@@ -2406,10 +2772,7 @@ export type CreateClientMutationFn = Apollo.MutationFunction<CreateClientMutatio
  * @example
  * const [createClientMutation, { data, loading, error }] = useCreateClientMutation({
  *   variables: {
- *      identifier: // value for 'identifier'
- *      version: // value for 'version'
- *      scopes: // value for 'scopes'
- *      logo: // value for 'logo'
+ *      input: // value for 'input'
  *   },
  * });
  */
@@ -2759,6 +3122,40 @@ export function useUpdateUserProfileMutation(baseOptions?: ApolloReactHooks.Muta
 export type UpdateUserProfileMutationHookResult = ReturnType<typeof useUpdateUserProfileMutation>;
 export type UpdateUserProfileMutationResult = Apollo.MutationResult<UpdateUserProfileMutation>;
 export type UpdateUserProfileMutationOptions = Apollo.BaseMutationOptions<UpdateUserProfileMutation, UpdateUserProfileMutationVariables>;
+export const CreateRedeemTokenDocument = gql`
+    mutation CreateRedeemToken($input: RedeemTokenInput!) {
+  createRedeemToken(input: $input) {
+    id
+    token
+  }
+}
+    `;
+export type CreateRedeemTokenMutationFn = Apollo.MutationFunction<CreateRedeemTokenMutation, CreateRedeemTokenMutationVariables>;
+
+/**
+ * __useCreateRedeemTokenMutation__
+ *
+ * To run a mutation, you first call `useCreateRedeemTokenMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useCreateRedeemTokenMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [createRedeemTokenMutation, { data, loading, error }] = useCreateRedeemTokenMutation({
+ *   variables: {
+ *      input: // value for 'input'
+ *   },
+ * });
+ */
+export function useCreateRedeemTokenMutation(baseOptions?: ApolloReactHooks.MutationHookOptions<CreateRedeemTokenMutation, CreateRedeemTokenMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return ApolloReactHooks.useMutation<CreateRedeemTokenMutation, CreateRedeemTokenMutationVariables>(CreateRedeemTokenDocument, options);
+      }
+export type CreateRedeemTokenMutationHookResult = ReturnType<typeof useCreateRedeemTokenMutation>;
+export type CreateRedeemTokenMutationResult = Apollo.MutationResult<CreateRedeemTokenMutation>;
+export type CreateRedeemTokenMutationOptions = Apollo.BaseMutationOptions<CreateRedeemTokenMutation, CreateRedeemTokenMutationVariables>;
 export const CreateStashDocument = gql`
     mutation CreateStash($name: String, $description: String = "") {
   createStash(input: {name: $name, description: $description}) {
