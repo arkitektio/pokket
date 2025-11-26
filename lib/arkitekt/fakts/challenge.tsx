@@ -47,6 +47,8 @@ export const challenge = async ({
           return json.token;
         case "error":
           throw new Error(json.message || "Challenge failed");
+        case "denied":
+          throw new Error("Challenge denied by user");
         default:
           if (json.challenge) return json.challenge;
           throw new Error("Malformed response");
@@ -64,6 +66,7 @@ export const challenge = async ({
     }
   } catch (e) {
     if ((e as Error).message === "User Cancelled") throw e;
+    if ((e as Error).message === "Challenge denied by user") throw e;
     await new Promise((r) => setTimeout(r, 1000));
     return challenge({
       endpoint,

@@ -51,7 +51,7 @@ export const AppLayout = () => {
         <Stack.Screen name="(tabs)" />
       </Stack.Protected>
       <Stack.Protected guard={!isLoggedIn} >
-        <Stack.Screen name="login" />
+        <Stack.Screen name="login" options={{ headerShown: false }} />
       </Stack.Protected>
     </Stack>
   );
