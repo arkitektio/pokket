@@ -5,6 +5,8 @@ import {
     BASE_URL_UUID,
     buildBaseURLPayload,
     buildFaktsTokenPayload,
+    buildWifiAnonymousIdentityPayload,
+    buildWifiIdentityPayload,
     buildWifiPasswordPayload,
     buildWifiSSIDPayload,
     FAKTS_TOKEN_UUID,
@@ -12,6 +14,8 @@ import {
     parseManifest,
     parseStatus,
     STATUS_UUID,
+    WIFI_ANONYMOUS_IDENTITY_UUID,
+    WIFI_IDENTITY_UUID,
     WIFI_PASSWORD_UUID,
     WIFI_SSID_UUID,
 } from './improvProtocol';
@@ -28,6 +32,8 @@ export interface DeviceManifest {
 export interface ProvisioningConfig {
   ssid: string;
   password: string;
+  identity?: string;
+  anonymousIdentity?: string;
   arkitektToken?: string;
   displayName?: string;
   baseUrl?: string;
@@ -243,6 +249,30 @@ export function useImprovProvisioning(): UseImprovProvisioningResult {
         WIFI_PASSWORD_UUID,
         passwordPayload
       );
+
+      // Step 4.5: Write WiFi Identity (if provided)
+      if (config.identity) {
+        setStatus('Sending WiFi identity...');
+        const identityPayload = buildWifiIdentityPayload(config.identity);
+        await writeCharacteristic(
+          deviceId,
+          ARKITEKT_SERVICE_UUID,
+          WIFI_IDENTITY_UUID,
+          identityPayload
+        );
+      }
+
+      // Step 4.6: Write WiFi Anonymous Identity (if provided)
+      if (config.anonymousIdentity) {
+        setStatus('Sending WiFi anonymous identity...');
+        const anonymousIdentityPayload = buildWifiAnonymousIdentityPayload(config.anonymousIdentity);
+        await writeCharacteristic(
+          deviceId,
+          ARKITEKT_SERVICE_UUID,
+          WIFI_ANONYMOUS_IDENTITY_UUID,
+          anonymousIdentityPayload
+        );
+      }
 
       // Step 5: Write Base URL (if provided)
       if (config.baseUrl) {

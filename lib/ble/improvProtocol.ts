@@ -13,6 +13,8 @@ export const BASE_URL_UUID = 'beb5483e-36e1-4688-b7f5-ea07361b26aa';
 export const FAKTS_TOKEN_UUID = 'beb5483e-36e1-4688-b7f5-ea07361b26ab';
 export const STATUS_UUID = 'beb5483e-36e1-4688-b7f5-ea07361b26ac';
 export const MANIFEST_UUID = 'beb5483e-36e1-4688-b7f5-ea07361b26ad';
+export const WIFI_IDENTITY_UUID = 'beb5483e-36e1-4688-b7f5-ea07361b26ae';
+export const WIFI_ANONYMOUS_IDENTITY_UUID = 'beb5483e-36e1-4688-b7f5-ea07361b26af';
 
 // Legacy aliases for backward compatibility
 export const REDEEM_TOKEN_UUID = FAKTS_TOKEN_UUID;
@@ -85,6 +87,20 @@ export function buildRedeemTokenPayload(token: string): string {
  */
 export function buildArkitektTokenPayload(token: string): string {
   return buildFaktsTokenPayload(token);
+}
+
+/**
+ * Build WiFi Identity payload
+ */
+export function buildWifiIdentityPayload(identity: string): string {
+  return btoa(identity);
+}
+
+/**
+ * Build WiFi Anonymous Identity payload
+ */
+export function buildWifiAnonymousIdentityPayload(identity: string): string {
+  return btoa(identity);
 }
 
 /**

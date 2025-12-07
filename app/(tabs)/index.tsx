@@ -6,9 +6,11 @@ import { HelloWave } from '@/components/HelloWave';
 import { Notifier } from '@/components/Notifier';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { Guard } from '@/lib/app/App';
+import { Link } from 'expo-router';
 
 export const NotLoggedInView = () => {
   return (
@@ -44,6 +46,12 @@ export default function HomeScreen() {
             </View>
           </CardContent>
         </Card>
+
+        <Link href="/wifi" asChild>
+          <Button variant="outline" className="mb-4">
+            <Text>Manage Wi-Fi Profiles</Text>
+          </Button>
+        </Link>
 
 
         {/* Info Card */}

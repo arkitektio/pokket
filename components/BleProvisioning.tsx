@@ -2,14 +2,15 @@ import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Text } from '@/components/ui/text';
+import { WifiForm, WifiFormConfig } from '@/components/WifiForm';
+import { useWifiProfiles } from '@/hooks/useWifiProfiles';
 import { App } from '@/lib/app/App';
 import { ARKITEKT_SERVICE_UUID, useBLEScanner, useImprovProvisioning } from '@/lib/ble';
+import { useEduroam } from '@/lib/eduroam/useEduroam';
 import { CreateClientDocument } from '@/lib/lok/api/graphql';
 import { useMutation } from '@/lib/lok/funcs';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, TextInput, TouchableOpacity, View } from 'react-native';
+import React, { useCallback, useState } from 'react';
+import { ActivityIndicator, Alert, ScrollView, Text, TextInput, View } from 'react-native';
 import { Device } from 'react-native-ble-plx';
 
 enum ProvisioningStep {
@@ -30,14 +31,12 @@ enum ProvisioningStep {
 export function BleProvisioning() {
     const [step, setStep] = useState<ProvisioningStep>(ProvisioningStep.SCANNING);
     const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
-    const [wifiSSID, setWifiSSID] = useState('');
-    const [wifiPassword, setWifiPassword] = useState('');
     const [displayName, setDisplayName] = useState('');
     const [baseUrl, setBaseUrl] = useState('');
-    const [showPassword, setShowPassword] = useState(false);
-    const [saveConfig, setSaveConfig] = useState(true);
-    const [savedConfigs, setSavedConfigs] = useState<{ ssid: string, password: string }[]>([]);
-    const [showSavedConfigs, setShowSavedConfigs] = useState(false);
+    
+    // Wifi Config State
+    const [wifiConfig, setWifiConfig] = useState<WifiFormConfig | null>(null);
+    const [isWifiValid, setIsWifiValid] = useState(false);
 
     // Get token from Arkitekt connection
     const token = App.useToken();
@@ -48,63 +47,16 @@ export function BleProvisioning() {
 
     // Provisioning hook
     const provisioning = useImprovProvisioning();
+    
+    // Eduroam hook (still needed for fetching EAP config in handleProvision)
+    const eduroam = useEduroam();
+    
+    // Wifi Profiles hook
+    const { saveProfile } = useWifiProfiles();
 
     // GraphQL mutation to create client and get fakts-token
     const [createClient] = useMutation(CreateClientDocument);
 
-    // Load saved WiFi configurations on mount
-    useEffect(() => {
-        loadSavedConfigs();
-    }, []);
-
-    const loadSavedConfigs = async () => {
-        try {
-            const stored = await AsyncStorage.getItem('wifi_configs');
-            if (stored) {
-                setSavedConfigs(JSON.parse(stored));
-            }
-        } catch (err) {
-            console.error('Failed to load WiFi configs:', err);
-        }
-    };
-
-    const saveWifiConfig = useCallback(async (ssid: string, password: string) => {
-        try {
-            // Check if config already exists
-            const exists = savedConfigs.some(c => c.ssid === ssid);
-            if (exists) {
-                // Update existing
-                const updated = savedConfigs.map(c =>
-                    c.ssid === ssid ? { ssid, password } : c
-                );
-                setSavedConfigs(updated);
-                await AsyncStorage.setItem('wifi_configs', JSON.stringify(updated));
-            } else {
-                // Add new
-                const updated = [...savedConfigs, { ssid, password }];
-                setSavedConfigs(updated);
-                await AsyncStorage.setItem('wifi_configs', JSON.stringify(updated));
-            }
-        } catch (err) {
-            console.error('Failed to save WiFi config:', err);
-        }
-    }, [savedConfigs]);
-
-    const deleteSavedConfig = useCallback(async (ssid: string) => {
-        try {
-            const updated = savedConfigs.filter(c => c.ssid !== ssid);
-            setSavedConfigs(updated);
-            await AsyncStorage.setItem('wifi_configs', JSON.stringify(updated));
-        } catch (err) {
-            console.error('Failed to delete WiFi config:', err);
-        }
-    }, [savedConfigs]);
-
-    const loadSavedConfig = useCallback((config: { ssid: string, password: string }) => {
-        setWifiSSID(config.ssid);
-        setWifiPassword(config.password);
-        setShowSavedConfigs(false);
-    }, []);
 
     const handleStartScan = useCallback(() => {
         scanner.clearDevices();
@@ -138,8 +90,7 @@ export function BleProvisioning() {
     const handleReset = useCallback(() => {
         setStep(ProvisioningStep.SCANNING);
         setSelectedDevice(null);
-        setWifiSSID('');
-        setWifiPassword('');
+        setWifiConfig(null);
         setDisplayName('');
         setBaseUrl('');
         scanner.clearDevices();
@@ -147,8 +98,13 @@ export function BleProvisioning() {
     }, [scanner, provisioning]);
 
     const handleProvision = useCallback(async () => {
-        if (!selectedDevice || !wifiSSID) {
-            Alert.alert('Error', 'Please enter Wi-Fi credentials');
+        if (!selectedDevice) {
+            Alert.alert('Error', 'No device selected');
+            return;
+        }
+
+        if (!wifiConfig || !isWifiValid) {
+            Alert.alert('Error', 'Please enter valid Wi-Fi credentials');
             return;
         }
 
@@ -159,15 +115,38 @@ export function BleProvisioning() {
 
         setStep(ProvisioningStep.PROVISIONING);
 
-        // Save WiFi config if checkbox is checked
-        if (saveConfig && wifiSSID && wifiPassword) {
-            await saveWifiConfig(wifiSSID, wifiPassword);
+        // Save WiFi config if requested
+        if (wifiConfig.save) {
+            await saveProfile({
+                ssid: wifiConfig.ssid,
+                password: wifiConfig.password,
+                type: wifiConfig.type,
+                identity: wifiConfig.identity,
+                anonymousIdentity: wifiConfig.anonymousIdentity,
+                universityId: wifiConfig.university?.id,
+                universityName: wifiConfig.university?.name,
+                universityCountry: wifiConfig.university?.country,
+            });
         }
 
         // Get base URL from fakts or use custom one
         const provisionBaseUrl = 'https://go.arkitekt.live';
 
         try {
+            // Step 0: If Eduroam, fetch EAP config to get anonymous identity if not set
+            let finalAnonymousIdentity = wifiConfig.anonymousIdentity;
+            if (wifiConfig.type === 'eduroam' && wifiConfig.university && !finalAnonymousIdentity) {
+                try {
+                    const eapConfig = await eduroam.fetchEapConfig(wifiConfig.university);
+                    // Try to find anonymous identity in the config
+                    if (eapConfig?.EAPIdentityProvider?.AuthenticationMethods?.AuthenticationMethod?.ClientSideCredential?.OuterIdentity) {
+                        finalAnonymousIdentity = eapConfig.EAPIdentityProvider.AuthenticationMethods.AuthenticationMethod.ClientSideCredential.OuterIdentity;
+                    }
+                } catch (e) {
+                    console.warn('Failed to fetch EAP config, proceeding without anonymous identity', e);
+                }
+            }
+
             // Step 1: Create a client with the device manifest to get fakts-token
             const deviceName = displayName || selectedDevice?.name || 'Unnamed Device';
             const manifest = await provisioning.getManifest(selectedDevice.id);
@@ -193,11 +172,13 @@ export function BleProvisioning() {
 
             // Step 2: Provision device with WiFi and fakts-token
             await provisioning.provision(selectedDevice.id, {
-                ssid: wifiSSID,
-                password: wifiPassword,
+                ssid: wifiConfig.ssid,
+                password: wifiConfig.password || '',
                 arkitektToken: faktsToken,
                 displayName: deviceName,
                 baseUrl: provisionBaseUrl,
+                identity: wifiConfig.identity,
+                anonymousIdentity: finalAnonymousIdentity,
             });
 
             setStep(ProvisioningStep.COMPLETE);
@@ -224,7 +205,7 @@ export function BleProvisioning() {
                 [{ text: 'Try Again' }]
             );
         }
-    }, [selectedDevice, wifiSSID, wifiPassword, displayName, baseUrl, fakts, token, provisioning, createClient, handleReset, saveConfig, saveWifiConfig]);
+    }, [selectedDevice, wifiConfig, isWifiValid, displayName, baseUrl, fakts, token, provisioning, createClient, handleReset, saveProfile, eduroam]);
 
     const renderScanningStep = () => (
         <Card className="mb-4">
@@ -383,105 +364,13 @@ export function BleProvisioning() {
                         </ThemedText>
                     </View>
 
-                    {/* SSID Input */}
-                    <View>
-                        <View className="flex-row justify-between items-center mb-2">
-                            <ThemedText className="font-medium">Network Name (SSID)</ThemedText>
-                            {savedConfigs.length > 0 && (
-                                <Button
-                                    variant="ghost"
-                                    onPress={() => setShowSavedConfigs(!showSavedConfigs)}
-                                    className="py-1"
-                                >
-                                    <Text className="text-xs text-blue-600">
-                                        {showSavedConfigs ? 'Hide' : `Saved (${savedConfigs.length})`}
-                                    </Text>
-                                </Button>
-                            )}
-                        </View>
-
-                        {showSavedConfigs && savedConfigs.length > 0 && (
-                            <View className="mb-2 border border-gray-200 rounded-lg bg-gray-50">
-                                {savedConfigs.map((config, index) => (
-                                    <TouchableOpacity
-                                        key={index}
-                                        onPress={() => loadSavedConfig(config)}
-                                        className="flex-row justify-between items-center p-3 border-b border-gray-200"
-                                    >
-                                        <View className="flex-1">
-                                            <ThemedText className="font-medium">{config.ssid}</ThemedText>
-                                            <ThemedText className="text-xs text-gray-500">••••••••</ThemedText>
-                                        </View>
-                                        <View className="flex-row space-x-2">
-                                            <Button
-                                                variant="ghost"
-                                                onPress={(e) => {
-                                                    e?.stopPropagation();
-                                                    loadSavedConfig(config);
-                                                }}
-                                                className="py-1 px-2"
-                                            >
-                                                <Text className="text-xs text-blue-600">Use</Text>
-                                            </Button>
-                                            <Button
-                                                variant="ghost"
-                                                onPress={(e) => {
-                                                    e?.stopPropagation();
-                                                    Alert.alert(
-                                                        'Delete Configuration',
-                                                        `Remove saved WiFi config for ${config.ssid}?`,
-                                                        [
-                                                            { text: 'Cancel', style: 'cancel' },
-                                                            {
-                                                                text: 'Delete',
-                                                                style: 'destructive',
-                                                                onPress: () => deleteSavedConfig(config.ssid)
-                                                            }
-                                                        ]
-                                                    );
-                                                }}
-                                                className="py-1 px-2"
-                                            >
-                                                <Text className="text-xs text-red-600">Delete</Text>
-                                            </Button>
-                                        </View>
-                                    </TouchableOpacity>
-                                ))}
-                            </View>
-                        )}
-
-                        <TextInput
-                            value={wifiSSID}
-                            onChangeText={setWifiSSID}
-                            placeholder="Enter Wi-Fi SSID"
-                            autoCapitalize="none"
-                            autoCorrect={false}
-                            className="border border-gray-300 rounded-lg px-4 py-3 bg-white"
-                        />
-                    </View>
-
-                    {/* Password Input */}
-                    <View>
-                        <ThemedText className="mb-2 font-medium">Password</ThemedText>
-                        <View className="relative">
-                            <TextInput
-                                value={wifiPassword}
-                                onChangeText={setWifiPassword}
-                                placeholder="Enter Wi-Fi password"
-                                secureTextEntry={!showPassword}
-                                autoCapitalize="none"
-                                autoCorrect={false}
-                                className="border border-gray-300 rounded-lg px-4 py-3 bg-white"
-                            />
-                            <Button
-                                variant="ghost"
-                                onPress={() => setShowPassword(!showPassword)}
-                                className="absolute right-2 top-1"
-                            >
-                                <Text className="text-xs">{showPassword ? 'Hide' : 'Show'}</Text>
-                            </Button>
-                        </View>
-                    </View>
+                    {/* Wifi Form */}
+                    <WifiForm 
+                        onConfigChange={(config, isValid) => {
+                            setWifiConfig(config);
+                            setIsWifiValid(isValid);
+                        }}
+                    />
 
                     {/* Token Info */}
                     {token && (
@@ -500,24 +389,6 @@ export function BleProvisioning() {
                         </View>
                     )}
 
-                    {/* Save Configuration Checkbox */}
-                    {wifiSSID && wifiPassword && (
-                        <TouchableOpacity
-                            onPress={() => setSaveConfig(!saveConfig)}
-                            className="flex-row items-center p-3 bg-gray-50 rounded-lg"
-                        >
-                            <View className={`w-5 h-5 border-2 rounded mr-3 items-center justify-center ${saveConfig ? 'bg-blue-600 border-blue-600' : 'border-gray-300 bg-white'
-                                }`}>
-                                {saveConfig && (
-                                    <ThemedText className="text-white text-xs">✓</ThemedText>
-                                )}
-                            </View>
-                            <ThemedText className="text-sm flex-1">
-                                Save this WiFi configuration for future use
-                            </ThemedText>
-                        </TouchableOpacity>
-                    )}
-
                     {/* Action Buttons */}
                     <View className="flex-row space-x-2 mt-4">
                         <Button
@@ -529,7 +400,7 @@ export function BleProvisioning() {
                         </Button>
                         <Button
                             onPress={handleProvision}
-                            disabled={!wifiSSID || provisioning.isProvisioning}
+                            disabled={!isWifiValid || provisioning.isProvisioning}
                             className="flex-1"
                         >
                             <Text>{provisioning.isProvisioning ? 'Provisioning...' : 'Provision Device'}</Text>
