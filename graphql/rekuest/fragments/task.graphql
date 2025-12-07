@@ -4,4 +4,5 @@ fragment Task on Assignation {
     name
   }
   createdAt
+  latestEventKind
 }

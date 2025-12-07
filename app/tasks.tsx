@@ -68,6 +68,9 @@ const TasksList = () => {
                         <ThemedText className="text-xs text-white ">
                             Created: {new Date(item.createdAt).toLocaleString()}
                         </ThemedText>
+                        <ThemedText className="text-xs text-white ">
+                            Latest Event: {item.latestEventKind || 'N/A'}
+                        </ThemedText>
                     </CardContent>
                 </Card>
             )}

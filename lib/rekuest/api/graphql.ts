@@ -3336,7 +3336,7 @@ export type WaiterFilter = {
   instanceId: Scalars['InstanceId']['input'];
 };
 
-export type TaskFragment = { __typename?: 'Assignation', id: string, createdAt: any, action: { __typename?: 'Action', name: string } };
+export type TaskFragment = { __typename?: 'Assignation', id: string, createdAt: any, latestEventKind: AssignationEventKind, action: { __typename?: 'Action', name: string } };
 
 export type TasksQueryVariables = Exact<{
   filters?: InputMaybe<AssignationFilter>;
@@ -3345,7 +3345,7 @@ export type TasksQueryVariables = Exact<{
 }>;
 
 
-export type TasksQuery = { __typename?: 'Query', tasks: Array<{ __typename?: 'Assignation', id: string, createdAt: any, action: { __typename?: 'Action', name: string } }> };
+export type TasksQuery = { __typename?: 'Query', tasks: Array<{ __typename?: 'Assignation', id: string, createdAt: any, latestEventKind: AssignationEventKind, action: { __typename?: 'Action', name: string } }> };
 
 export const TaskFragmentDoc = gql`
     fragment Task on Assignation {
@@ -3354,6 +3354,7 @@ export const TaskFragmentDoc = gql`
     name
   }
   createdAt
+  latestEventKind
 }
     `;
 export const TasksDocument = gql`
