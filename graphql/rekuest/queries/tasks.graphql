@@ -1,0 +1,5 @@
+query Tasks($filters: AssignationFilter, $order: AssignationOrder, $pagination: OffsetPaginationInput) {
+  tasks(filters: $filters, order: $order, pagination: $pagination) {
+    ...Task
+  }
+}

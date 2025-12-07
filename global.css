@@ -31,8 +31,8 @@
     .dark:root {
         --white:0 0% 100%;
         --black: 0 0% 0%;
-        --background: 240 10% 3.9%;
-        --foreground: 0 0% 98%;
+        --background: 0 0% 100%;
+        --foreground: 100 100% 98%;
         --card: 240 10% 3.9%;
         --card-foreground: 0 0% 98%;
         --popover: 240 10% 3.9%;

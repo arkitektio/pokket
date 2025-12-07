@@ -5,6 +5,7 @@ import { buildArkitekt } from "../arkitekt";
 import { kabinetDefinition } from "../kabinet/service";
 import { lokServiceDefinition } from "../lok/service";
 import { mikroServiceDefinition } from "../mikro/service";
+import { rekuestServiceDefinition } from "../rekuest/service";
 
 let asyncStorageProvider = {
   get: async (key: string) => {
@@ -59,6 +60,7 @@ export const App = buildArkitekt({
     mikro: mikroServiceDefinition,
     lok: lokServiceDefinition,
     kabinet: kabinetDefinition,
+    rekuest: rekuestServiceDefinition,
   },
   storageProvider: asyncStorageProvider,
   popper: windowPopper,
@@ -68,10 +70,12 @@ export const App = buildArkitekt({
 export const MikroInner = App.buildServiceGuard("mikro");
 export const LokInner = App.buildServiceGuard("lok");
 export const KabinetInner = App.buildServiceGuard("kabinet");
+export const RekuestInner = App.buildServiceGuard("rekuest");
 
 export const Guard = {
   Mikro: MikroInner,
   Lok: LokInner,
   Kabinet: KabinetInner,
+  Rekuest: RekuestInner,
 };
 

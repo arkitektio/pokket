@@ -76,20 +76,42 @@ export default function LoginScreen() {
     setError('Operation cancelled');
   };
 
-  const advHeight = advAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 64] });
+  const advHeight = advAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 130] });
   const advOpacity = advAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 1] });
 
   return (
-    <ThemedView style={{ flex: 1, backgroundColor: '#000000', position: 'relative' }}>
+    <View className="flex-1 bg-background-900">
       <StatusBar style="light" />
-      <ThemedView className="flex-1 items-center justify-center pt-20 px-6">
-        <ThemedView className="items-center mb-3">
+      <View className="flex-1 items-center justify-center pt-20 px-6 bg-background-900">
+        <View className="items-center mb-3">
           <Image source={require('../assets/images/icon.png')} style={styles.logo} />
-        </ThemedView>
+        </View>
 
         <ThemedText className="text-2xl font-light text-foreground  mb-2">Welcome to Arkitekt</ThemedText>
 
         <ThemedView style={{ marginTop: 10 }} />
+
+        <Animated.View style={[{ height: advHeight, opacity: advOpacity, overflow: 'hidden', width: '80%', marginBottom: advanced ? 1 : 0 }]}>
+            <View style={styles.advInner}>
+            <View style={styles.advHeader}>
+                <TouchableOpacity onPress={() => setAdvanced((s) => !s)}>
+                </TouchableOpacity>
+            </View>
+            <View style={{ marginTop: 8 }}>
+                <TextInput
+                placeholder="https://your-arkitekt.example"
+                value={url}
+                onChangeText={setUrl}
+                ref={(r) => { urlInputRef.current = r; }}
+                style={styles.input}
+                placeholderTextColor="#9ca3af"
+                autoCapitalize="none"
+                keyboardType="url"
+                autoCorrect={false}
+                />
+            </View>
+            </View>
+        </Animated.View>
 
         <View style={styles.connectRow}>
           <TouchableOpacity
@@ -104,42 +126,21 @@ export default function LoginScreen() {
             </View>
           </TouchableOpacity>
         </View>
-        <View style={{ marginTop: 8 }}>
-          <TouchableOpacity onPress={() => setAdvanced(true)} activeOpacity={0.8}>
-            <ThemedText className="text-sm text-indigo-300">Advanced</ThemedText>
-          </TouchableOpacity>
-        </View>
+        
+        {!advanced && (
+            <View style={{ marginTop: 8 }}>
+            <TouchableOpacity onPress={() => setAdvanced(true)} activeOpacity={0.8}>
+                <ThemedText className="text-sm text-indigo-300">Advanced</ThemedText>
+            </TouchableOpacity>
+            </View>
+        )}
+
         {error ? (
           <ThemedText className="text-sm text-red-400 mt-3 text-center">{error}</ThemedText>
         ) : null}
 
-      </ThemedView>
-
-      {/* Bottom advanced collapsible area */}
-      <Animated.View style={[styles.bottomArea, { height: advHeight, opacity: advOpacity }]}>
-        <View style={styles.advInner}>
-          <View style={styles.advHeader}>
-            <ThemedText className="text-sm text-gray-300">{url}</ThemedText>
-            <TouchableOpacity onPress={() => setAdvanced((s) => !s)}>
-              <ThemedText className="text-sm text-indigo-300 ml-4">{advanced ? 'Hide' : 'Advanced'}</ThemedText>
-            </TouchableOpacity>
-          </View>
-          <View style={{ marginTop: 8 }}>
-            <TextInput
-              placeholder="https://your-arkitekt.example"
-              value={url}
-              onChangeText={setUrl}
-              ref={(r) => { urlInputRef.current = r; }}
-              style={styles.input}
-              placeholderTextColor="#9ca3af"
-              autoCapitalize="none"
-              keyboardType="url"
-              autoCorrect={false}
-            />
-          </View>
-        </View>
-      </Animated.View>
-    </ThemedView>
+      </View>
+    </View>
   );
 }
 
