@@ -1,9 +1,9 @@
 import { Tabs } from 'expo-router';
 import React from 'react';
 
-import { Bluetooth } from '@/lib/icons/Bluetooth';
-import { Bug } from '@/lib/icons/Bug';
-import { Sun } from '@/lib/icons/Sun';
+import { SettingsButton } from '@/components/SettingsButton';
+import { Bell } from '@/lib/icons/Bell';
+import { Home } from 'lucide-react-native';
 
 export default function TabLayout() {
 
@@ -12,22 +12,16 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: "Arkitekt",
-          tabBarIcon: ({ color }) => <Sun size={28} color={color} />,
+          title: "Home",
+          tabBarIcon: ({ color }) => <Home size={28} color={color} />,
+          headerRight: () => <SettingsButton />,
         }}
       />
       <Tabs.Screen
-        name="provision"
+        name="notifications"
         options={{
-          title: "Provision",
-          tabBarIcon: ({ color }) => <Bluetooth size={28} color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="debug"
-        options={{
-          title: "Debug",
-          tabBarIcon: ({ color }) => <Bug size={28} color={color} />,
+          title: "Notifications",
+          tabBarIcon: ({ color }) => <Bell size={28} color={color} />,
         }}
       />
     </Tabs>

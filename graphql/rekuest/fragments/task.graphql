@@ -1,0 +1,7 @@
+fragment Task on Assignation {
+  id
+  action {
+    name
+  }
+  createdAt
+}

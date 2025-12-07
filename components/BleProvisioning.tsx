@@ -1,17 +1,16 @@
 import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { WifiForm, WifiFormConfig } from '@/components/WifiForm';
-import { useWifiProfiles } from '@/hooks/useWifiProfiles';
+import { WifiProfile, useWifiProfiles } from '@/hooks/useWifiProfiles';
 import { App } from '@/lib/app/App';
 import { ARKITEKT_SERVICE_UUID, useBLEScanner, useImprovProvisioning } from '@/lib/ble';
-import { useEduroam } from '@/lib/eduroam/useEduroam';
 import { CreateClientDocument } from '@/lib/lok/api/graphql';
 import { useMutation } from '@/lib/lok/funcs';
+import { Link } from 'expo-router';
 import React, { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { Device } from 'react-native-ble-plx';
+import { IconSymbol } from './ui/IconSymbol';
 
 enum ProvisioningStep {
     SCANNING = 'scanning',
@@ -32,15 +31,12 @@ export function BleProvisioning() {
     const [step, setStep] = useState<ProvisioningStep>(ProvisioningStep.SCANNING);
     const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
     const [displayName, setDisplayName] = useState('');
-    const [baseUrl, setBaseUrl] = useState('');
     
     // Wifi Config State
-    const [wifiConfig, setWifiConfig] = useState<WifiFormConfig | null>(null);
-    const [isWifiValid, setIsWifiValid] = useState(false);
+    const [selectedProfile, setSelectedProfile] = useState<WifiProfile | null>(null);
 
     // Get token from Arkitekt connection
     const token = App.useToken();
-    const fakts = App.useFakts();
 
     // Scan for devices with Arkitekt service
     const scanner = useBLEScanner([ARKITEKT_SERVICE_UUID]);
@@ -48,11 +44,8 @@ export function BleProvisioning() {
     // Provisioning hook
     const provisioning = useImprovProvisioning();
     
-    // Eduroam hook (still needed for fetching EAP config in handleProvision)
-    const eduroam = useEduroam();
-    
     // Wifi Profiles hook
-    const { saveProfile } = useWifiProfiles();
+    const { profiles, loading: profilesLoading } = useWifiProfiles();
 
     // GraphQL mutation to create client and get fakts-token
     const [createClient] = useMutation(CreateClientDocument);
@@ -90,9 +83,8 @@ export function BleProvisioning() {
     const handleReset = useCallback(() => {
         setStep(ProvisioningStep.SCANNING);
         setSelectedDevice(null);
-        setWifiConfig(null);
+        setSelectedProfile(null);
         setDisplayName('');
-        setBaseUrl('');
         scanner.clearDevices();
         provisioning.reset();
     }, [scanner, provisioning]);
@@ -103,8 +95,8 @@ export function BleProvisioning() {
             return;
         }
 
-        if (!wifiConfig || !isWifiValid) {
-            Alert.alert('Error', 'Please enter valid Wi-Fi credentials');
+        if (!selectedProfile) {
+            Alert.alert('Error', 'Please select a Wi-Fi profile');
             return;
         }
 
@@ -115,38 +107,13 @@ export function BleProvisioning() {
 
         setStep(ProvisioningStep.PROVISIONING);
 
-        // Save WiFi config if requested
-        if (wifiConfig.save) {
-            await saveProfile({
-                ssid: wifiConfig.ssid,
-                password: wifiConfig.password,
-                type: wifiConfig.type,
-                identity: wifiConfig.identity,
-                anonymousIdentity: wifiConfig.anonymousIdentity,
-                universityId: wifiConfig.university?.id,
-                universityName: wifiConfig.university?.name,
-                universityCountry: wifiConfig.university?.country,
-            });
-        }
-
         // Get base URL from fakts or use custom one
         const provisionBaseUrl = 'https://go.arkitekt.live';
 
         try {
             // Step 0: If Eduroam, fetch EAP config to get anonymous identity if not set
-            let finalAnonymousIdentity = wifiConfig.anonymousIdentity;
-            if (wifiConfig.type === 'eduroam' && wifiConfig.university && !finalAnonymousIdentity) {
-                try {
-                    const eapConfig = await eduroam.fetchEapConfig(wifiConfig.university);
-                    // Try to find anonymous identity in the config
-                    if (eapConfig?.EAPIdentityProvider?.AuthenticationMethods?.AuthenticationMethod?.ClientSideCredential?.OuterIdentity) {
-                        finalAnonymousIdentity = eapConfig.EAPIdentityProvider.AuthenticationMethods.AuthenticationMethod.ClientSideCredential.OuterIdentity;
-                    }
-                } catch (e) {
-                    console.warn('Failed to fetch EAP config, proceeding without anonymous identity', e);
-                }
-            }
-
+            let finalAnonymousIdentity = selectedProfile.anonymousIdentity;
+            
             // Step 1: Create a client with the device manifest to get fakts-token
             const deviceName = displayName || selectedDevice?.name || 'Unnamed Device';
             const manifest = await provisioning.getManifest(selectedDevice.id);
@@ -172,12 +139,12 @@ export function BleProvisioning() {
 
             // Step 2: Provision device with WiFi and fakts-token
             await provisioning.provision(selectedDevice.id, {
-                ssid: wifiConfig.ssid,
-                password: wifiConfig.password || '',
+                ssid: selectedProfile.ssid,
+                password: selectedProfile.password || '',
                 arkitektToken: faktsToken,
                 displayName: deviceName,
                 baseUrl: provisionBaseUrl,
-                identity: wifiConfig.identity,
+                identity: selectedProfile.identity,
                 anonymousIdentity: finalAnonymousIdentity,
             });
 
@@ -205,7 +172,7 @@ export function BleProvisioning() {
                 [{ text: 'Try Again' }]
             );
         }
-    }, [selectedDevice, wifiConfig, isWifiValid, displayName, baseUrl, fakts, token, provisioning, createClient, handleReset, saveProfile, eduroam]);
+    }, [selectedDevice, selectedProfile, displayName, token, provisioning, createClient, handleReset]);
 
     const renderScanningStep = () => (
         <Card className="mb-4">
@@ -221,7 +188,7 @@ export function BleProvisioning() {
                     disabled={scanner.isScanning || provisioning.isProvisioning}
                     className="mb-4"
                 >
-                    <Text>
+                    <Text className='text-white'>
                         {scanner.isScanning ? 'Scanning...' : 'Start Scan'}
                     </Text>
                 </Button>
@@ -317,7 +284,7 @@ export function BleProvisioning() {
                     </View>
                 )}
 
-                <View className="flex-row space-x-2">
+                <View className="flex-row space-x-2 gap-2">
                     <Button
                         variant="outline"
                         onPress={handleReset}
@@ -331,7 +298,7 @@ export function BleProvisioning() {
                         className="flex-1"
                         disabled={provisioning.isProvisioning}
                     >
-                        <Text>Continue</Text>
+                        <Text className="text-white">Continue</Text>
                     </Button>
                 </View>
             </CardContent>
@@ -343,7 +310,7 @@ export function BleProvisioning() {
             <CardHeader>
                 <CardTitle>Wi-Fi Credentials</CardTitle>
                 <CardDescription>
-                    Enter your Wi-Fi network details
+                    Select a saved Wi-Fi profile to use
                 </CardDescription>
             </CardHeader>
             <CardContent>
@@ -357,40 +324,80 @@ export function BleProvisioning() {
                             placeholder={selectedDevice?.name || 'My ESP32 Device'}
                             autoCapitalize="words"
                             autoCorrect={false}
-                            className="border border-gray-300 rounded-lg px-4 py-3 bg-white"
+                            className="border border-gray-300 rounded-lg px-4 py-3 bg-white dark:bg-zinc-800 dark:text-white dark:border-zinc-700"
+                            placeholderTextColor="#9CA3AF"
                         />
                         <ThemedText className="text-xs text-gray-500 mt-1">
                             Give your device a friendly name (optional)
                         </ThemedText>
                     </View>
 
-                    {/* Wifi Form */}
-                    <WifiForm 
-                        onConfigChange={(config, isValid) => {
-                            setWifiConfig(config);
-                            setIsWifiValid(isValid);
-                        }}
-                    />
+                    {/* Profile Selection */}
+                    <View>
+                        <ThemedText className="mb-2 font-medium">Wi-Fi Profile</ThemedText>
+                        <View className="space-y-2">
+                            {profiles.map((profile, index) => (
+                                <Pressable
+                                    key={index}
+                                    onPress={() => setSelectedProfile(profile)}
+                                    className={`p-4 rounded-lg border ${
+                                        selectedProfile === profile
+                                            ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                                            : 'border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800'
+                                    }`}
+                                >
+                                    <View className="flex-row items-center justify-between">
+                                        <View className="flex-row items-center">
+                                            <IconSymbol 
+                                                name={profile.type === 'eduroam' ? 'building.2.fill' : 'wifi'} 
+                                                size={20} 
+                                                color={selectedProfile === profile ? '#3B82F6' : '#6B7280'} 
+                                            />
+                                            <View className="ml-3">
+                                                <Text className={`font-medium ${
+                                                    selectedProfile === profile ? 'text-blue-700 dark:text-blue-400' : 'text-gray-900 dark:text-gray-100'
+                                                }`}>
+                                                    {profile.ssid}
+                                                </Text>
+                                                <Text className="text-xs text-gray-500">
+                                                    {profile.type === 'eduroam' ? 'Eduroam' : 'Standard Wi-Fi'}
+                                                </Text>
+                                            </View>
+                                        </View>
+                                        {selectedProfile === profile && (
+                                            <IconSymbol name="checkmark.circle.fill" size={20} color="#3B82F6" />
+                                        )}
+                                    </View>
+                                </Pressable>
+                            ))}
+                        </View>
+                        
+                        <Link href="/wifi" asChild>
+                            <Button variant="outline" className="mt-4">
+                                <Text>Setup New Profile</Text>
+                            </Button>
+                        </Link>
+                    </View>
 
                     {/* Token Info */}
                     {token && (
-                        <View className="p-3 bg-green-50 rounded-lg">
-                            <ThemedText className="text-green-700 text-xs">
+                        <View className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                            <ThemedText className="text-green-700 dark:text-green-400 text-xs">
                                 ✓ Arkitekt token will be sent to device
                             </ThemedText>
                         </View>
                     )}
 
                     {!token && (
-                        <View className="p-3 bg-yellow-50 rounded-lg">
-                            <ThemedText className="text-yellow-700 text-xs">
+                        <View className="p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
+                            <ThemedText className="text-yellow-700 dark:text-yellow-400 text-xs">
                                 ⚠ Not connected to Arkitekt. Device will not be registered.
                             </ThemedText>
                         </View>
                     )}
 
                     {/* Action Buttons */}
-                    <View className="flex-row space-x-2 mt-4">
+                    <View className="flex-row space-x-2 mt-4 gap-2">
                         <Button
                             variant="outline"
                             onPress={() => setStep(ProvisioningStep.DEVICE_SELECTED)}
@@ -400,10 +407,10 @@ export function BleProvisioning() {
                         </Button>
                         <Button
                             onPress={handleProvision}
-                            disabled={!isWifiValid || provisioning.isProvisioning}
+                            disabled={!selectedProfile || provisioning.isProvisioning}
                             className="flex-1"
                         >
-                            <Text>{provisioning.isProvisioning ? 'Provisioning...' : 'Provision Device'}</Text>
+                            <Text className="text-white">{provisioning.isProvisioning ? 'Provisioning...' : 'Provision Device'}</Text>
                         </Button>
                     </View>
                 </View>
@@ -458,15 +465,45 @@ export function BleProvisioning() {
         </Card>
     );
 
+    if (profilesLoading) {
+        return (
+            <View className="flex-1 items-center justify-center bg-background-300 dark:bg-zinc-900">
+                <ActivityIndicator size="large" color="#3B82F6" />
+            </View>
+        );
+    }
+
+    if (profiles.length === 0) {
+        return (
+            <View className="flex-1 bg-background-300 dark:bg-zinc-900 p-4 items-center justify-center">
+                <Card className="w-full max-w-sm">
+                    <CardHeader>
+                        <CardTitle className="text-center">No Wi-Fi Profiles</CardTitle>
+                        <CardDescription className="text-center">
+                            You need to configure at least one Wi-Fi profile before you can provision devices.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <Link href="/wifi" asChild>
+                            <Button className="w-full">
+                                <Text className="text-white">Configure Wi-Fi</Text>
+                            </Button>
+                        </Link>
+                    </CardContent>
+                </Card>
+            </View>
+        );
+    }
+
     return (
-        <ThemedView className="flex-1">
+        <View className="flex-1 bg-background-300 dark:bg-zinc-900">
             <ScrollView className="flex-1 p-4">
                 {/* Header */}
                 <View className="mb-6">
-                    <ThemedText className="text-2xl font-bold mb-2">
+                    <ThemedText className="text-2xl font-bold mb-2 text-white">
                         Device Provisioning
                     </ThemedText>
-                    <ThemedText className="text-gray-600">
+                    <ThemedText className="text-gray-200">
                         Set up new ESP32 devices with Wi-Fi and Arkitekt
                     </ThemedText>
                 </View>
@@ -501,6 +538,6 @@ export function BleProvisioning() {
                 {step === ProvisioningStep.PROVISIONING && renderProvisioningStep()}
                 {step === ProvisioningStep.COMPLETE && renderCompleteStep()}
             </ScrollView>
-        </ThemedView>
+        </View>
     );
 }

@@ -11,19 +11,19 @@ export default function WifiIndexScreen() {
     const { profiles, deleteProfile } = useWifiProfiles();
 
     return (
-        <View className="flex-1 bg-gray-50">
+        <View className="flex-1 bg-background-300">
             <Stack.Screen options={{ title: 'Wi-Fi Profiles' }} />
             
-            <View className="p-4 space-y-4">
-                <View className="flex-row space-x-4">
+            <View className="p-4 space-y-4 ">
+                <View className="flex-row space-x-2 gap-2 bg-background-800 dark:bg-zinc-900 p-2 rounded-lg justify-between">
                     <Link href="/wifi/standard" asChild>
-                        <Button className="flex-1 flex-row items-center space-x-2" variant="outline">
-                            <IconSymbol name="wifi" size={20} color="#000" />
-                            <ThemedText>Add Wi-Fi</ThemedText>
+                        <Button className="flex-1 flex-row items-center space-x-2 text-black-300 gap-2" variant="outline">
+                            <IconSymbol name="wifi" size={20} color="#000 mr-2" />
+                            <ThemedText className='text-black'>Add Wi-Fi</ThemedText>
                         </Button>
                     </Link>
                     <Link href="/wifi/eduroam" asChild>
-                        <Button className="flex-1 flex-row items-center space-x-2" variant="outline">
+                        <Button className="flex-1 flex-row items-center space-x-2 text-black-300 gap-2" variant="outline">
                             <IconSymbol name="building.2.fill" size={20} color="#000" />
                             <ThemedText>Add Eduroam</ThemedText>
                         </Button>

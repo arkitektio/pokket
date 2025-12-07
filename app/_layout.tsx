@@ -48,7 +48,10 @@ export const AppLayout = () => {
   return (
     <Stack>
       <Stack.Protected guard={isLoggedIn}>
-        <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="debug" options={{ title: 'Debug' }} />
+        <Stack.Screen name="provision" options={{ title: 'Provision' }} />
+        <Stack.Screen name="tasks" options={{ title: 'Tasks' }} />
       </Stack.Protected>
       <Stack.Protected guard={!isLoggedIn} >
         <Stack.Screen name="login" options={{ headerShown: false }} />
@@ -86,7 +89,7 @@ export default function RootLayout() {
   return (
     <App.Provider>
       <ThemeProvider value={DARK_THEME}>
-        <StatusBar style={'dark'} />
+        <StatusBar style={'light'} />
         <AppLayout />
       </ThemeProvider>
     </App.Provider>

@@ -1,80 +1,66 @@
-import { ScrollView, Text, View } from 'react-native';
-
-import { BleProvisioning } from '@/components/BleProvisioning';
-import { Disconnect } from '@/components/Disconnect';
-import { HelloWave } from '@/components/HelloWave';
+import { HomeCard } from '@/components/HomeCard';
 import { Notifier } from '@/components/Notifier';
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { IconSymbol } from '@/components/ui/IconSymbol';
+import { Text } from '@/components/ui/text';
 import { Guard } from '@/lib/app/App';
-import { Link } from 'expo-router';
+import { useMeQuery } from '@/lib/lok/api/graphql';
+import { ScrollView, View } from 'react-native';
 
-export const NotLoggedInView = () => {
+function Greeting() {
+  const { data } = useMeQuery({});
   return (
-    <ThemedView className="flex-1 justify-center items-center p-6">
-      <IconSymbol name="person.circle" size={80} color="#666" />
-      <ThemedText className="text-xl font-semibold mt-4 mb-2">Welcome to Pokket</ThemedText>
-      <ThemedText className="text-center text-gray-600 mb-6">
-        Please connect to get started with your Arkitekt services
-      </ThemedText>
-    </ThemedView>
+    <View className="mb-2">
+      <Text className="text-3xl font-bold text-foreground">
+        Hi, {data?.me?.username}
+      </Text>
+      <Text className="text-muted-foreground text-lg">
+        Welcome back to Pokket
+      </Text>
+    </View>
   );
-};
+}
 
 export default function HomeScreen() {
   return (
-    <ScrollView className="flex-1">
-      {/* Main Content */}
-      <View className="flex-1 px-4">
-        {/* Status Card */}
-        <Card className="mb-4 shadow-lg">
-          <CardHeader className="pb-3">
-            <View className="flex-row items-center">
-              <IconSymbol name="checkmark.circle.fill" size={24} color="#10B981" />
-              <CardTitle className="text-green-600"><Guard.Lok>
-                <HelloWave />
-              </Guard.Lok></CardTitle>
-            </View>
-          </CardHeader>
-          <CardContent>
+    <ScrollView className="flex-1 bg-background-300">
+      <View className="flex-1 px-4 pt-6">
+        <Guard.Lok>
+            <Greeting />
+        </Guard.Lok>
+        
+        <View className="mb-6">
             <Notifier />
-            <View className="mt-3">
-              <Disconnect />
-            </View>
-          </CardContent>
-        </Card>
+        </View>
 
-        <Link href="/wifi" asChild>
-          <Button variant="outline" className="mb-4">
-            <Text>Manage Wi-Fi Profiles</Text>
-          </Button>
-        </Link>
-
-
-        {/* Info Card */}
-        <Card className="shadow-lg">
-          <CardHeader>
-            <CardTitle className="flex-row items-center">
-              <IconSymbol name="info.circle" size={20} color="#6B7280" />
-              <Text className="ml-2">About Pokket</Text>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Text className="text-gray-600 leading-6">
-              Pokket is your mobile gateway to the Arkitekt ecosystem. Currently its only
-              here to act as a notification hub and a way to connect to your Arkitekt services.
-            </Text>
-            <View className="mt-4 p-3 bg-gray-50 rounded-lg">
-              <Text className="text-sm text-gray-500">
-                💡 Tip: Soon you will be able to access your microscopy data and run analysis workflows directly from Pokket.
-              </Text>
-            </View>
-          </CardContent>
-          <BleProvisioning />
-        </Card>
+        <View className="flex-row flex-wrap gap-4">
+          <HomeCard
+            href="/tasks"
+            title="Tasks"
+            icon="list.bullet"
+            color="#3B82F6"
+            iconBgClassName="bg-blue-100 dark:bg-blue-900/50"
+          />
+          <HomeCard
+            href="/wifi"
+            title="Wi-Fi"
+            icon="wifi"
+            color="#10B981"
+            iconBgClassName="bg-green-100 dark:bg-green-900/50"
+          />
+          <HomeCard
+            href="/provision"
+            title="Provision"
+            icon="qrcode"
+            color="#8B5CF6"
+            iconBgClassName="bg-purple-100 dark:bg-purple-900/50"
+          />
+          <HomeCard
+            href="/debug"
+            title="Debug"
+            icon="ant.fill"
+            color="#EF4444"
+            iconBgClassName="bg-red-100 dark:bg-red-900/50"
+          />
+        </View>
       </View>
     </ScrollView>
   );
