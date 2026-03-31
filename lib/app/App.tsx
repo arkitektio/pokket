@@ -80,7 +80,6 @@ export const App = buildArkitekt({
 
 
 export const MikroInner = App.buildServiceGuard("mikro");
-export const LokInner = App.buildServiceGuard("lok");
 export const KabinetInner = App.buildServiceGuard("kabinet");
 export const RekuestInner = App.buildServiceGuard("rekuest");
 

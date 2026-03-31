@@ -1,5 +1,5 @@
 overwrite: true
-schema: "http://jhnnsrs-lab/lok/graphql"
+schema: "https://go.arkitekt.live/lok/graphql"
 documents: "graphql/lok/**/*.graphql"
 generates:
   lib/lok/api/fragments.ts:

@@ -1,7 +1,5 @@
 fragment ServiceInstance on ServiceInstance {
-  identifier
   service {
-    identifier
     id
     description
     name
@@ -33,7 +31,6 @@ fragment ServiceInstance on ServiceInstance {
 
 fragment ListServiceInstance on ServiceInstance {
   id
-  identifier
   service {
     id
   }
