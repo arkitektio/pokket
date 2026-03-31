@@ -9,7 +9,7 @@ import {
   useSubscription as useApolloSubscription,
 } from "@apollo/client";
 import { toast } from "sonner-native";
-import { useService } from "../arkitekt/provider";
+import { useSelfService } from "../arkitekt/hooks";
 type MutationFuncType = typeof useApolloMutation;
 type QueryFuncType = typeof useApolloQuery;
 type LazyQueryFuncType = typeof useApolloLazyQuery;
@@ -25,7 +25,7 @@ export type {
 export const ServiceName = "lok";
 
 export const useMutation: MutationFuncType = (doc, options) => {
-  const service = useService(ServiceName);
+  const service = useSelfService();
 
   return useApolloMutation(doc, {
     ...options,
@@ -37,19 +37,22 @@ export const useMutation: MutationFuncType = (doc, options) => {
 };
 
 export const useQuery: QueryFuncType = (doc, options) => {
-  const service = useService(ServiceName);
+   const service = useSelfService();
+
 
   return useApolloQuery(doc, { ...options, client: service.client });
 };
 
 export const useSubscription: SubscriptionFuncType = (doc, options) => {
-  const service = useService(ServiceName);
+   const service = useSelfService();
+
 
   return useApolloSubscription(doc, { ...options, client: service.client });
 };
 
 export const useLazyQuery: LazyQueryFuncType = (doc, options) => {
-  const service = useService(ServiceName);
+   const service = useSelfService();
+
 
   return useApolloLazyQuery(doc, { ...options, client: service.client });
 };

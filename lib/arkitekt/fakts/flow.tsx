@@ -1,8 +1,10 @@
+import { EnhancedManifest } from "../provider";
+import { WindowPopper } from "../types";
 import { challenge } from "./challenge";
 import { claim } from "./claim";
 import { FaktsEndpoint } from "./endpointSchema";
 import { ActiveFakts } from "./faktsSchema";
-import { popOutWindowOpen, Popper } from "./popout";
+import { popOutWindowOpen } from "./popout";
 import { start } from "./start";
 
 export const flow = async ({
@@ -10,19 +12,19 @@ export const flow = async ({
   controller,
   manifest,
   expirationTime,
-  popper,
   challengeTimeout,
   maxRetries,
+  windowPopper,
 }: {
   endpoint: FaktsEndpoint;
   controller: AbortController;
-  manifest: any;
+  manifest: EnhancedManifest;
   expirationTime?: number;
   redirectURIs?: string[];
   retrieveTimeout?: number;
-  popper: Popper;
   challengeTimeout?: number;
   maxRetries?: number;
+  windowPopper: WindowPopper;
 }): Promise<ActiveFakts> => {
   // 1. Request device code
   const code = await start({
@@ -33,7 +35,7 @@ export const flow = async ({
   });
 
   // 2. Open configuration window
-  const handle = await popOutWindowOpen({ endpoint, code, popper });
+  const handle = await popOutWindowOpen({ endpoint, code, windowPopper });
 
   // 3. Poll challenge endpoint for token
   let token: string;

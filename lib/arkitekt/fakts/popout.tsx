@@ -1,33 +1,31 @@
+import { WindowPopper } from "../types";
 import { FaktsEndpoint } from "./endpointSchema";
 
 export interface Closable {
   close: () => Promise<void>;
 }
 
-export interface Popper {
-  open: (url: string) => Closable;
-}
-
 export const popOutWindowOpen = async ({
   endpoint,
   code,
-  popper
+  windowPopper,
 }: {
   endpoint: FaktsEndpoint;
   code: string;
-  popper: Popper;
+  windowPopper: WindowPopper;
 }): Promise<Closable> => {
-  const url = `${endpoint.base_url}configure/?device_code=${code}&grant=device_code`;
+  const url = `${endpoint.frontend_url}configure/${code}`;
 
-  const closable = popper.open(url);
-  if (!closable) throw new Error("Could not pop window");
+  const win = windowPopper.open(url);
+
+  if (!win) throw new Error("Could not open window");
 
   return {
     close: async () => {
       try {
-        closable.close?.();
+        win.close?.();
       } catch (e) {
-        console.error("Popping close failed", e);
+        console.error("Window close failed", e);
       }
     },
   };

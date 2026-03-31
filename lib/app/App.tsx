@@ -3,9 +3,10 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as WebBrowser from "expo-web-browser";
 import { buildArkitekt } from "../arkitekt";
 import { kabinetDefinition } from "../kabinet/service";
-import { lokServiceDefinition } from "../lok/service";
+import { lokServiceBuilder, lokServiceDefinition } from "../lok/service";
 import { mikroServiceDefinition } from "../mikro/service";
 import { rekuestServiceDefinition } from "../rekuest/service";
+
 
 let asyncStorageProvider = {
   get: async (key: string) => {
@@ -22,6 +23,15 @@ let asyncStorageProvider = {
   },
 };
 
+
+export const nodeIDProvider = async () => {
+  let nodeID = await AsyncStorage.getItem("nodeID");
+  if (!nodeID) {
+    nodeID = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+    await AsyncStorage.setItem("nodeID", nodeID);
+  }
+  return nodeID;
+}
 
 const windowPopper = {
   open: (url: string) => {
@@ -62,8 +72,10 @@ export const App = buildArkitekt({
     kabinet: kabinetDefinition,
     rekuest: rekuestServiceDefinition,
   },
+  selfServiceBuilder: lokServiceBuilder,
   storageProvider: asyncStorageProvider,
-  popper: windowPopper,
+  windowPopper: windowPopper,
+  nodeIDProvider: nodeIDProvider,
 });
 
 
@@ -74,7 +86,7 @@ export const RekuestInner = App.buildServiceGuard("rekuest");
 
 export const Guard = {
   Mikro: MikroInner,
-  Lok: LokInner,
+  Lok: App.Guard,
   Kabinet: KabinetInner,
   Rekuest: RekuestInner,
 };

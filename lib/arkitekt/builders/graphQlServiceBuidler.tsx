@@ -5,61 +5,71 @@ import {
   createHttpLink,
   split,
 } from "@apollo/client";
+import { setContext } from "@apollo/client/link/context";
 import { GraphQLWsLink } from "@apollo/client/link/subscriptions";
 import { getMainDefinition } from "@apollo/client/utilities";
 import { createClient } from "graphql-ws";
-import { Alias } from "../fakts/faktsSchema";
 import { aliasToHttpPath, aliasToWsPath } from "../alias/helpers";
-import { buildGraphQlWard } from "../ward";
-import { Service } from "../types";
-import { ApolloService } from "../provider";
+import { Service, ServiceBuilder } from "../types";
+
 
 export const createGraphQLServiceBuilder =
-  (possibleTypes: any) =>
-  async (config: { alias: Alias; token: string }): Promise<ApolloService> => {
-    const { alias, token } = config;
+  (possibleTypes: any, builderOptions?: { describe?: boolean }): ServiceBuilder<Service<ApolloClient<any>>> =>
+    (options) => {
+      const { alias, getToken } = options;
 
-    const httpLink = createHttpLink({
-      uri: aliasToHttpPath(alias, "graphql"),
-      headers: {
-        authorization: token ? `Bearer ${token}` : "",
-      },
-    });
+      const httpLink = createHttpLink({
+        uri: aliasToHttpPath(alias, "graphql"),
+      });
 
-    const queryLink = httpLink;
+      const queryLink = setContext(async (_, previousContext) => {
+        const token = await getToken();
 
-    const wslink = new GraphQLWsLink(
-      createClient({
-        url: aliasToWsPath(alias, "graphql"),
-        connectionParams: () => ({
-          token: token,
-        }),
-      })
-    );
+        return {
+          headers: {
+            ...previousContext.headers,
+            authorization: token ? `Bearer ${token.access_token}` : "",
+          },
+        };
+      }).concat(httpLink);
 
-    const splitLink = split(
-      ({ query }) => {
-        const definition = getMainDefinition(query);
-        return (
-          definition.kind === "OperationDefinition" &&
-          definition.operation === "subscription"
-        );
-      },
-      wslink,
-      queryLink as unknown as ApolloLink
-    );
+      const wslink = new GraphQLWsLink(
+        createClient({
+          url: aliasToWsPath(alias, "graphql"),
+          connectionParams: async () => {
+            const token = await getToken();
+            return {
+              token: token.access_token,
+            };
+          },
+        })
+      );
 
-    const client = new ApolloClient({
-      link: splitLink,
-      cache: new InMemoryCache({ possibleTypes }),
-    });
+      const splitLink = split(
+        ({ query }) => {
+          const definition = getMainDefinition(query);
+          return (
+            definition.kind === "OperationDefinition" &&
+            definition.operation === "subscription"
+          );
+        },
+        wslink,
+        queryLink as unknown as ApolloLink
+      );
 
-    const ward = buildGraphQlWard(client);
+      const client = new ApolloClient({
+        link: splitLink,
+        cache: new InMemoryCache({ possibleTypes }),
+      });
 
-    return {
-      type: "apollo",
-      client: client,
-      ward: ward, // Replace with appropriate logo component
-      alias: alias,
+
+      return {
+        type: "apollo",
+        client: client,
+        alias: alias,
+        clearCache: async () => {
+          await client.clearStore();
+          await client.resetStore();
+        },
+      }
     };
-  };

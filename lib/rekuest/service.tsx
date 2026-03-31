@@ -4,13 +4,7 @@ import { ServiceDefinition } from "../arkitekt/provider";
 
 export const rekuestServiceDefinition: ServiceDefinition = {
   builder: createGraphQLServiceBuilder(rekuestResult.possibleTypes),
-  requirements: [
-    {
-      key: "rekuest",
-      service: "live.arkitekt.rekuest",
-      optional: false,
-    },
-  ],
+  
   description: "Rekuest is a service for managing tasks.",
   key: "rekuest",
   name: "Rekuest",

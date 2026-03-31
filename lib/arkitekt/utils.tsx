@@ -1,10 +1,43 @@
+import { ApolloClient, NormalizedCache } from "@apollo/client";
 import { anySignal } from "any-signal";
+import { Alias } from "./fakts/faktsSchema";
+import { Manifest } from "./fakts/manifestSchema";
+import { AppContext, EnhancedManifest, NodeIDProvider, ReportRequest, Service } from "./types";
+
 
 function mstimeout(ms: number) {
   return new Promise((resolve, reject) =>
     setTimeout(() => reject(Error(`Timeout after ${ms}`)), ms),
   );
 }
+
+
+export const selectService = (context: AppContext, name: string): Service => {
+  const client = context.connection?.serviceMap[name];
+  if (!client) {
+    throw new Error(`Client ${name} not found`);
+  }
+  return client;
+}
+
+export const selectAlias = (context: AppContext, name: string): Alias => {
+  const alias = context.connection?.aliasMap[name];
+  if (!alias) {
+    throw new Error(`Alias ${name} not found`);
+  }
+  return alias;
+}
+
+
+
+export const selectApolloClient = (
+  context: AppContext,
+  name: string,
+): ApolloClient<NormalizedCache> => {
+  const client = selectService(context, name).client;
+  return client as ApolloClient<NormalizedCache>;
+}
+
 
 export async function awaitWithTimeout<T>(
   promise: Promise<T>,
@@ -67,3 +100,50 @@ export async function fetchWithTimeout(
     throw e;
   }
 }
+
+export const enhanceManifest = async (
+  manifest: Manifest,
+  nodeIDProvider: NodeIDProvider
+): Promise<EnhancedManifest> => {
+  // Add any enhancements to the manifest here
+  let node_id: string | undefined = undefined;
+  try {
+    node_id = await nodeIDProvider();
+  } catch (e) {
+    console.error("Failed to get node ID:", e);
+    node_id = undefined
+  }
+
+
+
+
+  return {
+    ...manifest,
+    node_id: node_id,
+  };
+};
+
+
+export const report = async (
+  url: string,
+  reportRequest: ReportRequest,
+): Promise<void> => {
+  try {
+    const response = await fetch(`${url}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(reportRequest),
+    });
+
+    if (!response.ok) {
+      console.warn(
+        `Report request failed: ${response.status} ${response.statusText}`,
+      );
+    }
+  } catch (e) {
+    console.error("Report request error:", e);
+  }
+}
+

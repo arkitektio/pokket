@@ -4,13 +4,6 @@ import { ServiceDefinition } from "../arkitekt/provider";
 
 export const kabinetDefinition: ServiceDefinition = {
   builder: createGraphQLServiceBuilder(kabinetResult.possibleTypes),
-  requirements: [
-    {
-      key: "kabinet",
-      service: "live.arkitekt.kabinet",
-      optional: false,
-    },
-  ],
   key: "kabinet",
 
   name: "Kabinet",
