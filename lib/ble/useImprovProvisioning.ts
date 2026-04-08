@@ -27,6 +27,7 @@ export interface Requirement {
   key: string;
   service: string;
   description: string;
+  optional: boolean;
 }
 
 export interface DeviceManifest {
@@ -110,12 +111,18 @@ export function useImprovProvisioning(): UseImprovProvisioningResult {
       // If already connected, return existing device
       const existingDevice = deviceRef.current.get(deviceId);
       if (existingDevice?.isConnected) {
+        console.log("[BLE] Already connected to device:", deviceId);
         return existingDevice;
       }
 
       // Connect to device
+      console.log("[BLE] Connecting to device:", deviceId);
       const device = await bleManager.connectToDevice(deviceId);
+      console.log(
+        "[BLE] Connected. Discovering services and characteristics...",
+      );
       await device.discoverAllServicesAndCharacteristics();
+      console.log("[BLE] Services and characteristics discovered");
       deviceRef.current.set(deviceId, device);
       return device;
     },
@@ -151,6 +158,9 @@ export function useImprovProvisioning(): UseImprovProvisioningResult {
       characteristicUUID: string,
       value: string,
     ): Promise<void> => {
+      console.log(
+        `[BLE] Write characteristic ${characteristicUUID} (payload length: ${value.length})`,
+      );
       const device = await ensureConnected(deviceId);
       await device.writeCharacteristicWithResponseForService(
         serviceUUID,
@@ -249,16 +259,33 @@ export function useImprovProvisioning(): UseImprovProvisioningResult {
       setError(null);
       setStatus("Starting provisioning...");
 
+      console.log("[Provision] Starting provisioning for device:", deviceId);
+      console.log("[Provision] Config:", {
+        ssid: config.ssid,
+        hasPassword: !!config.password,
+        identity: config.identity ?? "(none)",
+        anonymousIdentity: config.anonymousIdentity ?? "(none)",
+        hasPemCertificate: !!config.pemCertificate,
+        pemCertificateLength: config.pemCertificate?.length ?? 0,
+        baseUrl: config.baseUrl ?? "(none)",
+        hasArkitektToken: !!config.arkitektToken,
+      });
+
       try {
         // Ensure connected (connection happens in ensureConnected)
         setStatus("Connecting to device...");
+        console.log("[Provision] Step 1: Connecting to device...");
         await ensureConnected(deviceId);
+        console.log("[Provision] Step 1: Connected successfully");
 
         setStatus("Discovering services...");
-        // Services are already discovered in ensureConnected
+        console.log(
+          "[Provision] Step 2: Services already discovered in ensureConnected",
+        );
 
         // Step 3: Write WiFi SSID
         setStatus("Sending WiFi SSID...");
+        console.log("[Provision] Step 3: Writing WiFi SSID:", config.ssid);
         const ssidPayload = buildWifiSSIDPayload(config.ssid);
         await writeCharacteristic(
           deviceId,
@@ -266,9 +293,15 @@ export function useImprovProvisioning(): UseImprovProvisioningResult {
           WIFI_SSID_UUID,
           ssidPayload,
         );
+        console.log("[Provision] Step 3: WiFi SSID written successfully");
 
         // Step 4: Write WiFi Password
         setStatus("Sending WiFi password...");
+        console.log(
+          "[Provision] Step 4: Writing WiFi password (length:",
+          config.password.length,
+          ")",
+        );
         const passwordPayload = buildWifiPasswordPayload(config.password);
         await writeCharacteristic(
           deviceId,
@@ -276,10 +309,15 @@ export function useImprovProvisioning(): UseImprovProvisioningResult {
           WIFI_PASSWORD_UUID,
           passwordPayload,
         );
+        console.log("[Provision] Step 4: WiFi password written successfully");
 
         // Step 4.5: Write WiFi Identity (if provided)
         if (config.identity) {
           setStatus("Sending WiFi identity...");
+          console.log(
+            "[Provision] Step 4.5: Writing WiFi identity:",
+            config.identity,
+          );
           const identityPayload = buildWifiIdentityPayload(config.identity);
           await writeCharacteristic(
             deviceId,
@@ -287,11 +325,22 @@ export function useImprovProvisioning(): UseImprovProvisioningResult {
             WIFI_IDENTITY_UUID,
             identityPayload,
           );
+          console.log(
+            "[Provision] Step 4.5: WiFi identity written successfully",
+          );
+        } else {
+          console.log(
+            "[Provision] Step 4.5: No WiFi identity provided, skipping",
+          );
         }
 
         // Step 4.6: Write WiFi Anonymous Identity (if provided)
         if (config.anonymousIdentity) {
           setStatus("Sending WiFi anonymous identity...");
+          console.log(
+            "[Provision] Step 4.6: Writing WiFi anonymous identity:",
+            config.anonymousIdentity,
+          );
           const anonymousIdentityPayload = buildWifiAnonymousIdentityPayload(
             config.anonymousIdentity,
           );
@@ -301,25 +350,87 @@ export function useImprovProvisioning(): UseImprovProvisioningResult {
             WIFI_ANONYMOUS_IDENTITY_UUID,
             anonymousIdentityPayload,
           );
+          console.log(
+            "[Provision] Step 4.6: WiFi anonymous identity written successfully",
+          );
+        } else {
+          console.log(
+            "[Provision] Step 4.6: No anonymous identity provided, skipping",
+          );
         }
 
-        // Step 4.7: Write PEM Certificate (if provided)
+        // Step 4.7: Write PEM Certificate in chunks (if provided)
+        // BLE limits a single characteristic write to 512 bytes.
+        // The ESP32 accumulates successive writes; sending "CLEAR" resets the buffer.
         if (config.pemCertificate) {
-          setStatus("Sending PEM certificate...");
           const pemPayload = buildWifiPemCertificatePayload(
             config.pemCertificate,
           );
-          await writeCharacteristic(
-            deviceId,
-            ARKITEKT_SERVICE_UUID,
-            WIFI_PEM_CERTIFICATE_UUID,
-            pemPayload,
+          const pemByteLength = config.pemCertificate.length;
+          const pemPayloadLength = pemPayload.length;
+          const PEM_CHUNK_SIZE = 500;
+          const totalChunks = Math.ceil(pemPayloadLength / PEM_CHUNK_SIZE);
+
+          console.log(
+            `[Provision] Step 4.7: Writing PEM certificate in chunks (raw: ${pemByteLength} chars, base64: ${pemPayloadLength} chars, chunks: ${totalChunks}, chunkSize: ${PEM_CHUNK_SIZE})`,
+          );
+          try {
+            // Send CLEAR first to reset the ESP32 PEM buffer
+            setStatus("Clearing PEM buffer...");
+            console.log(
+              "[Provision] Step 4.7: Sending CLEAR to reset PEM buffer",
+            );
+            await writeCharacteristic(
+              deviceId,
+              ARKITEKT_SERVICE_UUID,
+              WIFI_PEM_CERTIFICATE_UUID,
+              btoa("CLEAR"),
+            );
+            console.log("[Provision] Step 4.7: PEM buffer cleared");
+
+            // Send PEM in chunks
+            for (let i = 0; i < pemPayloadLength; i += PEM_CHUNK_SIZE) {
+              const chunkIndex = Math.floor(i / PEM_CHUNK_SIZE) + 1;
+              const chunk = pemPayload.substring(i, i + PEM_CHUNK_SIZE);
+              setStatus(
+                `Sending PEM certificate chunk ${chunkIndex}/${totalChunks}...`,
+              );
+              console.log(
+                `[Provision] Step 4.7: Sending PEM chunk ${chunkIndex}/${totalChunks} (${chunk.length} chars, offset ${i})`,
+              );
+              await writeCharacteristic(
+                deviceId,
+                ARKITEKT_SERVICE_UUID,
+                WIFI_PEM_CERTIFICATE_UUID,
+                chunk,
+              );
+              console.log(
+                `[Provision] Step 4.7: PEM chunk ${chunkIndex}/${totalChunks} sent successfully`,
+              );
+            }
+            console.log(
+              "[Provision] Step 4.7: All PEM certificate chunks written successfully",
+            );
+          } catch (pemErr) {
+            const pemErrMsg =
+              pemErr instanceof Error ? pemErr.message : String(pemErr);
+            console.error(
+              `[Provision] Step 4.7: Failed to write PEM certificate (${pemByteLength} raw chars / ${pemPayloadLength} base64 chars). Error: ${pemErrMsg}`,
+            );
+            throw new Error(
+              `PEM certificate send failed (${pemByteLength} chars): ${pemErrMsg}`,
+            );
+          }
+        } else {
+          console.log(
+            "[Provision] Step 4.7: No PEM certificate provided, skipping",
           );
         }
 
         // Step 5: Write Base URL (if provided)
         if (config.baseUrl) {
           setStatus("Sending base URL...");
+          console.log("[Provision] Step 5: Writing base URL:", config.baseUrl);
           const baseUrlPayload = buildBaseURLPayload(config.baseUrl);
           await writeCharacteristic(
             deviceId,
@@ -327,11 +438,19 @@ export function useImprovProvisioning(): UseImprovProvisioningResult {
             BASE_URL_UUID,
             baseUrlPayload,
           );
+          console.log("[Provision] Step 5: Base URL written successfully");
+        } else {
+          console.log("[Provision] Step 5: No base URL provided, skipping");
         }
 
         // Step 6: Write Fakts Token (this triggers config save on Arduino)
         if (config.arkitektToken) {
           setStatus("Sending fakts token...");
+          console.log(
+            "[Provision] Step 6: Writing fakts token (length:",
+            config.arkitektToken.length,
+            ")",
+          );
           const tokenPayload = buildFaktsTokenPayload(config.arkitektToken);
           await writeCharacteristic(
             deviceId,
@@ -340,8 +459,16 @@ export function useImprovProvisioning(): UseImprovProvisioningResult {
             tokenPayload,
           );
           setStatus("Fakts token sent - configuration saved on device");
+          console.log(
+            "[Provision] Step 6: Fakts token written - configuration saved on device",
+          );
+        } else {
+          console.log("[Provision] Step 6: No fakts token provided, skipping");
         }
 
+        console.log(
+          "[Provision] All steps complete. Device should now connect to Wi-Fi and Arkitekt.",
+        );
         setStatus(
           "Provisioning complete! Device is connecting to Wi-Fi and Arkitekt...",
         );
@@ -349,6 +476,7 @@ export function useImprovProvisioning(): UseImprovProvisioningResult {
       } catch (err) {
         const errorMsg =
           err instanceof Error ? err.message : "Provisioning failed";
+        console.error("[Provision] Provisioning failed:", errorMsg, err);
         setError(errorMsg);
         setStatus(null);
         setIsProvisioning(false);

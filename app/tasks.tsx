@@ -1,7 +1,6 @@
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Guard } from '@/lib/app/App';
 import { Ordering, useTasksQuery } from '@/lib/rekuest/api/graphql';
 import { Stack } from 'expo-router';
 import React, { useCallback, useState } from 'react';
@@ -84,9 +83,6 @@ export default function TasksScreen() {
     return (
         <View className="flex-1 bg-background-800">
             <Stack.Screen options={{ title: 'Tasks' }} />
-            <Guard.Rekuest fallback={<ThemedText>Connecting to Rekuest...</ThemedText>}>
-                <TasksList />
-            </Guard.Rekuest>
         </View>
     );
 }
