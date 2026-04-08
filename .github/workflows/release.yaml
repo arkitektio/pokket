@@ -1,4 +1,4 @@
-name: Release and Build APK
+name: Direct Release and APK Build
 
 on:
   push:
@@ -7,36 +7,27 @@ on:
 
 permissions:
   contents: write
+  issues: write
   pull-requests: write
 
-# Forces the runner to use Node 24 for all JS actions
 env:
+  # Opt-in to Node 24 for all actions to satisfy 2026 requirements
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
-  release-please:
-    runs-on: ubuntu-latest
-    outputs:
-      release_created: ${{ steps.release.outputs.release_created }}
-      tag_name: ${{ steps.release.outputs.tag_name }}
-    steps:
-      - uses: googleapis/release-please-action@v4
-        id: release
-        with:
-          release-type: node
-
-  build-apk:
-    needs: release-please
-    if: ${{ needs.release-please.outputs.release_created }}
+  release:
+    name: Build & Release
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false # Required for semantic-release
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 22 # Stable LTS
+          node-version: 22
           cache: "npm"
 
       - name: Setup Java
@@ -45,22 +36,35 @@ jobs:
           java-version: "17"
           distribution: "temurin"
 
+      - name: Install Dependencies
+        run: npm install
+
       - name: Setup Expo
         uses: expo/expo-github-action@v8
         with:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
 
-      - name: Install dependencies
-        run: npm install
+      - name: Determine Version and Create Tag
+        id: semantic
+        uses: cycjimmy/semantic-release-action@v4
+        with:
+          extra_plugins: |
+            @semantic-release/git
+            @semantic-release/changelog
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build APK Locally
-        # We use --local to save Expo build credits
-        run: eas build --platform android --profile preview --non-interactive --local --output=./app-release.apk
+        # This only runs if a new version was actually detected
+        if: steps.semantic.outputs.new_release_published == 'true'
+        run: |
+          eas build --platform android --profile preview --non-interactive --local --output=./app-release.apk
 
-      - name: Upload APK to Release
+      - name: Upload APK to GitHub Release
+        if: steps.semantic.outputs.new_release_published == 'true'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ needs.release-please.outputs.tag_name }}
+          tag_name: v${{ steps.semantic.outputs.new_release_version }}
           files: ./app-release.apk
-          body: "Automated APK build for version ${{ needs.release-please.outputs.tag_name }}"
+          body: ${{ steps.semantic.outputs.new_release_notes }}
