@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useWifiProfiles } from '@/hooks/useWifiProfiles';
 import { EduroamInstance } from '@/lib/eduroam/types';
-import { useEduroam } from '@/lib/eduroam/useEduroam';
+import { extractPemCertificate, useEduroam } from '@/lib/eduroam/useEduroam';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
@@ -15,9 +15,10 @@ export default function EduroamWifiScreen() {
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [eduroamSearch, setEduroamSearch] = useState('');
+    const [pemCertificate, setPemCertificate] = useState('');
     
     const { saveProfile } = useWifiProfiles();
-    const { initialize, search, searchResults, loading } = useEduroam();
+    const { initialize, search, searchResults, fetchEapConfig, loading } = useEduroam();
     const router = useRouter();
     const params = useLocalSearchParams();
 
@@ -31,14 +32,29 @@ export default function EduroamWifiScreen() {
                 id: params.universityId as string,
                 name: params.universityName as string,
                 country: params.universityCountry as string,
-                cat_idp: 0,
+                geo: [],
                 profiles: []
             });
+            if (params.pemCertificate) setPemCertificate(params.pemCertificate as string);
         }
         if (params.identity) setIdentity(params.identity as string);
         if (params.anonymousIdentity) setAnonymousIdentity(params.anonymousIdentity as string);
         if (params.password) setPassword(params.password as string);
-    }, [params.universityId, params.universityName, params.universityCountry, params.identity, params.anonymousIdentity, params.password]);
+    }, [params.universityId, params.universityName, params.universityCountry, params.identity, params.anonymousIdentity, params.password, params.pemCertificate]);
+
+    // Fetch EAP config to get PEM certificate when university is selected
+    useEffect(() => {
+        if (university && university.profiles.length > 0 && !pemCertificate) {
+            fetchEapConfig(university.profiles[0]).then((eapConfig) => {
+                if (eapConfig) {
+                    const pem = extractPemCertificate(eapConfig);
+                    if (pem) setPemCertificate(pem);
+                }
+            }).catch((err) => {
+                console.warn('Failed to fetch EAP config for PEM certificate:', err);
+            });
+        }
+    }, [university, fetchEapConfig, pemCertificate]);
 
     useEffect(() => {
         if (eduroamSearch.length > 2) {
@@ -61,7 +77,7 @@ export default function EduroamWifiScreen() {
             universityId: university.id,
             universityName: university.name,
             universityCountry: university.country,
-            pemCertificate: university.profiles[0]?.pem_certificate || '', // Assuming the first profile's certificate for simplicity
+            pemCertificate,
         });
 
         router.back();

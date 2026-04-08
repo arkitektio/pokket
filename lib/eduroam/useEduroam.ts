@@ -2,11 +2,39 @@ import { File, Paths } from "expo-file-system";
 import { XMLParser } from "fast-xml-parser";
 import { useCallback, useState } from "react";
 import {
+  EapConfig,
   EapConfigSchema,
   EduroamDiscovery,
   EduroamInstance,
   EduroamProfile,
 } from "./types";
+
+/**
+ * Extract the first PEM certificate from a parsed EAP config.
+ * The CA cert text is base64-encoded DER in the XML; we wrap it as PEM.
+ */
+export function extractPemCertificate(eapConfig: EapConfig): string | null {
+  const serverCred =
+    eapConfig.EAPIdentityProviderList.EAPIdentityProvider.AuthenticationMethods
+      .AuthenticationMethod.ServerSideCredential;
+  if (!serverCred?.CA) return null;
+
+  const caEntry = Array.isArray(serverCred.CA)
+    ? serverCred.CA[0]
+    : serverCred.CA;
+  const raw = caEntry["#text"];
+  if (!raw) return null;
+
+  const trimmed = raw.replace(/\s/g, "");
+  // Wrap in PEM headers if not already present
+  if (trimmed.startsWith("-----BEGIN")) return raw;
+  const lines = trimmed.match(/.{1,64}/g) || [];
+  return [
+    "-----BEGIN CERTIFICATE-----",
+    ...lines,
+    "-----END CERTIFICATE-----",
+  ].join("\n");
+}
 
 const DISCOVERY_URL = "https://discovery.eduroam.app/v1/discovery.json";
 const DISCOVERY_FILE = "eduroam_discovery.json";
@@ -83,7 +111,9 @@ export function useEduroam() {
       console.log("Downloading EAP config for:", profile.name);
 
       const eapFile = new File(Paths.document, `eap_config_${profile.id}.xml`);
-      await File.downloadFileAsync(profile.eapconfig_endpoint, eapFile);
+      await File.downloadFileAsync(profile.eapconfig_endpoint, eapFile, {
+        idempotent: true,
+      });
 
       const content = await eapFile.text();
 
@@ -92,6 +122,7 @@ export function useEduroam() {
         attributeNamePrefix: "@_",
       });
       const jsonObj = parser.parse(content);
+      console.log("Parsed EAP config JSON:", jsonObj);
       const eapConfig = EapConfigSchema.parse(jsonObj);
 
       return eapConfig;

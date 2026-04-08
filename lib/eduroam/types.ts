@@ -29,28 +29,37 @@ export const EduroamDiscoverySchema = z.object({
 
 /**
  * Zod Schema for the EAP Configuration
- * Added 'pem_certificate' to handle the extracted CA data.
+ * Matches the XML structure: EAPIdentityProviderList > EAPIdentityProvider
  */
+const EAPIdentityProviderSchema = z.object({
+  AuthenticationMethods: z.object({
+    AuthenticationMethod: z.object({
+      EAPMethod: z.object({
+        Type: z.number(),
+      }),
+      ServerSideCredential: z
+        .object({
+          CA: z
+            .union([
+              z.array(z.object({ "#text": z.string() })),
+              z.object({ "#text": z.string() }),
+            ])
+            .optional(),
+        })
+        .optional(),
+    }),
+  }),
+  CredentialApplicability: z.object({
+    IEEE80211: z.union([z.array(z.any()), z.object({}).passthrough()]),
+  }),
+  ProviderInfo: z.object({
+    DisplayName: z.union([z.string(), z.object({ "#text": z.string() })]),
+  }),
+});
+
 export const EapConfigSchema = z.object({
-  EAPIdentityProvider: z.object({
-    AuthenticationMethods: z.object({
-      AuthenticationMethod: z.object({
-        EAPMethod: z.object({
-          Type: z.number(),
-        }),
-      }),
-    }),
-    CredentialApplicability: z.object({
-      IEEE80211: z.object({
-        SSID: z.string(),
-      }),
-    }),
-    ProviderInfo: z.object({
-      DisplayName: z.string(),
-      Description: z.string(),
-    }),
-    // Added field for the decoded PEM certificate string
-    pem_certificate: z.string().min(1, "PEM certificate cannot be empty"),
+  EAPIdentityProviderList: z.object({
+    EAPIdentityProvider: EAPIdentityProviderSchema,
   }),
 });
 

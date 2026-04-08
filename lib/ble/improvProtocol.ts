@@ -4,17 +4,19 @@
  */
 
 // Arkitekt Provisioning Service UUID (matches Arduino code)
-export const ARKITEKT_SERVICE_UUID = '4fafc201-1fb5-459e-8fcc-c5c9c331914b';
+export const ARKITEKT_SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
 
 // Characteristic UUIDs (matches Arduino code)
-export const WIFI_SSID_UUID = 'beb5483e-36e1-4688-b7f5-ea07361b26a8';
-export const WIFI_PASSWORD_UUID = 'beb5483e-36e1-4688-b7f5-ea07361b26a9';
-export const BASE_URL_UUID = 'beb5483e-36e1-4688-b7f5-ea07361b26aa';
-export const FAKTS_TOKEN_UUID = 'beb5483e-36e1-4688-b7f5-ea07361b26ab';
-export const STATUS_UUID = 'beb5483e-36e1-4688-b7f5-ea07361b26ac';
-export const MANIFEST_UUID = 'beb5483e-36e1-4688-b7f5-ea07361b26ad';
-export const WIFI_IDENTITY_UUID = 'beb5483e-36e1-4688-b7f5-ea07361b26ae';
-export const WIFI_ANONYMOUS_IDENTITY_UUID = 'beb5483e-36e1-4688-b7f5-ea07361b26af';
+export const WIFI_SSID_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
+export const WIFI_PASSWORD_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26a9";
+export const BASE_URL_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26aa";
+export const FAKTS_TOKEN_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26ab";
+export const STATUS_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26ac";
+export const MANIFEST_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26ad";
+export const WIFI_IDENTITY_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26ae";
+export const WIFI_ANONYMOUS_IDENTITY_UUID =
+  "beb5483e-36e1-4688-b7f5-ea07361b26af";
+export const WIFI_PEM_CERTIFICATE_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26b0";
 
 // Legacy aliases for backward compatibility
 export const REDEEM_TOKEN_UUID = FAKTS_TOKEN_UUID;
@@ -104,38 +106,45 @@ export function buildWifiAnonymousIdentityPayload(identity: string): string {
 }
 
 /**
+ * Build WiFi PEM Certificate payload
+ */
+export function buildWifiPemCertificatePayload(pem: string): string {
+  return btoa(pem);
+}
+
+/**
  * Build Improv Wi-Fi provisioning payload (legacy support)
  */
 export function buildImprovWifiPayload(ssid: string, password: string): string {
   const encoder = new TextEncoder();
-  
+
   // Encode SSID and password
   const ssidBytes = encoder.encode(ssid);
   const passwordBytes = encoder.encode(password);
-  
+
   // Build packet: [Command, SSID_Length, SSID, Password_Length, Password]
   const packet = new Uint8Array(
-    1 + 1 + ssidBytes.length + 1 + passwordBytes.length
+    1 + 1 + ssidBytes.length + 1 + passwordBytes.length,
   );
-  
+
   let offset = 0;
-  
+
   // Command
   packet[offset++] = ImprovCommand.WIFI_SETTINGS;
-  
+
   // SSID Length
   packet[offset++] = ssidBytes.length;
-  
+
   // SSID
   packet.set(ssidBytes, offset);
   offset += ssidBytes.length;
-  
+
   // Password Length
   packet[offset++] = passwordBytes.length;
-  
+
   // Password
   packet.set(passwordBytes, offset);
-  
+
   // Convert to base64
   return btoa(String.fromCharCode(...packet));
 }
@@ -155,11 +164,11 @@ export function buildManifestRequestPayload(): string {
  */
 export function decodeResponse(base64Value: string | null): string | null {
   if (!base64Value) return null;
-  
+
   try {
     return atob(base64Value);
   } catch (err) {
-    console.error('Failed to decode response:', err);
+    console.error("Failed to decode response:", err);
     return null;
   }
 }
@@ -174,15 +183,17 @@ export function parseStatus(base64Value: string | null): string | null {
 /**
  * Parse Improv status
  */
-export function parseImprovStatus(base64Value: string | null): ImprovStatus | null {
+export function parseImprovStatus(
+  base64Value: string | null,
+): ImprovStatus | null {
   if (!base64Value) return null;
-  
+
   try {
     const decoded = atob(base64Value);
     const statusCode = decoded.charCodeAt(0);
     return statusCode as ImprovStatus;
   } catch (err) {
-    console.error('Failed to parse status:', err);
+    console.error("Failed to parse status:", err);
     return null;
   }
 }
@@ -190,15 +201,17 @@ export function parseImprovStatus(base64Value: string | null): ImprovStatus | nu
 /**
  * Parse Improv error
  */
-export function parseImprovError(base64Value: string | null): ImprovError | null {
+export function parseImprovError(
+  base64Value: string | null,
+): ImprovError | null {
   if (!base64Value) return null;
-  
+
   try {
     const decoded = atob(base64Value);
     const errorCode = decoded.charCodeAt(0);
     return errorCode as ImprovError;
   } catch (err) {
-    console.error('Failed to parse error:', err);
+    console.error("Failed to parse error:", err);
     return null;
   }
 }
@@ -210,11 +223,11 @@ export function parseImprovError(base64Value: string | null): ImprovError | null
 export function parseManifest(base64Value: string | null): any | null {
   const decoded = decodeResponse(base64Value);
   if (!decoded) return null;
-  
+
   try {
     return JSON.parse(decoded);
   } catch (err) {
-    console.error('Failed to parse manifest JSON:', err);
+    console.error("Failed to parse manifest JSON:", err);
     return null;
   }
 }

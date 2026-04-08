@@ -149,6 +149,7 @@ export function BleProvisioning() {
                 baseUrl: provisionBaseUrl,
                 identity: selectedProfile.identity,
                 anonymousIdentity: finalAnonymousIdentity,
+                pemCertificate: selectedProfile.pemCertificate,
             });
             } catch (err) {
                 console.error('Provisioning error:', err);

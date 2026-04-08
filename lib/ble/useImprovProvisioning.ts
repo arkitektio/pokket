@@ -8,6 +8,7 @@ import {
   buildWifiAnonymousIdentityPayload,
   buildWifiIdentityPayload,
   buildWifiPasswordPayload,
+  buildWifiPemCertificatePayload,
   buildWifiSSIDPayload,
   FAKTS_TOKEN_UUID,
   MANIFEST_UUID,
@@ -17,6 +18,7 @@ import {
   WIFI_ANONYMOUS_IDENTITY_UUID,
   WIFI_IDENTITY_UUID,
   WIFI_PASSWORD_UUID,
+  WIFI_PEM_CERTIFICATE_UUID,
   WIFI_SSID_UUID,
 } from "./improvProtocol";
 import { bleManager } from "./manager";
@@ -41,6 +43,7 @@ export interface ProvisioningConfig {
   password: string;
   identity?: string;
   anonymousIdentity?: string;
+  pemCertificate?: string;
   arkitektToken?: string;
   displayName?: string;
   baseUrl?: string;
@@ -297,6 +300,20 @@ export function useImprovProvisioning(): UseImprovProvisioningResult {
             ARKITEKT_SERVICE_UUID,
             WIFI_ANONYMOUS_IDENTITY_UUID,
             anonymousIdentityPayload,
+          );
+        }
+
+        // Step 4.7: Write PEM Certificate (if provided)
+        if (config.pemCertificate) {
+          setStatus("Sending PEM certificate...");
+          const pemPayload = buildWifiPemCertificatePayload(
+            config.pemCertificate,
+          );
+          await writeCharacteristic(
+            deviceId,
+            ARKITEKT_SERVICE_UUID,
+            WIFI_PEM_CERTIFICATE_UUID,
+            pemPayload,
           );
         }
 
