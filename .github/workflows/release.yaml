@@ -59,7 +59,7 @@ jobs:
         # This only runs if a new version was actually detected
         if: steps.semantic.outputs.new_release_published == 'true'
         run: |
-          eas build --platform android --profile preview --non-interactive --local --output=./app-release.apk
+          eas build --platform android --profile apk --non-interactive --local --output=./app-release.apk
 
       - name: Upload APK to GitHub Release
         if: steps.semantic.outputs.new_release_published == 'true'
