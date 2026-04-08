@@ -1,3 +1,10 @@
+## [1.0.1](https://github.com/arkitektio/pokket/compare/v1.0.0...v1.0.1) (2026-04-08)
+
+
+### Bug Fixes
+
+* test ([9d53691](https://github.com/arkitektio/pokket/commit/9d53691b341c94539b6e24c193dba042ad9c3b62))
+
 # 1.0.0 (2026-04-08)
 
 
