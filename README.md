@@ -7,17 +7,22 @@
 ## Features
 
 ### 🔗 Arkitekt Connection
+
 Seamlessly connect to your Arkitekt instance. Pokket handles authentication via `lok` and provides a secure connection to your services.
 
 ### 📋 Task Management
+
 Stay on top of your workflows. View and manage your latest tasks through the `rekuest` service integration, ensuring you never miss an important action.
 
 ### 📡 Device Provisioning
+
 Easily provision ESP32-based devices for your lab or home. Pokket uses the **Improv Wi-Fi** protocol over BLE to configure devices with:
+
 - Wi-Fi Credentials (Standard & Eduroam support)
 - Arkitekt Connection Tokens
 
 ### 📶 Wi-Fi Profile Management
+
 Manage your Wi-Fi configurations in one place. Save standard and Eduroam profiles to quickly provision multiple devices without re-entering credentials.
 
 ## Get Started
@@ -48,4 +53,4 @@ Currently available for Android devices with BLE support. Just download the APK 
 
 ## License
 
-MIT
+MIT (see [LICENSE](LICENSE))
