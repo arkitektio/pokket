@@ -125,6 +125,8 @@ export function BleProvisioning() {
                             identifier: manifest?.identifier || `esp32-${selectedDevice?.id.substring(0, 8)}`,
                             version: manifest?.version || '1.0.0',
                             scopes: manifest?.scopes || ['read', 'write'],
+                            deviceName: deviceName,
+                            requirements: manifest?.requirements || [],
                         }
                     }
                 }

@@ -1,0 +1,14 @@
+query ListServiceRelease(
+  $pagination: OffsetPaginationInput
+  $filters: ServiceReleaseFilter
+) {
+  serviceReleases(pagination: $pagination, filters: $filters) {
+    ...ListServiceRelease
+  }
+}
+
+query GetServiceRelease($id: ID!) {
+  serviceRelease(id: $id) {
+    ...ServiceRelease
+  }
+}

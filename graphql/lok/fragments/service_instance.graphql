@@ -1,8 +1,12 @@
 fragment ServiceInstance on ServiceInstance {
-  service {
+  release {
     id
-    description
-    name
+    version
+    service {
+      identifier
+      id
+      name
+    }
   }
   id
 
@@ -31,13 +35,4 @@ fragment ServiceInstance on ServiceInstance {
 
 fragment ListServiceInstance on ServiceInstance {
   id
-  service {
-    id
-  }
-  allowedUsers {
-    ...ListUser
-  }
-  deniedUsers {
-    ...ListUser
-  }
 }
