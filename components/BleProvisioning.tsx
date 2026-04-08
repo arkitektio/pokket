@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { WifiProfile, useWifiProfiles } from '@/hooks/useWifiProfiles';
 import { App } from '@/lib/app/App';
 import { ARKITEKT_SERVICE_UUID, useBLEScanner, useImprovProvisioning } from '@/lib/ble';
-import { CreateClientDocument } from '@/lib/lok/api/graphql';
+import { CreateClientDocument, CreateClientMutation, CreateClientMutationVariables } from '@/lib/lok/api/graphql';
 import { useMutation } from '@/lib/lok/funcs';
 import { Link } from 'expo-router';
 import React, { useCallback, useState } from 'react';
@@ -48,7 +48,7 @@ export function BleProvisioning() {
     const { profiles, loading: profilesLoading } = useWifiProfiles();
 
     // GraphQL mutation to create client and get fakts-token
-    const [createClient] = useMutation(CreateClientDocument);
+    const [createClient] = useMutation<CreateClientMutation, CreateClientMutationVariables>(CreateClientDocument);
 
 
     const handleStartScan = useCallback(() => {
@@ -125,8 +125,8 @@ export function BleProvisioning() {
                             identifier: manifest?.identifier || `esp32-${selectedDevice?.id.substring(0, 8)}`,
                             version: manifest?.version || '1.0.0',
                             scopes: manifest?.scopes || ['read', 'write'],
-                            deviceName: deviceName,
-                            requirements: manifest?.requirements || [],
+                            nodeId: selectedDevice.id,
+                            requirements: manifest?.requirements.map((r) => ({ ...r })) || [],
                         }
                     }
                 }
@@ -140,6 +140,7 @@ export function BleProvisioning() {
             console.log('Obtained fakts-token:', faktsToken);
 
             // Step 2: Provision device with WiFi and fakts-token
+            try {
             await provisioning.provision(selectedDevice.id, {
                 ssid: selectedProfile.ssid,
                 password: selectedProfile.password || '',
@@ -149,6 +150,10 @@ export function BleProvisioning() {
                 identity: selectedProfile.identity,
                 anonymousIdentity: finalAnonymousIdentity,
             });
+            } catch (err) {
+                console.error('Provisioning error:', err);
+                throw err;
+            }
 
             setStep(ProvisioningStep.COMPLETE);
 
@@ -281,6 +286,21 @@ export function BleProvisioning() {
                         {provisioning.manifest.scopes && (
                             <ThemedText className="text-xs">
                                 Scopes: {provisioning.manifest.scopes.join(', ')}
+                            </ThemedText>
+                        )}
+                        {provisioning.manifest.requirements && provisioning.manifest.requirements.length > 0 && (
+                            <View className="mt-2">
+                                <ThemedText className="text-xs font-medium mb-1">Requirements:</ThemedText>
+                                {provisioning.manifest.requirements.map((req, index) => (
+                                    <ThemedText key={index} className="text-xs ml-2">
+                                        - {req.key}: {req.service} ({req.description})
+                                    </ThemedText>
+                                ))}
+                            </View>
+                        )}
+                        {provisioning.manifest.device_id && (
+                            <ThemedText className="text-xs mt-2">
+                                Device ID: {provisioning.manifest.device_id}
                             </ThemedText>
                         )}
                     </View>

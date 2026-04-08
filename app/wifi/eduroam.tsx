@@ -61,6 +61,7 @@ export default function EduroamWifiScreen() {
             universityId: university.id,
             universityName: university.name,
             universityCountry: university.country,
+            pemCertificate: university.profiles[0]?.pem_certificate || '', // Assuming the first profile's certificate for simplicity
         });
 
         router.back();

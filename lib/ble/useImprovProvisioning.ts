@@ -23,6 +23,7 @@ import { bleManager } from "./manager";
 
 export interface Requirement {
   key: string;
+  service: string;
   description: string;
 }
 
