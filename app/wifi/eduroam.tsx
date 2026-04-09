@@ -1,7 +1,5 @@
-import { ThemedText } from '@/components/ThemedText';
 import { useAlertDialog } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useWifiProfiles } from '@/hooks/useWifiProfiles';
 import { EduroamInstance } from '@/lib/eduroam/types';
 import { extractPemCertificate, useEduroam } from '@/lib/eduroam/useEduroam';
@@ -86,121 +84,126 @@ export default function EduroamWifiScreen() {
     };
 
     return (
-        <View className="flex-1 bg-gray-50 p-4">
+        <View className="flex-1 bg-zinc-950">
             <Stack.Screen options={{ title: params.universityId ? 'Edit Eduroam Profile' : 'Add Eduroam Profile' }} />
-            <ScrollView className="space-y-4">
-                <Card>
-                    <CardHeader>
-                        <CardTitle>University / Organization</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        {university ? (
-                            <View className="flex-row items-center justify-between p-3 bg-blue-50 rounded-lg border border-blue-100">
-                                <View className="flex-1">
-                                    <Text className="font-semibold text-blue-900">{university.name}</Text>
-                                    <Text className="text-xs text-blue-700">{university.country}</Text>
-                                </View>
-                                <Pressable onPress={() => setUniversity(null)} className="p-2">
-                                    <Text className="text-blue-600 font-bold">Change</Text>
-                                </Pressable>
-                            </View>
-                        ) : (
-                            <View>
-                                <TextInput
-                                    value={eduroamSearch}
-                                    onChangeText={setEduroamSearch}
-                                    placeholder="Search for your university..."
-                                    className="border border-gray-300 rounded-lg px-4 py-3 bg-white mb-2"
-                                />
-                                {loading && (
-                                    <View className="py-4">
-                                        <ActivityIndicator size="small" color="#0000ff" />
-                                    </View>
-                                )}
-                                {!loading && searchResults.length > 0 && (
-                                    <View className="border border-gray-200 rounded-lg bg-white max-h-48 overflow-hidden">
-                                        <ScrollView nestedScrollEnabled>
-                                            {searchResults.map((inst) => (
-                                                <Pressable
-                                                    key={inst.id}
-                                                    onPress={() => {
-                                                        setUniversity(inst);
-                                                        setEduroamSearch('');
-                                                    }}
-                                                    className="p-3 border-b border-gray-100 active:bg-gray-50"
-                                                >
-                                                    <Text className="font-medium">{inst.name}</Text>
-                                                    <Text className="text-xs text-gray-500">{inst.country}</Text>
-                                                </Pressable>
-                                            ))}
-                                        </ScrollView>
-                                    </View>
-                                )}
-                            </View>
-                        )}
-                    </CardContent>
-                </Card>
+            <ScrollView className="flex-1" contentContainerClassName="p-5 gap-5">
+                {/* University Section */}
+                <View>
+                    <Text className="text-lg font-semibold text-white mb-1">University / Organization</Text>
+                    <Text className="text-sm text-zinc-400 mb-4">Select your institution</Text>
 
+                    {university ? (
+                        <View className="flex-row items-center justify-between p-4 bg-blue-500/10 rounded-xl border border-blue-500/20">
+                            <View className="flex-1">
+                                <Text className="font-semibold text-blue-400">{university.name}</Text>
+                                <Text className="text-xs text-blue-400/60 mt-0.5">{university.country}</Text>
+                            </View>
+                            <Pressable onPress={() => setUniversity(null)} className="p-2">
+                                <Text className="text-blue-400 font-semibold text-sm">Change</Text>
+                            </Pressable>
+                        </View>
+                    ) : (
+                        <View>
+                            <TextInput
+                                value={eduroamSearch}
+                                onChangeText={setEduroamSearch}
+                                placeholder="Search for your university..."
+                                placeholderTextColor="#52525B"
+                                className="border border-zinc-700/50 rounded-xl px-4 py-3 bg-zinc-800/80 text-zinc-100 mb-2"
+                            />
+                            {loading && (
+                                <View className="py-4 items-center">
+                                    <ActivityIndicator size="small" color="#60A5FA" />
+                                    <Text className="text-zinc-400 text-xs mt-2">Searching...</Text>
+                                </View>
+                            )}
+                            {!loading && searchResults.length > 0 && (
+                                <View className="border border-zinc-700/50 rounded-xl bg-zinc-800/80 max-h-48 overflow-hidden">
+                                    <ScrollView nestedScrollEnabled>
+                                        {searchResults.map((inst) => (
+                                            <Pressable
+                                                key={inst.id}
+                                                onPress={() => {
+                                                    setUniversity(inst);
+                                                    setEduroamSearch('');
+                                                }}
+                                                className="p-3 border-b border-zinc-700/30 active:bg-zinc-700"
+                                            >
+                                                <Text className="font-medium text-zinc-200 text-sm">{inst.name}</Text>
+                                                <Text className="text-xs text-zinc-500">{inst.country}</Text>
+                                            </Pressable>
+                                        ))}
+                                    </ScrollView>
+                                </View>
+                            )}
+                        </View>
+                    )}
+                </View>
+
+                {/* Credentials Section */}
                 {university && (
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Credentials</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
+                    <View>
+                        <Text className="text-lg font-semibold text-white mb-1">Credentials</Text>
+                        <Text className="text-sm text-zinc-400 mb-4">Enter your login details</Text>
+
+                        <View className="gap-4">
                             <View>
-                                <ThemedText className="mb-2 font-medium">Identity (Username)</ThemedText>
+                                <Text className="text-sm font-medium text-zinc-300 mb-2">Identity (Username)</Text>
                                 <TextInput
                                     value={identity}
                                     onChangeText={setIdentity}
                                     placeholder="user@university.edu"
+                                    placeholderTextColor="#52525B"
                                     autoCapitalize="none"
                                     autoCorrect={false}
-                                    className="border border-gray-300 rounded-lg px-4 py-3 bg-white"
+                                    className="border border-zinc-700/50 rounded-xl px-4 py-3 bg-zinc-800/80 text-zinc-100"
                                 />
                             </View>
                             
                             <View>
-                                <ThemedText className="mb-2 font-medium">Anonymous Identity (Optional)</ThemedText>
+                                <Text className="text-sm font-medium text-zinc-300 mb-2">Anonymous Identity (Optional)</Text>
                                 <TextInput
                                     value={anonymousIdentity}
                                     onChangeText={setAnonymousIdentity}
                                     placeholder="anonymous@university.edu"
+                                    placeholderTextColor="#52525B"
                                     autoCapitalize="none"
                                     autoCorrect={false}
-                                    className="border border-gray-300 rounded-lg px-4 py-3 bg-white"
+                                    className="border border-zinc-700/50 rounded-xl px-4 py-3 bg-zinc-800/80 text-zinc-100"
                                 />
-                                <ThemedText className="text-xs text-gray-500 mt-1">
+                                <Text className="text-xs text-zinc-500 mt-1">
                                     Leave blank to use the default anonymous identity
-                                </ThemedText>
+                                </Text>
                             </View>
 
                             <View>
-                                <ThemedText className="mb-2 font-medium">Password</ThemedText>
+                                <Text className="text-sm font-medium text-zinc-300 mb-2">Password</Text>
                                 <View className="relative">
                                     <TextInput
                                         value={password}
                                         onChangeText={setPassword}
                                         placeholder="Password"
+                                        placeholderTextColor="#52525B"
                                         secureTextEntry={!showPassword}
                                         autoCapitalize="none"
                                         autoCorrect={false}
-                                        className="border border-gray-300 rounded-lg px-4 py-3 bg-white"
+                                        className="border border-zinc-700/50 rounded-xl px-4 py-3 bg-zinc-800/80 text-zinc-100 pr-16"
                                     />
                                     <Button
                                         variant="ghost"
                                         onPress={() => setShowPassword(!showPassword)}
-                                        className="absolute right-2 top-1"
+                                        className="absolute right-1 top-1"
                                     >
-                                        <Text className="text-xs">{showPassword ? 'Hide' : 'Show'}</Text>
+                                        <Text className="text-xs text-zinc-400">{showPassword ? 'Hide' : 'Show'}</Text>
                                     </Button>
                                 </View>
                             </View>
 
-                            <Button onPress={handleSave} className="mt-4">
-                                <Text>Save Configuration</Text>
+                            <Button onPress={handleSave} className="mt-2">
+                                <Text className="text-white font-medium">Save Configuration</Text>
                             </Button>
-                        </CardContent>
-                    </Card>
+                        </View>
+                    </View>
                 )}
             </ScrollView>
         </View>
