@@ -1,3 +1,17 @@
+# [1.1.0](https://github.com/arkitektio/pokket/compare/v1.0.1...v1.1.0) (2026-04-09)
+
+
+### Bug Fixes
+
+* add stuff ([fe2b5ab](https://github.com/arkitektio/pokket/commit/fe2b5abf451679ce5cdc3fe5583645c4c56a1e55))
+* multi step workflows ([b6b498b](https://github.com/arkitektio/pokket/commit/b6b498b491adcd41ec2d3ddaf7bd8c3e5d4c3b14))
+
+
+### Features
+
+* fix the ui ([71d3961](https://github.com/arkitektio/pokket/commit/71d3961ec3a21ef5c11f8cb9c103fac1cf61ed6d))
+* new ui update ([b7a1d40](https://github.com/arkitektio/pokket/commit/b7a1d40409b3a52e8248983f661201cc80f205d8))
+
 ## [1.0.1](https://github.com/arkitektio/pokket/compare/v1.0.0...v1.0.1) (2026-04-08)
 
 
