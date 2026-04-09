@@ -1,4 +1,5 @@
 import { ThemedText } from '@/components/ThemedText';
+import { useAlertDialog } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useWifiProfiles } from '@/hooks/useWifiProfiles';
@@ -6,7 +7,7 @@ import { EduroamInstance } from '@/lib/eduroam/types';
 import { extractPemCertificate, useEduroam } from '@/lib/eduroam/useEduroam';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 
 export default function EduroamWifiScreen() {
     const [university, setUniversity] = useState<EduroamInstance | null>(null);
@@ -21,6 +22,7 @@ export default function EduroamWifiScreen() {
     const { initialize, search, searchResults, fetchEapConfig, loading } = useEduroam();
     const router = useRouter();
     const params = useLocalSearchParams();
+    const alert = useAlertDialog();
 
     useEffect(() => {
         initialize();
@@ -64,7 +66,7 @@ export default function EduroamWifiScreen() {
 
     const handleSave = async () => {
         if (!university || !identity || !password) {
-            Alert.alert('Error', 'Please fill in all required fields');
+            alert.show('Missing Fields', 'Please fill in all required fields (university, identity, and password).');
             return;
         }
 

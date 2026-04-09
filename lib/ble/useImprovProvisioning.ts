@@ -1,43 +1,34 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Device } from "react-native-ble-plx";
 import {
-  ARKITEKT_SERVICE_UUID,
-  BASE_URL_UUID,
-  buildBaseURLPayload,
-  buildFaktsTokenPayload,
-  buildWifiAnonymousIdentityPayload,
-  buildWifiIdentityPayload,
-  buildWifiPasswordPayload,
-  buildWifiPemCertificatePayload,
-  buildWifiSSIDPayload,
-  FAKTS_TOKEN_UUID,
-  MANIFEST_UUID,
-  parseManifest,
-  parseStatus,
-  STATUS_UUID,
-  WIFI_ANONYMOUS_IDENTITY_UUID,
-  WIFI_IDENTITY_UUID,
-  WIFI_PASSWORD_UUID,
-  WIFI_PEM_CERTIFICATE_UUID,
-  WIFI_SSID_UUID,
+    ARKITEKT_SERVICE_UUID,
+    BASE_URL_UUID,
+    buildBaseURLPayload,
+    buildFaktsTokenPayload,
+    buildWifiAnonymousIdentityPayload,
+    buildWifiIdentityPayload,
+    buildWifiPasswordPayload,
+    buildWifiPemCertificatePayload,
+    buildWifiSSIDPayload,
+    FAKTS_TOKEN_UUID,
+    MANIFEST_UUID,
+    parseManifest,
+    parseStatus,
+    STATUS_UUID,
+    WIFI_ANONYMOUS_IDENTITY_UUID,
+    WIFI_IDENTITY_UUID,
+    WIFI_PASSWORD_UUID,
+    WIFI_PEM_CERTIFICATE_UUID,
+    WIFI_SSID_UUID,
 } from "./improvProtocol";
 import { bleManager } from "./manager";
+import {
+    ManifestValidationError,
+    validateProvisioningConfig,
+    type ValidatedDeviceManifest,
+} from "./validation";
 
-export interface Requirement {
-  key: string;
-  service: string;
-  description: string;
-  optional: boolean;
-}
-
-export interface DeviceManifest {
-  identifier: string;
-  version: string;
-  scopes?: string[];
-  logo?: string;
-  device_id: string;
-  requirements: Requirement[];
-}
+export type { ValidatedDeviceManifest as DeviceManifest };
 
 export interface ProvisioningConfig {
   ssid: string;
@@ -54,9 +45,9 @@ export interface UseImprovProvisioningResult {
   isProvisioning: boolean;
   status: string | null;
   error: string | null;
-  manifest: DeviceManifest | null;
+  manifest: ValidatedDeviceManifest | null;
   provision: (deviceId: string, config: ProvisioningConfig) => Promise<void>;
-  getManifest: (deviceId: string) => Promise<DeviceManifest | null>;
+  getManifest: (deviceId: string) => Promise<ValidatedDeviceManifest | null>;
   getStatus: (deviceId: string) => Promise<string | null>;
   reset: () => void;
 }
@@ -74,7 +65,9 @@ export function useImprovProvisioning(): UseImprovProvisioningResult {
   const [isProvisioning, setIsProvisioning] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [manifest, setManifest] = useState<DeviceManifest | null>(null);
+  const [manifest, setManifest] = useState<ValidatedDeviceManifest | null>(
+    null,
+  );
   const deviceRef = useRef<Map<string, Device>>(new Map());
 
   // Cleanup on unmount
@@ -195,10 +188,12 @@ export function useImprovProvisioning(): UseImprovProvisioningResult {
   );
 
   /**
-   * Get device manifest from MANIFEST characteristic
+   * Get device manifest from MANIFEST characteristic.
+   * Validates the manifest against DeviceManifestSchema.
+   * Returns null and sets error if the manifest is missing or invalid.
    */
   const getManifest = useCallback(
-    async (deviceId: string): Promise<DeviceManifest | null> => {
+    async (deviceId: string): Promise<ValidatedDeviceManifest | null> => {
       try {
         setError(null);
         setStatus("Reading device manifest...");
@@ -213,16 +208,13 @@ export function useImprovProvisioning(): UseImprovProvisioningResult {
 
         console.log("Raw manifest data:", manifestData);
 
+        // parseManifest now validates via Zod – throws ManifestValidationError on schema mismatch
         const parsedManifest = parseManifest(manifestData);
 
         if (!parsedManifest) {
-          // Fallback to basic manifest if parsing fails
-          const basicManifest: DeviceManifest = {
-            identifier: "error-unknown-device",
-            version: "ERROR",
-          };
-          setManifest(basicManifest);
-          return basicManifest;
+          setError("Device returned an empty manifest");
+          setManifest(null);
+          return null;
         }
 
         setManifest(parsedManifest);
@@ -230,15 +222,15 @@ export function useImprovProvisioning(): UseImprovProvisioningResult {
         return parsedManifest;
       } catch (err) {
         const errorMsg =
-          err instanceof Error ? err.message : "Failed to get manifest";
+          err instanceof ManifestValidationError
+            ? err.message
+            : err instanceof Error
+              ? err.message
+              : "Failed to get manifest";
+        console.error("Manifest validation failed:", errorMsg);
         setError(errorMsg);
-        // Return basic manifest as fallback
-        const basicManifest: DeviceManifest = {
-          identifier: "FAULTY-DEVICE",
-          version: errorMsg,
-        };
-        setManifest(basicManifest);
-        return basicManifest;
+        setManifest(null);
+        return null;
       }
     },
     [readCharacteristic],
@@ -257,6 +249,11 @@ export function useImprovProvisioning(): UseImprovProvisioningResult {
     async (deviceId: string, config: ProvisioningConfig) => {
       setIsProvisioning(true);
       setError(null);
+      setStatus("Validating provisioning config...");
+
+      // Validate provisioning config before sending anything over BLE
+      validateProvisioningConfig(config);
+
       setStatus("Starting provisioning...");
 
       console.log("[Provision] Starting provisioning for device:", deviceId);

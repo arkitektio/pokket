@@ -3,6 +3,8 @@
  * Custom BLE service for provisioning ESP32 devices with WiFi and Arkitekt credentials
  */
 
+import { validateManifest, type ValidatedDeviceManifest } from "./validation";
+
 // Arkitekt Provisioning Service UUID (matches Arduino code)
 export const ARKITEKT_SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
 
@@ -218,16 +220,24 @@ export function parseImprovError(
 
 /**
  * Parse device manifest from response
- * The manifest is returned as JSON string from MANIFEST_UUID
+ * The manifest is returned as JSON string from MANIFEST_UUID.
+ * Validates the parsed JSON against DeviceManifestSchema – throws
+ * ManifestValidationError when the payload does not conform.
  */
-export function parseManifest(base64Value: string | null): any | null {
+export function parseManifest(
+  base64Value: string | null,
+): ValidatedDeviceManifest | null {
   const decoded = decodeResponse(base64Value);
   if (!decoded) return null;
 
+  let raw: unknown;
   try {
-    return JSON.parse(decoded);
+    raw = JSON.parse(decoded);
   } catch (err) {
     console.error("Failed to parse manifest JSON:", err);
     return null;
   }
+
+  // Validate against schema – will throw ManifestValidationError on mismatch
+  return validateManifest(raw);
 }

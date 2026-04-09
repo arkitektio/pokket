@@ -1,14 +1,16 @@
 import { ThemedText } from '@/components/ThemedText';
+import { useAlertDialog } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { WifiProfile, useWifiProfiles } from '@/hooks/useWifiProfiles';
 import { App } from '@/lib/app/App';
 import { ARKITEKT_SERVICE_UUID, useBLEScanner, useImprovProvisioning } from '@/lib/ble';
+import { ManifestValidationError, WifiProfileValidationError, validateWifiProfile } from '@/lib/ble/validation';
 import { CreateClientDocument, CreateClientMutation, CreateClientMutationVariables } from '@/lib/lok/api/graphql';
 import { useMutation } from '@/lib/lok/funcs';
 import { Link } from 'expo-router';
 import React, { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { Device } from 'react-native-ble-plx';
 import { IconSymbol } from './ui/IconSymbol';
 
@@ -47,6 +49,9 @@ export function BleProvisioning() {
     // Wifi Profiles hook
     const { profiles, loading: profilesLoading } = useWifiProfiles();
 
+    // Custom alert dialog
+    const alert = useAlertDialog();
+
     // GraphQL mutation to create client and get fakts-token
     const [createClient] = useMutation<CreateClientMutation, CreateClientMutationVariables>(CreateClientDocument);
 
@@ -62,24 +67,6 @@ export function BleProvisioning() {
         }, 15000);
     }, [scanner]);
 
-    const handleDeviceSelect = useCallback(async (device: Device) => {
-        scanner.stopScan();
-        setSelectedDevice(device);
-        setStep(ProvisioningStep.DEVICE_SELECTED);
-
-        // Try to get device manifest
-        try {
-            await provisioning.getManifest(device.id);
-        } catch (err) {
-            console.warn('Could not retrieve manifest:', err);
-        }
-    }, [scanner, provisioning]);
-
-    const handleContinueToCredentials = useCallback(() => {
-        if (!selectedDevice) return;
-        setStep(ProvisioningStep.CREDENTIALS);
-    }, [selectedDevice]);
-
     const handleReset = useCallback(() => {
         setStep(ProvisioningStep.SCANNING);
         setSelectedDevice(null);
@@ -89,19 +76,74 @@ export function BleProvisioning() {
         provisioning.reset();
     }, [scanner, provisioning]);
 
+    const handleDeviceSelect = useCallback(async (device: Device) => {
+        scanner.stopScan();
+        setSelectedDevice(device);
+        setStep(ProvisioningStep.DEVICE_SELECTED);
+
+        // Try to get and validate device manifest
+        try {
+            const manifest = await provisioning.getManifest(device.id);
+            if (!manifest) {
+                alert.show(
+                    'Invalid Device',
+                    'The device did not return a valid manifest. It may not be compatible with this app.',
+                    [{ label: 'Back to Scan', onPress: handleReset }],
+                );
+            }
+        } catch (err) {
+            const message = err instanceof ManifestValidationError
+                ? `Device manifest validation failed:\n${err.issues.map(i => `• ${i.path.join('.')}: ${i.message}`).join('\n')}`
+                : err instanceof Error ? err.message : 'Unknown error';
+            alert.show(
+                'Incompatible Device',
+                message,
+                [{ label: 'Back to Scan', onPress: handleReset }],
+            );
+        }
+    }, [scanner, provisioning, handleReset]);
+
+    const handleContinueToCredentials = useCallback(() => {
+        if (!selectedDevice) return;
+        if (!provisioning.manifest) {
+            alert.show(
+                'Invalid Device',
+                'Cannot continue — the device manifest is missing or invalid. Please select a compatible device.',
+            );
+            return;
+        }
+        setStep(ProvisioningStep.CREDENTIALS);
+    }, [selectedDevice, provisioning.manifest]);
+
     const handleProvision = useCallback(async () => {
         if (!selectedDevice) {
-            Alert.alert('Error', 'No device selected');
+            alert.show('Error', 'No device selected.');
             return;
         }
 
         if (!selectedProfile) {
-            Alert.alert('Error', 'Please select a Wi-Fi profile');
+            alert.show('Error', 'Please select a Wi-Fi profile.');
             return;
         }
 
         if (!token) {
-            Alert.alert('Error', 'Not connected to Arkitekt. Please connect first.');
+            alert.show('Error', 'Not connected to Arkitekt. Please connect first.');
+            return;
+        }
+
+        // Validate WiFi profile before provisioning
+        try {
+            validateWifiProfile(selectedProfile);
+        } catch (err) {
+            if (err instanceof WifiProfileValidationError) {
+                const details = err.issues.map(i => `• ${i.path.join('.')}: ${i.message}`).join('\n');
+                alert.show(
+                    'Invalid Wi-Fi Profile',
+                    `The selected profile has validation errors:\n${details}\n\nPlease update the profile and try again.`,
+                );
+            } else {
+                alert.show('Error', err instanceof Error ? err.message : 'Wi-Fi profile validation failed');
+            }
             return;
         }
 
@@ -117,6 +159,10 @@ export function BleProvisioning() {
             // Step 1: Create a client with the device manifest to get fakts-token
             const deviceName = displayName || selectedDevice?.name || 'Unnamed Device';
             const manifest = await provisioning.getManifest(selectedDevice.id);
+
+            if (!manifest) {
+                throw new Error('Device returned an invalid or empty manifest. Cannot proceed with provisioning.');
+            }
 
             const { data } = await createClient({
                 variables: {
@@ -158,26 +204,20 @@ export function BleProvisioning() {
 
             setStep(ProvisioningStep.COMPLETE);
 
-            Alert.alert(
+            alert.show(
                 'Success!',
                 'Device provisioned successfully. It should now connect to your Wi-Fi network and register with Arkitekt.',
                 [
-                    {
-                        text: 'Provision Another Device',
-                        onPress: handleReset,
-                    },
-                    {
-                        text: 'Done',
-                        style: 'cancel',
-                    },
-                ]
+                    { label: 'Provision Another', onPress: handleReset },
+                    { label: 'Done', variant: 'cancel' },
+                ],
             );
         } catch (err) {
             setStep(ProvisioningStep.CREDENTIALS);
-            Alert.alert(
+            alert.show(
                 'Provisioning Failed',
                 err instanceof Error ? err.message : 'Unknown error occurred',
-                [{ text: 'Try Again' }]
+                [{ label: 'Try Again' }],
             );
         }
     }, [selectedDevice, selectedProfile, displayName, token, provisioning, createClient, handleReset]);

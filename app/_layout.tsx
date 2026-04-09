@@ -1,5 +1,6 @@
 import '~/global.css';
 
+import { AlertDialogProvider } from '@/components/ui/alert-dialog';
 import { App } from '@/lib/app/App';
 import { useArkitekt } from '@/lib/arkitekt/provider';
 import { useColorScheme } from '@/lib/useColorScheme';
@@ -14,8 +15,8 @@ import { NAV_THEME } from '~/lib/constants';
 
 
 export {
-  // Catch any errors thrown by the Layout component.
-  ErrorBoundary
+    // Catch any errors thrown by the Layout component.
+    ErrorBoundary
 } from 'expo-router';
 
 
@@ -89,8 +90,10 @@ export default function RootLayout() {
   return (
     <App.Provider>
       <ThemeProvider value={DARK_THEME}>
-        <StatusBar style={'light'} />
-        <AppLayout />
+        <AlertDialogProvider>
+          <StatusBar style={'light'} />
+          <AppLayout />
+        </AlertDialogProvider>
       </ThemeProvider>
     </App.Provider>
   );

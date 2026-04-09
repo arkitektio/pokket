@@ -1,10 +1,11 @@
 import { ThemedText } from '@/components/ThemedText';
+import { useAlertDialog } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useWifiProfiles } from '@/hooks/useWifiProfiles';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { Alert, ScrollView, Text, TextInput, View } from 'react-native';
+import { ScrollView, Text, TextInput, View } from 'react-native';
 
 export default function StandardWifiScreen() {
     const [ssid, setSsid] = useState('');
@@ -13,6 +14,7 @@ export default function StandardWifiScreen() {
     const { saveProfile } = useWifiProfiles();
     const router = useRouter();
     const params = useLocalSearchParams();
+    const alert = useAlertDialog();
 
     useEffect(() => {
         if (params.ssid) {
@@ -25,7 +27,7 @@ export default function StandardWifiScreen() {
 
     const handleSave = async () => {
         if (!ssid) {
-            Alert.alert('Error', 'SSID is required');
+            alert.show('Missing Field', 'SSID is required. Please enter the network name.');
             return;
         }
 

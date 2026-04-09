@@ -1,14 +1,16 @@
 import { ThemedText } from '@/components/ThemedText';
+import { useAlertDialog } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { useWifiProfiles } from '@/hooks/useWifiProfiles';
 import { Link, Stack } from 'expo-router';
 import React from 'react';
-import { Alert, FlatList, View } from 'react-native';
+import { FlatList, View } from 'react-native';
 
 export default function WifiIndexScreen() {
     const { profiles, deleteProfile } = useWifiProfiles();
+    const alert = useAlertDialog();
 
     return (
         <View className="flex-1 bg-background-300">
@@ -75,17 +77,17 @@ export default function WifiIndexScreen() {
                                             variant="ghost"
                                             size="sm"
                                             onPress={() => {
-                                                Alert.alert(
+                                                alert.show(
                                                     'Delete Profile',
                                                     'Are you sure you want to delete this profile?',
                                                     [
-                                                        { text: 'Cancel', style: 'cancel' },
+                                                        { label: 'Cancel', variant: 'cancel' },
                                                         { 
-                                                            text: 'Delete', 
-                                                            style: 'destructive',
-                                                            onPress: () => deleteProfile(item)
-                                                        }
-                                                    ]
+                                                            label: 'Delete', 
+                                                            variant: 'destructive',
+                                                            onPress: () => deleteProfile(item),
+                                                        },
+                                                    ],
                                                 );
                                             }}
                                         >
