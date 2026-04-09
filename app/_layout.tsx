@@ -1,5 +1,6 @@
 import '~/global.css';
 
+import { AlertDialogProvider } from '@/components/ui/alert-dialog';
 import { App } from '@/lib/app/App';
 import { useArkitekt } from '@/lib/arkitekt/provider';
 import { useColorScheme } from '@/lib/useColorScheme';
@@ -48,7 +49,7 @@ export const AppLayout = () => {
   return (
     <Stack>
       <Stack.Protected guard={isLoggedIn}>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false, title: "Home" }} />
+        <Stack.Screen name="(tabs)" options={{ headerShown: false, title: "Pokket" }} />
         <Stack.Screen name="debug" options={{ title: 'Debug' }} />
         <Stack.Screen name="provision" options={{ title: 'Provision' }} />
         <Stack.Screen name="tasks" options={{ title: 'Tasks' }} />
@@ -89,8 +90,10 @@ export default function RootLayout() {
   return (
     <App.Provider>
       <ThemeProvider value={DARK_THEME}>
-        <StatusBar style={'light'} />
-        <AppLayout />
+        <AlertDialogProvider>
+          <StatusBar style={'light'} />
+          <AppLayout />
+        </AlertDialogProvider>
       </ThemeProvider>
     </App.Provider>
   );

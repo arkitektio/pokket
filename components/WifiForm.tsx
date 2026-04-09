@@ -1,10 +1,11 @@
 
+import { useAlertDialog } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { useWifiProfiles, WifiProfile } from '@/hooks/useWifiProfiles';
 import { EduroamInstance } from '@/lib/eduroam/types';
 import { useEduroam } from '@/lib/eduroam/useEduroam';
 import React, { useEffect, useState } from 'react';
-import { Alert, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { ThemedText } from './ThemedText';
 
 export type WifiFormConfig = {
@@ -36,6 +37,7 @@ export function WifiForm({ onConfigChange, initialConfig, showSaveOption = true 
     const [eduroamSearch, setEduroamSearch] = useState('');
     const [showSavedConfigs, setShowSavedConfigs] = useState(false);
 
+    const alert = useAlertDialog();
     const { profiles, deleteProfile } = useWifiProfiles();
     const { initialize, search, searchResults } = useEduroam();
 
@@ -154,17 +156,17 @@ export function WifiForm({ onConfigChange, initialConfig, showSaveOption = true 
                                             variant="ghost"
                                             onPress={(e) => {
                                                 e?.stopPropagation();
-                                                Alert.alert(
+                                                alert.show(
                                                     'Delete Profile',
-                                                    `Remove saved profile?`,
+                                                    'Remove saved profile?',
                                                     [
-                                                        { text: 'Cancel', style: 'cancel' },
+                                                        { label: 'Cancel', variant: 'cancel' },
                                                         {
-                                                            text: 'Delete',
-                                                            style: 'destructive',
-                                                            onPress: () => deleteProfile(profile)
-                                                        }
-                                                    ]
+                                                            label: 'Delete',
+                                                            variant: 'destructive',
+                                                            onPress: () => deleteProfile(profile),
+                                                        },
+                                                    ],
                                                 );
                                             }}
                                             className="py-1 px-2"

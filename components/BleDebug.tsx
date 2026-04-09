@@ -1,11 +1,9 @@
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { IconSymbol } from '@/components/ui/IconSymbol';
 import { Text } from '@/components/ui/text';
 import { useBLEDevice, useBLEScanner } from '@/lib/ble';
 import React, { useCallback, useState } from 'react';
-import { ActivityIndicator, ScrollView, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
 import { Device } from 'react-native-ble-plx';
 
 /**
@@ -78,251 +76,262 @@ export function BleDebug() {
     };
 
     const renderScanningView = () => (
-        <Card className="mb-4">
-            <CardHeader>
-                <CardTitle>Scan for All BLE Devices</CardTitle>
-                <CardDescription>
-                    Debug view - shows all nearby Bluetooth devices
-                </CardDescription>
-            </CardHeader>
-            <CardContent>
+        <View className="gap-4">
+            <View className="bg-card border border-border rounded-2xl p-5">
+                <Text className="text-lg font-semibold text-foreground mb-1">Scan for Devices</Text>
+                <Text className="text-sm text-muted-foreground mb-4">
+                    Shows all nearby Bluetooth devices
+                </Text>
+
                 <Button
                     onPress={handleStartScan}
                     disabled={scanner.isScanning}
                     className="mb-4"
                 >
-                    <Text>
+                    <Text className="text-primary-foreground font-medium">
                         {scanner.isScanning ? 'Scanning...' : 'Start Scan'}
                     </Text>
                 </Button>
 
                 {scanner.isScanning && (
-                    <View className="flex-row items-center mb-4 p-3 bg-blue-50 rounded-lg">
-                        <ActivityIndicator size="small" color="#3B82F6" />
-                        <ThemedText className="ml-2 text-blue-700">
-                            Scanning for all BLE devices...
-                        </ThemedText>
+                    <View className="flex-row items-center mb-4 p-3 bg-primary/10 rounded-xl">
+                        <ActivityIndicator size="small" color="hsl(165, 50%, 55%)" />
+                        <Text className="ml-3 text-primary text-sm">
+                            Scanning for BLE devices...
+                        </Text>
                     </View>
                 )}
 
                 {scanner.error && (
-                    <View className="mb-4 p-3 bg-red-50 rounded-lg">
-                        <ThemedText className="text-red-700">{scanner.error}</ThemedText>
+                    <View className="mb-4 p-3 bg-destructive/10 rounded-xl">
+                        <Text className="text-destructive text-sm">{scanner.error}</Text>
                     </View>
                 )}
+            </View>
 
-                {/* Device List */}
-                <View className="space-y-2">
-                    <ThemedText className="font-semibold mb-2">
+            {/* Device List */}
+            {(scanner.devices.length > 0 || scanner.isScanning) && (
+                <View className="bg-card border border-border rounded-2xl p-5">
+                    <Text className="font-semibold text-foreground mb-3">
                         Found {scanner.devices.length} device(s)
-                    </ThemedText>
+                    </Text>
 
-                    {scanner.devices.map((device) => (
-                        <TouchableOpacity
-                            key={device.id}
-                            onPress={() => handleDeviceSelect(device)}
-                            className="p-3 border border-gray-300 rounded-lg bg-white"
-                        >
-                            <View className="flex-row justify-between items-start">
-                                <View className="flex-1">
-                                    <Text className="font-semibold">
-                                        {device.name || 'Unnamed Device'}
-                                    </Text>
-                                    <Text className="text-xs text-gray-500 mt-1">
-                                        ID: {device.id}
-                                    </Text>
-                                    {device.localName && device.localName !== device.name && (
-                                        <Text className="text-xs text-gray-500">
-                                            Local: {device.localName}
+                    <View className="gap-2">
+                        {scanner.devices.map((device) => (
+                            <Pressable
+                                key={device.id}
+                                onPress={() => handleDeviceSelect(device)}
+                                className="p-3 border border-border rounded-xl bg-muted active:bg-accent"
+                            >
+                                <View className="flex-row justify-between items-start">
+                                    <View className="flex-1">
+                                        <Text className="font-semibold text-card-foreground text-sm">
+                                            {device.name || 'Unnamed Device'}
                                         </Text>
-                                    )}
-                                </View>
-                                <View className="items-end">
-                                    <Text className="text-xs font-medium">
-                                        {device.rssi} dBm
-                                    </Text>
-                                    {device.serviceUUIDs && device.serviceUUIDs.length > 0 && (
-                                        <Text className="text-xs text-blue-600 mt-1">
-                                            {device.serviceUUIDs.length} service(s)
+                                        <Text className="text-xs text-muted-foreground mt-1">
+                                            {device.id}
                                         </Text>
-                                    )}
+                                        {device.localName && device.localName !== device.name && (
+                                            <Text className="text-xs text-muted-foreground">
+                                                Local: {device.localName}
+                                            </Text>
+                                        )}
+                                    </View>
+                                    <View className="items-end">
+                                        <Text className="text-xs font-medium text-foreground">
+                                            {device.rssi} dBm
+                                        </Text>
+                                        {device.serviceUUIDs && device.serviceUUIDs.length > 0 && (
+                                            <Text className="text-xs text-primary mt-1">
+                                                {device.serviceUUIDs.length} service(s)
+                                            </Text>
+                                        )}
+                                    </View>
                                 </View>
-                            </View>
-                        </TouchableOpacity>
-                    ))}
-                </View>
-
-                {scanner.devices.length === 0 && !scanner.isScanning && (
-                    <View className="p-6 items-center">
-                        <ThemedText className="text-gray-500 text-center">
-                            No devices found. Make sure Bluetooth is enabled.
-                        </ThemedText>
+                            </Pressable>
+                        ))}
                     </View>
-                )}
-            </CardContent>
-        </Card>
+
+                    {scanner.devices.length === 0 && scanner.isScanning && (
+                        <View className="py-6 items-center">
+                            <Text className="text-muted-foreground text-sm text-center">
+                                Searching for devices...
+                            </Text>
+                        </View>
+                    )}
+                </View>
+            )}
+
+            {scanner.devices.length === 0 && !scanner.isScanning && (
+                <View className="py-8 items-center">
+                    <View className="p-4 rounded-2xl bg-muted mb-4">
+                        <IconSymbol name="antenna.radiowaves.left.and.right" size={32} color="hsl(165, 10%, 65%)" />
+                    </View>
+                    <Text className="text-muted-foreground text-sm text-center">
+                        No devices found. Tap scan to search.
+                    </Text>
+                </View>
+            )}
+        </View>
     );
 
     const renderDeviceDetails = () => {
         if (!selectedDevice) return null;
 
         return (
-            <>
-                {/* Device Info Card */}
-                <Card className="mb-4">
-                    <CardHeader>
-                        <CardTitle>Device Information</CardTitle>
-                        <CardDescription>
-                            {selectedDevice.name || 'Unnamed Device'}
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <View className="space-y-2">
-                            <View className="flex-row justify-between">
-                                <ThemedText className="text-gray-600">Connection:</ThemedText>
-                                <ThemedText className={bleDevice.isConnected ? "text-green-600 font-semibold" : "text-red-600"}>
+            <View className="gap-4">
+                {/* Device Info */}
+                <View className="bg-card border border-border rounded-2xl p-5">
+                    <Text className="text-lg font-semibold text-foreground mb-1">Device Information</Text>
+                    <Text className="text-sm text-muted-foreground mb-4">
+                        {selectedDevice.name || 'Unnamed Device'}
+                    </Text>
+
+                    <View className="gap-3">
+                        <View className="flex-row justify-between items-center">
+                            <Text className="text-muted-foreground text-sm">Connection</Text>
+                            <View className={`px-2.5 py-1 rounded-full ${bleDevice.isConnected ? 'bg-primary/15' : 'bg-destructive/15'}`}>
+                                <Text className={`text-xs font-medium ${bleDevice.isConnected ? 'text-primary' : 'text-destructive'}`}>
                                     {bleDevice.isConnected ? 'Connected' : 'Disconnected'}
-                                </ThemedText>
+                                </Text>
                             </View>
-
-                            <View className="flex-row justify-between">
-                                <ThemedText className="text-gray-600">Device ID:</ThemedText>
-                                <ThemedText className="font-mono text-xs flex-1 text-right">
-                                    {selectedDevice.id.substring(0, 24)}...
-                                </ThemedText>
-                            </View>
-
-                            <View className="flex-row justify-between">
-                                <ThemedText className="text-gray-600">RSSI:</ThemedText>
-                                <ThemedText className="font-semibold">
-                                    {selectedDevice.rssi} dBm
-                                </ThemedText>
-                            </View>
-
-                            {selectedDevice.manufacturerData && (
-                                <View className="flex-row justify-between">
-                                    <ThemedText className="text-gray-600">Manufacturer Data:</ThemedText>
-                                    <ThemedText className="font-mono text-xs">
-                                        {selectedDevice.manufacturerData}
-                                    </ThemedText>
-                                </View>
-                            )}
-
-                            {selectedDevice.serviceUUIDs && selectedDevice.serviceUUIDs.length > 0 && (
-                                <View>
-                                    <ThemedText className="text-gray-600 mb-1">Advertised Services:</ThemedText>
-                                    {selectedDevice.serviceUUIDs.map(uuid => (
-                                        <ThemedText key={uuid} className="font-mono text-xs ml-2">
-                                            • {uuid}
-                                        </ThemedText>
-                                    ))}
-                                </View>
-                            )}
                         </View>
 
-                        <View className="flex-row space-x-2 mt-4">
-                            <Button
-                                variant="outline"
-                                onPress={handleDisconnect}
-                                className="flex-1"
-                            >
-                                <Text>Disconnect</Text>
-                            </Button>
-                            {bleDevice.isConnected && bleDevice.services.length === 0 && (
-                                <Button
-                                    onPress={() => bleDevice.discoverServices()}
-                                    className="flex-1"
-                                >
-                                    <Text>Discover Services</Text>
-                                </Button>
-                            )}
+                        <View className="flex-row justify-between items-center">
+                            <Text className="text-muted-foreground text-sm">Device ID</Text>
+                            <Text className="font-mono text-xs text-card-foreground flex-shrink">
+                                {selectedDevice.id.substring(0, 20)}...
+                            </Text>
                         </View>
 
-                        {bleDevice.error && (
-                            <View className="mt-3 p-3 bg-red-50 rounded-lg">
-                                <ThemedText className="text-red-700 text-sm">
-                                    {bleDevice.error}
-                                </ThemedText>
+                        <View className="flex-row justify-between items-center">
+                            <Text className="text-muted-foreground text-sm">RSSI</Text>
+                            <Text className="font-semibold text-sm text-foreground">
+                                {selectedDevice.rssi} dBm
+                            </Text>
+                        </View>
+
+                        {selectedDevice.manufacturerData && (
+                            <View className="flex-row justify-between items-center">
+                                <Text className="text-muted-foreground text-sm">Manufacturer</Text>
+                                <Text className="font-mono text-xs text-card-foreground">
+                                    {selectedDevice.manufacturerData}
+                                </Text>
                             </View>
                         )}
-                    </CardContent>
-                </Card>
+
+                        {selectedDevice.serviceUUIDs && selectedDevice.serviceUUIDs.length > 0 && (
+                            <View>
+                                <Text className="text-muted-foreground text-sm mb-2">Advertised Services</Text>
+                                {selectedDevice.serviceUUIDs.map(uuid => (
+                                    <Text key={uuid} className="font-mono text-xs text-card-foreground ml-2 mb-1">
+                                        • {uuid}
+                                    </Text>
+                                ))}
+                            </View>
+                        )}
+                    </View>
+
+                    <View className="flex-row gap-3 mt-5">
+                        <Button
+                            variant="outline"
+                            onPress={handleDisconnect}
+                            className="flex-1"
+                        >
+                            <Text className="text-foreground">Disconnect</Text>
+                        </Button>
+                        {bleDevice.isConnected && bleDevice.services.length === 0 && (
+                            <Button
+                                onPress={() => bleDevice.discoverServices()}
+                                className="flex-1"
+                            >
+                                <Text className="text-primary-foreground font-medium">Discover</Text>
+                            </Button>
+                        )}
+                    </View>
+
+                    {bleDevice.error && (
+                        <View className="mt-3 p-3 bg-destructive/10 rounded-xl">
+                            <Text className="text-destructive text-sm">{bleDevice.error}</Text>
+                        </View>
+                    )}
+                </View>
 
                 {/* Services & Characteristics */}
                 {bleDevice.services.length > 0 && (
-                    <Card className="mb-4">
-                        <CardHeader>
-                            <CardTitle>Services & Characteristics</CardTitle>
-                            <CardDescription>
-                                {bleDevice.services.length} service(s) discovered
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <View className="space-y-3">
-                                {bleDevice.services.map((service) => (
-                                    <View key={service.uuid} className="border border-gray-300 rounded-lg overflow-hidden">
-                                        {/* Service Header */}
-                                        <TouchableOpacity
-                                            onPress={() => toggleService(service.uuid)}
-                                            className="p-3 bg-gray-50 flex-row justify-between items-center"
-                                        >
-                                            <View className="flex-1">
-                                                <Text className="font-semibold">Service</Text>
-                                                <Text className="font-mono text-xs text-gray-600 mt-1">
-                                                    {service.uuid}
-                                                </Text>
-                                            </View>
-                                            <View className="flex-row items-center">
-                                                <Text className="text-xs text-gray-500 mr-2">
-                                                    {service.characteristics.length} char(s)
-                                                </Text>
-                                                <Text className="text-lg">
-                                                    {expandedServices.has(service.uuid) ? '▼' : '▶'}
-                                                </Text>
-                                            </View>
-                                        </TouchableOpacity>
+                    <View className="bg-card border border-border rounded-2xl p-5">
+                        <Text className="text-lg font-semibold text-foreground mb-1">Services & Characteristics</Text>
+                        <Text className="text-sm text-muted-foreground mb-4">
+                            {bleDevice.services.length} service(s) discovered
+                        </Text>
 
-                                        {/* Characteristics (expandable) */}
-                                        {expandedServices.has(service.uuid) && (
-                                            <View className="p-3 bg-white space-y-2">
-                                                {service.characteristics.map((char) => (
-                                                    <View key={char.uuid} className="p-2 bg-gray-50 rounded">
-                                                        <Text className="font-mono text-xs text-gray-800">
-                                                            {char.uuid}
-                                                        </Text>
-                                                        <Text className="text-xs text-gray-600 mt-1">
-                                                            Properties: {getCharacteristicProperties(char)}
-                                                        </Text>
-                                                    </View>
-                                                ))}
-                                            </View>
-                                        )}
-                                    </View>
-                                ))}
-                            </View>
-                        </CardContent>
-                    </Card>
+                        <View className="gap-3">
+                            {bleDevice.services.map((service) => (
+                                <View key={service.uuid} className="border border-border rounded-xl overflow-hidden">
+                                    {/* Service Header */}
+                                    <Pressable
+                                        onPress={() => toggleService(service.uuid)}
+                                        className="p-3 bg-muted flex-row justify-between items-center active:bg-accent"
+                                    >
+                                        <View className="flex-1">
+                                            <Text className="font-semibold text-sm text-card-foreground">Service</Text>
+                                            <Text className="font-mono text-xs text-muted-foreground mt-1">
+                                                {service.uuid}
+                                            </Text>
+                                        </View>
+                                        <View className="flex-row items-center">
+                                            <Text className="text-xs text-muted-foreground mr-2">
+                                                {service.characteristics.length} char(s)
+                                            </Text>
+                                            <IconSymbol
+                                                name={expandedServices.has(service.uuid) ? "chevron.right" : "chevron.right"}
+                                                size={14}
+                                                color="hsl(165, 10%, 65%)"
+                                                style={{ transform: [{ rotate: expandedServices.has(service.uuid) ? '90deg' : '0deg' }] }}
+                                            />
+                                        </View>
+                                    </Pressable>
+
+                                    {/* Characteristics (expandable) */}
+                                    {expandedServices.has(service.uuid) && (
+                                        <View className="p-3 gap-2">
+                                            {service.characteristics.map((char) => (
+                                                <View key={char.uuid} className="p-2.5 bg-muted rounded-lg">
+                                                    <Text className="font-mono text-xs text-card-foreground">
+                                                        {char.uuid}
+                                                    </Text>
+                                                    <Text className="text-xs text-muted-foreground mt-1">
+                                                        {getCharacteristicProperties(char)}
+                                                    </Text>
+                                                </View>
+                                            ))}
+                                        </View>
+                                    )}
+                                </View>
+                            ))}
+                        </View>
+                    </View>
                 )}
-            </>
+            </View>
         );
     };
 
     return (
-        <ThemedView className="flex-1">
-            <ScrollView className="flex-1 p-4">
+        <View className="flex-1 bg-background">
+            <ScrollView className="flex-1" contentContainerClassName="p-4 gap-4">
                 {/* Header */}
-                <View className="mb-6">
-                    <ThemedText className="text-2xl font-bold mb-2">
-                        BLE Device Debug
-                    </ThemedText>
-                    <ThemedText className="text-gray-600">
-                        Scan and inspect all nearby Bluetooth devices
-                    </ThemedText>
+                <View>
+                    <Text className="text-2xl font-bold text-foreground mb-1">
+                        BLE Debug
+                    </Text>
+                    <Text className="text-muted-foreground text-sm">
+                        Scan and inspect nearby Bluetooth devices
+                    </Text>
                 </View>
 
                 {!selectedDevice && renderScanningView()}
                 {selectedDevice && renderDeviceDetails()}
             </ScrollView>
-        </ThemedView>
+        </View>
     );
 }

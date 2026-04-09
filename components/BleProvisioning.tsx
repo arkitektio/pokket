@@ -1,14 +1,14 @@
-import { ThemedText } from '@/components/ThemedText';
+import { useAlertDialog } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { WifiProfile, useWifiProfiles } from '@/hooks/useWifiProfiles';
 import { App } from '@/lib/app/App';
 import { ARKITEKT_SERVICE_UUID, useBLEScanner, useImprovProvisioning } from '@/lib/ble';
+import { ManifestValidationError, WifiProfileValidationError, validateWifiProfile } from '@/lib/ble/validation';
 import { CreateClientDocument, CreateClientMutation, CreateClientMutationVariables } from '@/lib/lok/api/graphql';
 import { useMutation } from '@/lib/lok/funcs';
 import { Link } from 'expo-router';
 import React, { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 import { Device } from 'react-native-ble-plx';
 import { IconSymbol } from './ui/IconSymbol';
 
@@ -18,6 +18,63 @@ enum ProvisioningStep {
     CREDENTIALS = 'credentials',
     PROVISIONING = 'provisioning',
     COMPLETE = 'complete',
+}
+
+const STEPS = [
+    { key: ProvisioningStep.SCANNING, label: 'Scan' },
+    { key: ProvisioningStep.DEVICE_SELECTED, label: 'Inspect' },
+    { key: ProvisioningStep.CREDENTIALS, label: 'Configure' },
+    { key: ProvisioningStep.COMPLETE, label: 'Done' },
+];
+
+function getStepIndex(step: ProvisioningStep): number {
+    if (step === ProvisioningStep.PROVISIONING) return 2; // provisioning maps to configure
+    return STEPS.findIndex((s) => s.key === step);
+}
+
+function StepIndicator({ currentStep }: { currentStep: ProvisioningStep }) {
+    const activeIndex = getStepIndex(currentStep);
+    return (
+        <View className="flex-row items-center justify-between mb-6 px-2">
+            {STEPS.map((item, index) => {
+                const isActive = index === activeIndex;
+                const isCompleted = index < activeIndex;
+                return (
+                    <React.Fragment key={item.key}>
+                        {index > 0 && (
+                            <View className={`flex-1 h-px mx-1 ${isCompleted ? 'bg-primary' : 'bg-zinc-700'}`} />
+                        )}
+                        <View className="items-center">
+                            <View
+                                className={`w-7 h-7 rounded-full items-center justify-center ${
+                                    isActive ? 'bg-primary' : isCompleted ? 'bg-primary/30' : 'bg-zinc-800'
+                                } ${isActive ? 'border-2 border-primary' : isCompleted ? 'border border-primary/50' : 'border border-zinc-700'}`}
+                            >
+                                {isCompleted ? (
+                                    <IconSymbol name="checkmark" size={12} color="hsl(165, 50%, 55%)" />
+                                ) : (
+                                    <View className={`w-2 h-2 rounded-full ${isActive ? 'bg-white' : 'bg-zinc-600'}`} />
+                                )}
+                            </View>
+                            <Text className={`text-[10px] mt-1 ${
+                                isActive ? 'text-primary font-semibold' : isCompleted ? 'text-primary/60' : 'text-zinc-500'
+                            }`}>
+                                {item.label}
+                            </Text>
+                        </View>
+                    </React.Fragment>
+                );
+            })}
+        </View>
+    );
+}
+
+function PulsingDot({ color = 'bg-blue-500' }: { color?: string }) {
+    return (
+        <View className="items-center justify-center w-5 h-5">
+            <View className={`w-2.5 h-2.5 rounded-full ${color}`} />
+        </View>
+    );
 }
 
 /**
@@ -30,7 +87,7 @@ enum ProvisioningStep {
 export function BleProvisioning() {
     const [step, setStep] = useState<ProvisioningStep>(ProvisioningStep.SCANNING);
     const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
-    const [displayName, setDisplayName] = useState('');
+    const [manifestLoading, setManifestLoading] = useState(false);
     
     // Wifi Config State
     const [selectedProfile, setSelectedProfile] = useState<WifiProfile | null>(null);
@@ -47,6 +104,9 @@ export function BleProvisioning() {
     // Wifi Profiles hook
     const { profiles, loading: profilesLoading } = useWifiProfiles();
 
+    // Custom alert dialog
+    const alert = useAlertDialog();
+
     // GraphQL mutation to create client and get fakts-token
     const [createClient] = useMutation<CreateClientMutation, CreateClientMutationVariables>(CreateClientDocument);
 
@@ -62,46 +122,87 @@ export function BleProvisioning() {
         }, 15000);
     }, [scanner]);
 
-    const handleDeviceSelect = useCallback(async (device: Device) => {
-        scanner.stopScan();
-        setSelectedDevice(device);
-        setStep(ProvisioningStep.DEVICE_SELECTED);
-
-        // Try to get device manifest
-        try {
-            await provisioning.getManifest(device.id);
-        } catch (err) {
-            console.warn('Could not retrieve manifest:', err);
-        }
-    }, [scanner, provisioning]);
-
-    const handleContinueToCredentials = useCallback(() => {
-        if (!selectedDevice) return;
-        setStep(ProvisioningStep.CREDENTIALS);
-    }, [selectedDevice]);
-
     const handleReset = useCallback(() => {
         setStep(ProvisioningStep.SCANNING);
         setSelectedDevice(null);
         setSelectedProfile(null);
-        setDisplayName('');
+        setManifestLoading(false);
         scanner.clearDevices();
         provisioning.reset();
     }, [scanner, provisioning]);
 
+    const handleDeviceSelect = useCallback(async (device: Device) => {
+        scanner.stopScan();
+        setSelectedDevice(device);
+        setStep(ProvisioningStep.DEVICE_SELECTED);
+        setManifestLoading(true);
+
+        // Fetch and validate device manifest upfront
+        try {
+            const manifest = await provisioning.getManifest(device.id);
+            if (!manifest) {
+                alert.show(
+                    'Invalid Device',
+                    'The device did not return a valid manifest. It may not be compatible with this app.',
+                    [{ label: 'Back to Scan', onPress: handleReset }],
+                );
+            }
+        } catch (err) {
+            const message = err instanceof ManifestValidationError
+                ? `Device manifest validation failed:\n${err.issues.map(i => `• ${i.path.join('.')}: ${i.message}`).join('\n')}`
+                : err instanceof Error ? err.message : 'Unknown error';
+            alert.show(
+                'Incompatible Device',
+                message,
+                [{ label: 'Back to Scan', onPress: handleReset }],
+            );
+        } finally {
+            setManifestLoading(false);
+        }
+    }, [scanner, provisioning, handleReset]);
+
+    const handleContinueToCredentials = useCallback(() => {
+        if (!selectedDevice) return;
+        if (manifestLoading) return;
+        if (!provisioning.manifest) {
+            alert.show(
+                'Invalid Device',
+                'Cannot continue — the device manifest is missing or invalid. Please select a compatible device.',
+            );
+            return;
+        }
+        setStep(ProvisioningStep.CREDENTIALS);
+    }, [selectedDevice, manifestLoading, provisioning.manifest]);
+
     const handleProvision = useCallback(async () => {
         if (!selectedDevice) {
-            Alert.alert('Error', 'No device selected');
+            alert.show('Error', 'No device selected.');
             return;
         }
 
         if (!selectedProfile) {
-            Alert.alert('Error', 'Please select a Wi-Fi profile');
+            alert.show('Error', 'Please select a Wi-Fi profile.');
             return;
         }
 
         if (!token) {
-            Alert.alert('Error', 'Not connected to Arkitekt. Please connect first.');
+            alert.show('Error', 'Not connected to Arkitekt. Please connect first.');
+            return;
+        }
+
+        // Validate WiFi profile before provisioning
+        try {
+            validateWifiProfile(selectedProfile);
+        } catch (err) {
+            if (err instanceof WifiProfileValidationError) {
+                const details = err.issues.map(i => `• ${i.path.join('.')}: ${i.message}`).join('\n');
+                alert.show(
+                    'Invalid Wi-Fi Profile',
+                    `The selected profile has validation errors:\n${details}\n\nPlease update the profile and try again.`,
+                );
+            } else {
+                alert.show('Error', err instanceof Error ? err.message : 'Wi-Fi profile validation failed');
+            }
             return;
         }
 
@@ -114,9 +215,11 @@ export function BleProvisioning() {
             // Step 0: If Eduroam, fetch EAP config to get anonymous identity if not set
             let finalAnonymousIdentity = selectedProfile.anonymousIdentity;
             
-            // Step 1: Create a client with the device manifest to get fakts-token
-            const deviceName = displayName || selectedDevice?.name || 'Unnamed Device';
-            const manifest = await provisioning.getManifest(selectedDevice.id);
+            // Use the manifest already fetched and validated in step 2
+            const manifest = provisioning.manifest;
+            if (!manifest) {
+                throw new Error('Device returned an invalid or empty manifest. Cannot proceed with provisioning.');
+            }
 
             const { data } = await createClient({
                 variables: {
@@ -145,7 +248,6 @@ export function BleProvisioning() {
                 ssid: selectedProfile.ssid,
                 password: selectedProfile.password || '',
                 arkitektToken: faktsToken,
-                displayName: deviceName,
                 baseUrl: provisionBaseUrl,
                 identity: selectedProfile.identity,
                 anonymousIdentity: finalAnonymousIdentity,
@@ -158,403 +260,368 @@ export function BleProvisioning() {
 
             setStep(ProvisioningStep.COMPLETE);
 
-            Alert.alert(
+            alert.show(
                 'Success!',
                 'Device provisioned successfully. It should now connect to your Wi-Fi network and register with Arkitekt.',
                 [
-                    {
-                        text: 'Provision Another Device',
-                        onPress: handleReset,
-                    },
-                    {
-                        text: 'Done',
-                        style: 'cancel',
-                    },
-                ]
+                    { label: 'Provision Another', onPress: handleReset },
+                    { label: 'Done', variant: 'cancel' },
+                ],
             );
         } catch (err) {
             setStep(ProvisioningStep.CREDENTIALS);
-            Alert.alert(
+            alert.show(
                 'Provisioning Failed',
                 err instanceof Error ? err.message : 'Unknown error occurred',
-                [{ text: 'Try Again' }]
+                [{ label: 'Try Again' }],
             );
         }
-    }, [selectedDevice, selectedProfile, displayName, token, provisioning, createClient, handleReset]);
+    }, [selectedDevice, selectedProfile, token, provisioning, createClient, handleReset]);
 
     const renderScanningStep = () => (
-        <Card className="mb-4">
-            <CardHeader>
-                <CardTitle>Scan for Devices</CardTitle>
-                <CardDescription>
-                    Looking for devices with Improv Wi-Fi support
-                </CardDescription>
-            </CardHeader>
-            <CardContent>
-                <Button
-                    onPress={handleStartScan}
-                    disabled={scanner.isScanning || provisioning.isProvisioning}
-                    className="mb-4"
-                >
-                    <Text className='text-white'>
+        <View className="flex-1">
+            <Text className="text-lg font-semibold text-foreground mb-1">Find Your Device</Text>
+            <Text className="text-sm text-muted-foreground mb-5">Scan for nearby devices with Improv support</Text>
+
+            <Button
+                onPress={handleStartScan}
+                disabled={scanner.isScanning || provisioning.isProvisioning}
+                className="mb-5"
+            >
+                <View className="flex-row items-center gap-2">
+                    <IconSymbol name={scanner.isScanning ? 'antenna.radiowaves.left.and.right' : 'magnifyingglass'} size={16} color="#fff" />
+                    <Text className="text-white font-medium">
                         {scanner.isScanning ? 'Scanning...' : 'Start Scan'}
                     </Text>
-                </Button>
-
-                {scanner.isScanning && (
-                    <View className="flex-row items-center mb-4 p-3 bg-blue-50 rounded-lg">
-                        <ActivityIndicator size="small" color="#3B82F6" />
-                        <ThemedText className="ml-2 text-blue-700">
-                            Scanning for nearby devices...
-                        </ThemedText>
-                    </View>
-                )}
-
-                {scanner.error && (
-                    <View className="mb-4 p-3 bg-red-50 rounded-lg">
-                        <ThemedText className="text-red-700">{scanner.error}</ThemedText>
-                    </View>
-                )}
-
-                {/* Device List */}
-                <View className="space-y-2">
-                    {scanner.devices.map((device) => (
-                        <Button
-                            key={device.id}
-                            variant="outline"
-                            onPress={() => handleDeviceSelect(device)}
-                            className="justify-start"
-                        >
-                            <View className="flex-row items-center">
-                                <View className="w-2 h-2 bg-green-500 rounded-full mr-3" />
-                                <View>
-                                    <Text className="font-semibold">
-                                        {device.name || 'Unknown Device'}
-                                    </Text>
-                                    <Text className="text-xs text-gray-500">
-                                        {device.id.substring(0, 20)}...
-                                    </Text>
-                                </View>
-                            </View>
-                        </Button>
-                    ))}
                 </View>
+            </Button>
 
-                {scanner.devices.length === 0 && !scanner.isScanning && (
-                    <View className="p-6 items-center">
-                        <ThemedText className="text-gray-500 text-center">
-                            No devices found. Make sure your device is in pairing mode.
-                        </ThemedText>
+            {scanner.isScanning && (
+                <View className="flex-row items-center mb-4 p-3 bg-primary/10 rounded-xl border border-primary/20">
+                    <ActivityIndicator size="small" color="hsl(165, 50%, 55%)" />
+                    <Text className="ml-3 text-primary text-sm">
+                        Scanning for nearby devices...
+                    </Text>
+                </View>
+            )}
+
+            {scanner.error && (
+                <View className="mb-4 p-3 bg-red-500/10 rounded-xl border border-red-500/20">
+                    <Text className="text-red-400 text-sm">{scanner.error}</Text>
+                </View>
+            )}
+
+            <View className="gap-2">
+                {scanner.devices.map((device) => (
+                    <Pressable
+                        key={device.id}
+                        onPress={() => handleDeviceSelect(device)}
+                        className="flex-row items-center p-4 bg-card rounded-xl border border-border active:bg-accent"
+                    >
+                        <View className="w-10 h-10 rounded-full bg-primary/15 items-center justify-center mr-3">
+                            <IconSymbol name="wifi" size={18} color="hsl(165, 50%, 55%)" />
+                        </View>
+                        <View className="flex-1">
+                            <Text className="font-semibold text-card-foreground text-sm">
+                                {device.name || 'Unknown Device'}
+                            </Text>
+                            <Text className="text-xs text-muted-foreground font-mono mt-0.5">
+                                {device.id.substring(0, 20)}...
+                            </Text>
+                        </View>
+                        <View className="flex-row items-center">
+                            <PulsingDot color="bg-green-500" />
+                        </View>
+                    </Pressable>
+                ))}
+            </View>
+
+            {scanner.devices.length === 0 && !scanner.isScanning && (
+                <View className="py-12 items-center">
+                    <View className="w-16 h-16 rounded-full bg-card items-center justify-center mb-4">
+                        <IconSymbol name="wifi" size={28} color="hsl(165, 8%, 35%)"/>
                     </View>
-                )}
-            </CardContent>
-        </Card>
+                    <Text className="text-muted-foreground text-center text-sm">
+                        No devices found.{'\n'}Make sure your device is in pairing mode.
+                    </Text>
+                </View>
+            )}
+        </View>
     );
 
     const renderDeviceSelectedStep = () => (
-        <Card className="mb-4">
-            <CardHeader>
-                <CardTitle>Device Information</CardTitle>
-                <CardDescription>
-                    {selectedDevice?.name || 'Unknown Device'}
-                </CardDescription>
-            </CardHeader>
-            <CardContent>
-                <View className="mb-4 p-4 bg-gray-50 rounded-lg">
-                    <View className="flex-row justify-between mb-2">
-                        <ThemedText className="text-gray-600">Device ID:</ThemedText>
-                        <ThemedText className="font-mono text-xs">
-                            {selectedDevice?.id.substring(0, 16)}...
-                        </ThemedText>
-                    </View>
-                    <View className="flex-row justify-between mb-2">
-                        <ThemedText className="text-gray-600">RSSI:</ThemedText>
-                        <ThemedText className="font-semibold">
-                            {selectedDevice?.rssi} dBm
-                        </ThemedText>
-                    </View>
-                </View>
+        <View className="flex-1">
+            <Text className="text-lg font-semibold text-foreground mb-1">Device Details</Text>
+            <Text className="text-sm text-muted-foreground mb-5">
+                {selectedDevice?.name || 'Unknown Device'}
+            </Text>
 
-                {provisioning.manifest && (
-                    <View className="mb-4 p-4 bg-blue-50 rounded-lg">
-                        <ThemedText className="font-bold mb-2">Device Manifest:</ThemedText>
-                        <ThemedText className="text-xs">
-                            Identifier: {provisioning.manifest.identifier}
-                        </ThemedText>
-                        <ThemedText className="text-xs">
-                            Version: {provisioning.manifest.version}
-                        </ThemedText>
+            <View className="p-4 bg-card rounded-xl border border-border mb-4">
+                <View className="flex-row justify-between items-center mb-3">
+                    <Text className="text-muted-foreground text-sm">Device ID</Text>
+                    <Text className="text-card-foreground font-mono text-xs">
+                        {selectedDevice?.id.substring(0, 16)}...
+                    </Text>
+                </View>
+                <View className="flex-row justify-between items-center">
+                    <Text className="text-muted-foreground text-sm">Signal</Text>
+                    <Text className="text-card-foreground text-sm font-medium">
+                        {selectedDevice?.rssi} dBm
+                    </Text>
+                </View>
+            </View>
+
+            {manifestLoading && (
+                <View className="p-5 bg-primary/10 rounded-xl border border-primary/20 mb-4 items-center">
+                    <ActivityIndicator size="small" color="hsl(165, 50%, 55%)" />
+                    <Text className="text-primary text-sm mt-3">Reading device manifest...</Text>
+                </View>
+            )}
+
+            {provisioning.manifest && !manifestLoading && (
+                <View className="p-4 bg-card rounded-xl border border-border mb-4">
+                    <View className="flex-row items-center mb-3">
+                        <View className="w-8 h-8 rounded-lg bg-primary/15 items-center justify-center mr-3">
+                            <IconSymbol name="doc.text" size={16} color="hsl(165, 50%, 55%)" />
+                        </View>
+                        <Text className="font-semibold text-foreground text-sm">Manifest</Text>
+                    </View>
+                    <View className="gap-2">
+                        <View className="flex-row justify-between">
+                            <Text className="text-muted-foreground text-xs">Identifier</Text>
+                            <Text className="text-card-foreground text-xs font-mono">{provisioning.manifest.identifier}</Text>
+                        </View>
+                        <View className="flex-row justify-between">
+                            <Text className="text-muted-foreground text-xs">Version</Text>
+                            <Text className="text-card-foreground text-xs">{provisioning.manifest.version}</Text>
+                        </View>
                         {provisioning.manifest.scopes && (
-                            <ThemedText className="text-xs">
-                                Scopes: {provisioning.manifest.scopes.join(', ')}
-                            </ThemedText>
+                            <View className="flex-row justify-between">
+                                <Text className="text-muted-foreground text-xs">Scopes</Text>
+                                <Text className="text-card-foreground text-xs">{provisioning.manifest.scopes.join(', ')}</Text>
+                            </View>
                         )}
-                        {provisioning.manifest.requirements && provisioning.manifest.requirements.length > 0 && (
-                            <View className="mt-2">
-                                <ThemedText className="text-xs font-medium mb-1">Requirements:</ThemedText>
+                        {provisioning.manifest.requirements?.length > 0 && (
+                            <View className="mt-1 pt-2 border-t border-border">
+                                <Text className="text-muted-foreground text-xs mb-1">Requirements</Text>
                                 {provisioning.manifest.requirements.map((req, index) => (
-                                    <ThemedText key={index} className="text-xs ml-2">
-                                        - {req.key}: {req.service} ({req.description})
-                                    </ThemedText>
+                                    <Text key={index} className="text-muted-foreground text-xs ml-2">
+                                        {req.key}: {req.service}
+                                    </Text>
                                 ))}
                             </View>
                         )}
-                        {provisioning.manifest.device_id && (
-                            <ThemedText className="text-xs mt-2">
-                                Device ID: {provisioning.manifest.device_id}
-                            </ThemedText>
-                        )}
                     </View>
-                )}
-
-                <View className="flex-row space-x-2 gap-2">
-                    <Button
-                        variant="outline"
-                        onPress={handleReset}
-                        className="flex-1"
-                        disabled={provisioning.isProvisioning}
-                    >
-                        <Text>Back</Text>
-                    </Button>
-                    <Button
-                        onPress={handleContinueToCredentials}
-                        className="flex-1"
-                        disabled={provisioning.isProvisioning}
-                    >
-                        <Text className="text-white">Continue</Text>
-                    </Button>
                 </View>
-            </CardContent>
-        </Card>
+            )}
+
+            <View className="flex-row gap-3 mt-auto">
+                <Button
+                    variant="outline"
+                    onPress={handleReset}
+                    className="flex-1 border-border"
+                    disabled={provisioning.isProvisioning}
+                >
+                    <View className="flex-row items-center gap-2">
+                        <IconSymbol name="chevron.left" size={14} color="hsl(165, 10%, 65%)" />
+                        <Text className="text-muted-foreground">Back</Text>
+                    </View>
+                </Button>
+                <Button
+                    onPress={handleContinueToCredentials}
+                    className="flex-1"
+                    disabled={provisioning.isProvisioning || manifestLoading || !provisioning.manifest}
+                >
+                    {manifestLoading ? (
+                        <View className="flex-row items-center gap-2">
+                            <ActivityIndicator size="small" color="#fff" />
+                            <Text className="text-primary-foreground font-medium">Loading...</Text>
+                        </View>
+                    ) : (
+                        <View className="flex-row items-center gap-2">
+                            <Text className="text-primary-foreground font-medium">Continue</Text>
+                            <IconSymbol name="arrow.right" size={14} color="hsl(165, 50%, 8%)" />
+                        </View>
+                    )}
+                </Button>
+            </View>
+        </View>
     );
 
     const renderCredentialsStep = () => (
-        <Card className="mb-4">
-            <CardHeader>
-                <CardTitle>Wi-Fi Credentials</CardTitle>
-                <CardDescription>
-                    Select a saved Wi-Fi profile to use
-                </CardDescription>
-            </CardHeader>
-            <CardContent>
-                <View className="space-y-4">
-                    {/* Display Name Input */}
-                    <View>
-                        <ThemedText className="mb-2 font-medium">Device Name</ThemedText>
-                        <TextInput
-                            value={displayName}
-                            onChangeText={setDisplayName}
-                            placeholder={selectedDevice?.name || 'My ESP32 Device'}
-                            autoCapitalize="words"
-                            autoCorrect={false}
-                            className="border border-gray-300 rounded-lg px-4 py-3 bg-white dark:bg-zinc-800 dark:text-white dark:border-zinc-700"
-                            placeholderTextColor="#9CA3AF"
-                        />
-                        <ThemedText className="text-xs text-gray-500 mt-1">
-                            Give your device a friendly name (optional)
-                        </ThemedText>
-                    </View>
+        <View className="flex-1">
+            <Text className="text-lg font-semibold text-foreground mb-1">Wi-Fi Configuration</Text>
+            <Text className="text-sm text-muted-foreground mb-5">Select a saved Wi-Fi profile</Text>
 
-                    {/* Profile Selection */}
-                    <View>
-                        <ThemedText className="mb-2 font-medium">Wi-Fi Profile</ThemedText>
-                        <View className="space-y-2">
-                            {profiles.map((profile, index) => (
-                                <Pressable
-                                    key={index}
-                                    onPress={() => setSelectedProfile(profile)}
-                                    className={`p-4 rounded-lg border ${
-                                        selectedProfile === profile
-                                            ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-                                            : 'border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800'
-                                    }`}
-                                >
-                                    <View className="flex-row items-center justify-between">
-                                        <View className="flex-row items-center">
-                                            <IconSymbol 
-                                                name={profile.type === 'eduroam' ? 'building.2.fill' : 'wifi'} 
-                                                size={20} 
-                                                color={selectedProfile === profile ? '#3B82F6' : '#6B7280'} 
-                                            />
-                                            <View className="ml-3">
-                                                <Text className={`font-medium ${
-                                                    selectedProfile === profile ? 'text-blue-700 dark:text-blue-400' : 'text-gray-900 dark:text-gray-100'
-                                                }`}>
-                                                    {profile.ssid}
-                                                </Text>
-                                                <Text className="text-xs text-gray-500">
-                                                    {profile.type === 'eduroam' ? 'Eduroam' : 'Standard Wi-Fi'}
-                                                </Text>
-                                            </View>
-                                        </View>
-                                        {selectedProfile === profile && (
-                                            <IconSymbol name="checkmark.circle.fill" size={20} color="#3B82F6" />
-                                        )}
-                                    </View>
-                                </Pressable>
-                            ))}
+            <View className="gap-2 mb-4">
+                {profiles.map((profile, index) => (
+                    <Pressable
+                        key={index}
+                        onPress={() => setSelectedProfile(profile)}
+                        className={`p-4 rounded-xl border ${
+                            selectedProfile === profile
+                                ? 'border-primary/50 bg-primary/10'
+                                : 'border-border bg-card'
+                        } active:bg-accent`}
+                    >
+                        <View className="flex-row items-center justify-between">
+                            <View className="flex-row items-center">
+                                <View className={`w-10 h-10 rounded-full items-center justify-center mr-3 ${
+                                    selectedProfile === profile ? 'bg-primary/20' : 'bg-muted'
+                                }`}>
+                                    <IconSymbol
+                                        name={profile.type === 'eduroam' ? 'building.2.fill' : 'wifi'}
+                                        size={18}
+                                        color={selectedProfile === profile ? 'hsl(165, 50%, 55%)' : 'hsl(165, 8%, 45%)'}
+                                    />
+                                </View>
+                                <View>
+                                    <Text className={`font-medium text-sm ${
+                                        selectedProfile === profile ? 'text-primary' : 'text-card-foreground'
+                                    }`}>
+                                        {profile.ssid}
+                                    </Text>
+                                    <Text className="text-xs text-muted-foreground mt-0.5">
+                                        {profile.type === 'eduroam' ? 'Eduroam' : 'Standard Wi-Fi'}
+                                    </Text>
+                                </View>
+                            </View>
+                            {selectedProfile === profile && (
+                                <IconSymbol name="checkmark.circle.fill" size={20} color="hsl(165, 50%, 55%)" />
+                            )}
                         </View>
-                        
-                        <Link href="/wifi" asChild>
-                            <Button variant="outline" className="mt-4">
-                                <Text>Setup New Profile</Text>
-                            </Button>
-                        </Link>
+                    </Pressable>
+                ))}
+            </View>
+
+            <Link href="/wifi" asChild>
+                <Button variant="outline" className="border-border mb-4">
+                    <View className="flex-row items-center gap-2">
+                        <IconSymbol name="plus" size={14} color="hsl(165, 10%, 65%)" />
+                        <Text className="text-muted-foreground">Add New Profile</Text>
                     </View>
+                </Button>
+            </Link>
 
-                    {/* Token Info */}
-                    {token && (
-                        <View className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                            <ThemedText className="text-green-700 dark:text-green-400 text-xs">
-                                ✓ Arkitekt token will be sent to device
-                            </ThemedText>
-                        </View>
-                    )}
-
-                    {!token && (
-                        <View className="p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
-                            <ThemedText className="text-yellow-700 dark:text-yellow-400 text-xs">
-                                ⚠ Not connected to Arkitekt. Device will not be registered.
-                            </ThemedText>
-                        </View>
-                    )}
-
-                    {/* Action Buttons */}
-                    <View className="flex-row space-x-2 mt-4 gap-2">
-                        <Button
-                            variant="outline"
-                            onPress={() => setStep(ProvisioningStep.DEVICE_SELECTED)}
-                            className="flex-1"
-                        >
-                            <Text>Back</Text>
-                        </Button>
-                        <Button
-                            onPress={handleProvision}
-                            disabled={!selectedProfile || provisioning.isProvisioning}
-                            className="flex-1"
-                        >
-                            <Text className="text-white">{provisioning.isProvisioning ? 'Provisioning...' : 'Provision Device'}</Text>
-                        </Button>
-                    </View>
+            {token && (
+                <View className="p-3 bg-green-500/10 rounded-xl border border-green-500/20 mb-3">
+                    <Text className="text-green-400 text-xs">
+                        ✓ Arkitekt token will be sent to device
+                    </Text>
                 </View>
-            </CardContent>
-        </Card>
+            )}
+
+            {!token && (
+                <View className="p-3 bg-yellow-500/10 rounded-xl border border-yellow-500/20 mb-3">
+                    <Text className="text-yellow-400 text-xs">
+                        ⚠ Not connected to Arkitekt. Device will not be registered.
+                    </Text>
+                </View>
+            )}
+
+            <View className="flex-row gap-3 mt-auto">
+                <Button
+                    variant="outline"
+                    onPress={() => setStep(ProvisioningStep.DEVICE_SELECTED)}
+                    className="flex-1 border-border"
+                >
+                    <View className="flex-row items-center gap-2">
+                        <IconSymbol name="chevron.left" size={14} color="hsl(165, 10%, 65%)" />
+                        <Text className="text-muted-foreground">Back</Text>
+                    </View>
+                </Button>
+                <Button
+                    onPress={handleProvision}
+                    disabled={!selectedProfile || provisioning.isProvisioning}
+                    className="flex-1"
+                >
+                    <View className="flex-row items-center gap-2">
+                        <IconSymbol name="bolt.fill" size={14} color="hsl(165, 50%, 8%)" />
+                        <Text className="text-primary-foreground font-medium">
+                            {provisioning.isProvisioning ? 'Provisioning...' : 'Provision'}
+                        </Text>
+                    </View>
+                </Button>
+            </View>
+        </View>
     );
 
     const renderProvisioningStep = () => (
-        <Card className="mb-4">
-            <CardHeader>
-                <CardTitle>Provisioning Device</CardTitle>
-                <CardDescription>Please wait...</CardDescription>
-            </CardHeader>
-            <CardContent>
-                <View className="items-center py-8">
-                    <ActivityIndicator size="large" color="#3B82F6" />
-                    <ThemedText className="mt-4 text-center text-gray-600">
-                        {provisioning.status || 'Connecting to device...'}
-                    </ThemedText>
-                </View>
+        <View className="flex-1 items-center justify-center py-12">
+            <View className="w-20 h-20 rounded-full bg-primary/15 items-center justify-center mb-6">
+                <ActivityIndicator size="large" color="hsl(165, 50%, 55%)" />
+            </View>
+            <Text className="text-foreground font-semibold text-lg mb-2">Provisioning Device</Text>
+            <Text className="text-muted-foreground text-sm text-center mb-6">
+                {provisioning.status || 'Connecting to device...'}
+            </Text>
 
-                {provisioning.error && (
-                    <View className="mt-4 p-3 bg-red-50 rounded-lg">
-                        <ThemedText className="text-red-700">{provisioning.error}</ThemedText>
-                    </View>
-                )}
-            </CardContent>
-        </Card>
+            {provisioning.error && (
+                <View className="w-full p-3 bg-destructive/10 rounded-xl border border-destructive/20">
+                    <Text className="text-destructive text-sm">{provisioning.error}</Text>
+                </View>
+            )}
+        </View>
     );
 
     const renderCompleteStep = () => (
-        <Card className="mb-4">
-            <CardHeader>
-                <CardTitle>Provisioning Complete! 🎉</CardTitle>
-                <CardDescription>Your device is ready to use</CardDescription>
-            </CardHeader>
-            <CardContent>
-                <View className="items-center py-6">
-                    <View className="w-16 h-16 bg-green-500 rounded-full items-center justify-center mb-4">
-                        <Text className="text-white text-3xl">✓</Text>
-                    </View>
-                    <ThemedText className="text-center mb-6 text-gray-600">
-                        The device has been provisioned and should now be connecting to your Wi-Fi network.
-                        {token && ' It will register with your Arkitekt server automatically.'}
-                    </ThemedText>
+        <View className="flex-1 items-center justify-center py-12">
+            <View className="w-20 h-20 rounded-full bg-primary/15 items-center justify-center mb-6">
+                <IconSymbol name="checkmark" size={36} color="hsl(165, 50, 55)" />
+            </View>
+            <Text className="text-foreground font-semibold text-lg mb-2">All Done!</Text>
+            <Text className="text-muted-foreground text-sm text-center mb-8 px-4">
+                The device has been provisioned and should now be connecting to your Wi-Fi network.
+                {token && ' It will register with Arkitekt automatically.'}
+            </Text>
 
-                    <Button onPress={handleReset} className="w-full">
-                        <Text>Provision Another Device</Text>
-                    </Button>
+            <Button onPress={handleReset} className="w-full">
+                <View className="flex-row items-center gap-2">
+                    <IconSymbol name="arrow.clockwise" size={14} color="hsl(165, 50%, 8%)" />
+                    <Text className="text-primary-foreground font-medium">Provision Another Device</Text>
                 </View>
-            </CardContent>
-        </Card>
+            </Button>
+        </View>
     );
 
     if (profilesLoading) {
         return (
-            <View className="flex-1 items-center justify-center bg-background-300 dark:bg-zinc-900">
-                <ActivityIndicator size="large" color="#3B82F6" />
+            <View className="flex-1 items-center justify-center bg-background">
+                <View className="w-16 h-16 rounded-full bg-card items-center justify-center mb-4">
+                    <ActivityIndicator size="large" color="hsl(165, 50%, 55%)" />
+                </View>
+                <Text className="text-muted-foreground text-sm">Loading profiles...</Text>
             </View>
         );
     }
 
     if (profiles.length === 0) {
         return (
-            <View className="flex-1 bg-background-300 dark:bg-zinc-900 p-4 items-center justify-center">
-                <Card className="w-full max-w-sm">
-                    <CardHeader>
-                        <CardTitle className="text-center">No Wi-Fi Profiles</CardTitle>
-                        <CardDescription className="text-center">
-                            You need to configure at least one Wi-Fi profile before you can provision devices.
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <Link href="/wifi" asChild>
-                            <Button className="w-full">
-                                <Text className="text-white">Configure Wi-Fi</Text>
-                            </Button>
-                        </Link>
-                    </CardContent>
-                </Card>
+            <View className="flex-1 bg-background p-6 items-center justify-center">
+                <View className="w-16 h-16 rounded-full bg-card items-center justify-center mb-4">
+                    <IconSymbol name="wifi" size={28} color="hsl(165, 8%, 35%)" />
+                </View>
+                <Text className="text-foreground font-semibold text-lg mb-2 text-center">No Wi-Fi Profiles</Text>
+                <Text className="text-muted-foreground text-sm text-center mb-6">
+                    Configure at least one Wi-Fi profile before provisioning devices.
+                </Text>
+                <Link href="/wifi" asChild>
+                    <Button className="w-full max-w-xs">
+                        <View className="flex-row items-center gap-2">
+                            <IconSymbol name="wifi" size={14} color="hsl(165, 50%, 8%)" />
+                            <Text className="text-primary-foreground font-medium">Configure Wi-Fi</Text>
+                        </View>
+                    </Button>
+                </Link>
             </View>
         );
     }
 
     return (
-        <View className="flex-1 bg-background-300 dark:bg-zinc-900">
-            <ScrollView className="flex-1 p-4">
-                {/* Header */}
-                <View className="mb-6">
-                    <ThemedText className="text-2xl font-bold mb-2 text-white">
-                        Device Provisioning
-                    </ThemedText>
-                    <ThemedText className="text-gray-200">
-                        Set up new ESP32 devices with Wi-Fi and Arkitekt
-                    </ThemedText>
-                </View>
+        <View className="flex-1 bg-background">
+            <ScrollView className="flex-1" contentContainerClassName="p-5 pb-10">
+                <StepIndicator currentStep={step} />
 
-                {/* Progress Indicator */}
-                <View className="flex-row justify-between mb-6 px-4">
-                    {[
-                        { step: ProvisioningStep.SCANNING, label: 'Scan' },
-                        { step: ProvisioningStep.DEVICE_SELECTED, label: 'Select' },
-                        { step: ProvisioningStep.CREDENTIALS, label: 'Configure' },
-                        { step: ProvisioningStep.COMPLETE, label: 'Done' },
-                    ].map((item, index) => (
-                        <View key={item.step} className="items-center flex-1">
-                            <View
-                                className={`w-8 h-8 rounded-full items-center justify-center ${step === item.step ||
-                                    (step === ProvisioningStep.PROVISIONING && item.step === ProvisioningStep.CREDENTIALS)
-                                    ? 'bg-blue-500'
-                                    : 'bg-gray-300'
-                                    }`}
-                            >
-                                <Text className="text-white font-bold">{index + 1}</Text>
-                            </View>
-                            <ThemedText className="text-xs mt-1">{item.label}</ThemedText>
-                        </View>
-                    ))}
-                </View>
-
-                {/* Step Content */}
                 {step === ProvisioningStep.SCANNING && renderScanningStep()}
                 {step === ProvisioningStep.DEVICE_SELECTED && renderDeviceSelectedStep()}
                 {step === ProvisioningStep.CREDENTIALS && renderCredentialsStep()}

@@ -21,7 +21,7 @@ function Greeting() {
 
 export default function HomeScreen() {
   return (
-    <ScrollView className="flex-1 bg-background-300">
+    <ScrollView className="flex-1 bg-background">
       <View className="flex-1 px-4 pt-6">
         <Guard.Lok>
             <Greeting />
@@ -36,29 +36,33 @@ export default function HomeScreen() {
             href="/tasks"
             title="Tasks"
             icon="list.bullet"
-            color="#3B82F6"
-            iconBgClassName="bg-blue-100 dark:bg-blue-900/50"
+            color="hsl(170, 36%, 43%)"
+            iconBgClassName="bg-chart-1/10"
+            borderClassName="border-t-2 border-t-chart-1/40"
           />
           <HomeCard
             href="/wifi"
             title="Wi-Fi"
             icon="wifi"
-            color="#10B981"
-            iconBgClassName="bg-green-100 dark:bg-green-900/50"
+            color="hsl(170, 36%, 43%)"
+            iconBgClassName="bg-chart-2/10"
+            borderClassName="border-t-2 border-t-chart-2/40"
           />
           <HomeCard
             href="/provision"
             title="Provision"
-            icon="qrcode"
-            color="#8B5CF6"
-            iconBgClassName="bg-purple-100 dark:bg-purple-900/50"
+            icon="antenna.radiowaves.left.and.right"
+            color="hsl(170, 36%, 43%)"
+            iconBgClassName="bg-chart-3/10"
+            borderClassName="border-t-2 border-t-chart-3/40"
           />
           <HomeCard
             href="/debug"
             title="Debug"
             icon="ant.fill"
-            color="#EF4444"
-            iconBgClassName="bg-red-100 dark:bg-red-900/50"
+            color="hsl(170, 36%, 43%)"
+            iconBgClassName="bg-chart-1/10"
+            borderClassName="border-t-2 border-t-chart-1/40"
           />
         </View>
       </View>
