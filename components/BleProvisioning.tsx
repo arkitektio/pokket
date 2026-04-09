@@ -22,7 +22,7 @@ enum ProvisioningStep {
 
 const STEPS = [
     { key: ProvisioningStep.SCANNING, label: 'Scan' },
-    { key: ProvisioningStep.DEVICE_SELECTED, label: 'Device' },
+    { key: ProvisioningStep.DEVICE_SELECTED, label: 'Inspect' },
     { key: ProvisioningStep.CREDENTIALS, label: 'Configure' },
     { key: ProvisioningStep.COMPLETE, label: 'Done' },
 ];
@@ -42,22 +42,22 @@ function StepIndicator({ currentStep }: { currentStep: ProvisioningStep }) {
                 return (
                     <React.Fragment key={item.key}>
                         {index > 0 && (
-                            <View className={`flex-1 h-px mx-1 ${isCompleted ? 'bg-blue-500' : 'bg-zinc-700'}`} />
+                            <View className={`flex-1 h-px mx-1 ${isCompleted ? 'bg-primary' : 'bg-zinc-700'}`} />
                         )}
                         <View className="items-center">
                             <View
                                 className={`w-7 h-7 rounded-full items-center justify-center ${
-                                    isActive ? 'bg-blue-500' : isCompleted ? 'bg-blue-500/30' : 'bg-zinc-800'
-                                } ${isActive ? 'border-2 border-blue-400' : isCompleted ? 'border border-blue-500/50' : 'border border-zinc-700'}`}
+                                    isActive ? 'bg-primary' : isCompleted ? 'bg-primary/30' : 'bg-zinc-800'
+                                } ${isActive ? 'border-2 border-primary' : isCompleted ? 'border border-primary/50' : 'border border-zinc-700'}`}
                             >
                                 {isCompleted ? (
-                                    <IconSymbol name="checkmark" size={12} color="#60A5FA" />
+                                    <IconSymbol name="checkmark" size={12} color="hsl(165, 50%, 55%)" />
                                 ) : (
                                     <View className={`w-2 h-2 rounded-full ${isActive ? 'bg-white' : 'bg-zinc-600'}`} />
                                 )}
                             </View>
                             <Text className={`text-[10px] mt-1 ${
-                                isActive ? 'text-blue-400 font-semibold' : isCompleted ? 'text-blue-400/60' : 'text-zinc-500'
+                                isActive ? 'text-primary font-semibold' : isCompleted ? 'text-primary/60' : 'text-zinc-500'
                             }`}>
                                 {item.label}
                             </Text>
@@ -280,23 +280,26 @@ export function BleProvisioning() {
 
     const renderScanningStep = () => (
         <View className="flex-1">
-            <Text className="text-lg font-semibold text-white mb-1">Find Your Device</Text>
-            <Text className="text-sm text-zinc-400 mb-5">Scan for nearby devices with Improv support</Text>
+            <Text className="text-lg font-semibold text-foreground mb-1">Find Your Device</Text>
+            <Text className="text-sm text-muted-foreground mb-5">Scan for nearby devices with Improv support</Text>
 
             <Button
                 onPress={handleStartScan}
                 disabled={scanner.isScanning || provisioning.isProvisioning}
                 className="mb-5"
             >
-                <Text className="text-white font-medium">
-                    {scanner.isScanning ? 'Scanning...' : 'Start Scan'}
-                </Text>
+                <View className="flex-row items-center gap-2">
+                    <IconSymbol name={scanner.isScanning ? 'antenna.radiowaves.left.and.right' : 'magnifyingglass'} size={16} color="#fff" />
+                    <Text className="text-white font-medium">
+                        {scanner.isScanning ? 'Scanning...' : 'Start Scan'}
+                    </Text>
+                </View>
             </Button>
 
             {scanner.isScanning && (
-                <View className="flex-row items-center mb-4 p-3 bg-blue-500/10 rounded-xl border border-blue-500/20">
-                    <ActivityIndicator size="small" color="#60A5FA" />
-                    <Text className="ml-3 text-blue-400 text-sm">
+                <View className="flex-row items-center mb-4 p-3 bg-primary/10 rounded-xl border border-primary/20">
+                    <ActivityIndicator size="small" color="hsl(165, 50%, 55%)" />
+                    <Text className="ml-3 text-primary text-sm">
                         Scanning for nearby devices...
                     </Text>
                 </View>
@@ -313,16 +316,16 @@ export function BleProvisioning() {
                     <Pressable
                         key={device.id}
                         onPress={() => handleDeviceSelect(device)}
-                        className="flex-row items-center p-4 bg-zinc-800/80 rounded-xl border border-zinc-700/50 active:bg-zinc-700"
+                        className="flex-row items-center p-4 bg-card rounded-xl border border-border active:bg-accent"
                     >
-                        <View className="w-10 h-10 rounded-full bg-blue-500/15 items-center justify-center mr-3">
-                            <IconSymbol name="wifi" size={18} color="#60A5FA" />
+                        <View className="w-10 h-10 rounded-full bg-primary/15 items-center justify-center mr-3">
+                            <IconSymbol name="wifi" size={18} color="hsl(165, 50%, 55%)" />
                         </View>
                         <View className="flex-1">
-                            <Text className="font-semibold text-white text-sm">
+                            <Text className="font-semibold text-card-foreground text-sm">
                                 {device.name || 'Unknown Device'}
                             </Text>
-                            <Text className="text-xs text-zinc-500 font-mono mt-0.5">
+                            <Text className="text-xs text-muted-foreground font-mono mt-0.5">
                                 {device.id.substring(0, 20)}...
                             </Text>
                         </View>
@@ -335,10 +338,10 @@ export function BleProvisioning() {
 
             {scanner.devices.length === 0 && !scanner.isScanning && (
                 <View className="py-12 items-center">
-                    <View className="w-16 h-16 rounded-full bg-zinc-800 items-center justify-center mb-4">
-                        <IconSymbol name="wifi" size={28} color="#52525B" />
+                    <View className="w-16 h-16 rounded-full bg-card items-center justify-center mb-4">
+                        <IconSymbol name="wifi" size={28} color="hsl(165, 8%, 35%)"/>
                     </View>
-                    <Text className="text-zinc-500 text-center text-sm">
+                    <Text className="text-muted-foreground text-center text-sm">
                         No devices found.{'\n'}Make sure your device is in pairing mode.
                     </Text>
                 </View>
@@ -348,61 +351,61 @@ export function BleProvisioning() {
 
     const renderDeviceSelectedStep = () => (
         <View className="flex-1">
-            <Text className="text-lg font-semibold text-white mb-1">Device Details</Text>
-            <Text className="text-sm text-zinc-400 mb-5">
+            <Text className="text-lg font-semibold text-foreground mb-1">Device Details</Text>
+            <Text className="text-sm text-muted-foreground mb-5">
                 {selectedDevice?.name || 'Unknown Device'}
             </Text>
 
-            <View className="p-4 bg-zinc-800/80 rounded-xl border border-zinc-700/50 mb-4">
+            <View className="p-4 bg-card rounded-xl border border-border mb-4">
                 <View className="flex-row justify-between items-center mb-3">
-                    <Text className="text-zinc-400 text-sm">Device ID</Text>
-                    <Text className="text-zinc-300 font-mono text-xs">
+                    <Text className="text-muted-foreground text-sm">Device ID</Text>
+                    <Text className="text-card-foreground font-mono text-xs">
                         {selectedDevice?.id.substring(0, 16)}...
                     </Text>
                 </View>
                 <View className="flex-row justify-between items-center">
-                    <Text className="text-zinc-400 text-sm">Signal</Text>
-                    <Text className="text-zinc-300 text-sm font-medium">
+                    <Text className="text-muted-foreground text-sm">Signal</Text>
+                    <Text className="text-card-foreground text-sm font-medium">
                         {selectedDevice?.rssi} dBm
                     </Text>
                 </View>
             </View>
 
             {manifestLoading && (
-                <View className="p-5 bg-blue-500/10 rounded-xl border border-blue-500/20 mb-4 items-center">
-                    <ActivityIndicator size="small" color="#60A5FA" />
-                    <Text className="text-blue-400 text-sm mt-3">Reading device manifest...</Text>
+                <View className="p-5 bg-primary/10 rounded-xl border border-primary/20 mb-4 items-center">
+                    <ActivityIndicator size="small" color="hsl(165, 50%, 55%)" />
+                    <Text className="text-primary text-sm mt-3">Reading device manifest...</Text>
                 </View>
             )}
 
             {provisioning.manifest && !manifestLoading && (
-                <View className="p-4 bg-zinc-800/80 rounded-xl border border-zinc-700/50 mb-4">
+                <View className="p-4 bg-card rounded-xl border border-border mb-4">
                     <View className="flex-row items-center mb-3">
-                        <View className="w-8 h-8 rounded-lg bg-blue-500/15 items-center justify-center mr-3">
-                            <IconSymbol name="doc.text" size={16} color="#60A5FA" />
+                        <View className="w-8 h-8 rounded-lg bg-primary/15 items-center justify-center mr-3">
+                            <IconSymbol name="doc.text" size={16} color="hsl(165, 50%, 55%)" />
                         </View>
-                        <Text className="font-semibold text-white text-sm">Manifest</Text>
+                        <Text className="font-semibold text-foreground text-sm">Manifest</Text>
                     </View>
                     <View className="gap-2">
                         <View className="flex-row justify-between">
-                            <Text className="text-zinc-500 text-xs">Identifier</Text>
-                            <Text className="text-zinc-300 text-xs font-mono">{provisioning.manifest.identifier}</Text>
+                            <Text className="text-muted-foreground text-xs">Identifier</Text>
+                            <Text className="text-card-foreground text-xs font-mono">{provisioning.manifest.identifier}</Text>
                         </View>
                         <View className="flex-row justify-between">
-                            <Text className="text-zinc-500 text-xs">Version</Text>
-                            <Text className="text-zinc-300 text-xs">{provisioning.manifest.version}</Text>
+                            <Text className="text-muted-foreground text-xs">Version</Text>
+                            <Text className="text-card-foreground text-xs">{provisioning.manifest.version}</Text>
                         </View>
                         {provisioning.manifest.scopes && (
                             <View className="flex-row justify-between">
-                                <Text className="text-zinc-500 text-xs">Scopes</Text>
-                                <Text className="text-zinc-300 text-xs">{provisioning.manifest.scopes.join(', ')}</Text>
+                                <Text className="text-muted-foreground text-xs">Scopes</Text>
+                                <Text className="text-card-foreground text-xs">{provisioning.manifest.scopes.join(', ')}</Text>
                             </View>
                         )}
                         {provisioning.manifest.requirements?.length > 0 && (
-                            <View className="mt-1 pt-2 border-t border-zinc-700/50">
-                                <Text className="text-zinc-500 text-xs mb-1">Requirements</Text>
+                            <View className="mt-1 pt-2 border-t border-border">
+                                <Text className="text-muted-foreground text-xs mb-1">Requirements</Text>
                                 {provisioning.manifest.requirements.map((req, index) => (
-                                    <Text key={index} className="text-zinc-400 text-xs ml-2">
+                                    <Text key={index} className="text-muted-foreground text-xs ml-2">
                                         {req.key}: {req.service}
                                     </Text>
                                 ))}
@@ -416,10 +419,13 @@ export function BleProvisioning() {
                 <Button
                     variant="outline"
                     onPress={handleReset}
-                    className="flex-1 border-zinc-700"
+                    className="flex-1 border-border"
                     disabled={provisioning.isProvisioning}
                 >
-                    <Text className="text-zinc-300">Back</Text>
+                    <View className="flex-row items-center gap-2">
+                        <IconSymbol name="chevron.left" size={14} color="hsl(165, 10%, 65%)" />
+                        <Text className="text-muted-foreground">Back</Text>
+                    </View>
                 </Button>
                 <Button
                     onPress={handleContinueToCredentials}
@@ -429,10 +435,13 @@ export function BleProvisioning() {
                     {manifestLoading ? (
                         <View className="flex-row items-center gap-2">
                             <ActivityIndicator size="small" color="#fff" />
-                            <Text className="text-white font-medium">Loading...</Text>
+                            <Text className="text-primary-foreground font-medium">Loading...</Text>
                         </View>
                     ) : (
-                        <Text className="text-white font-medium">Continue</Text>
+                        <View className="flex-row items-center gap-2">
+                            <Text className="text-primary-foreground font-medium">Continue</Text>
+                            <IconSymbol name="arrow.right" size={14} color="hsl(165, 50%, 8%)" />
+                        </View>
                     )}
                 </Button>
             </View>
@@ -441,8 +450,8 @@ export function BleProvisioning() {
 
     const renderCredentialsStep = () => (
         <View className="flex-1">
-            <Text className="text-lg font-semibold text-white mb-1">Wi-Fi Configuration</Text>
-            <Text className="text-sm text-zinc-400 mb-5">Select a saved Wi-Fi profile</Text>
+            <Text className="text-lg font-semibold text-foreground mb-1">Wi-Fi Configuration</Text>
+            <Text className="text-sm text-muted-foreground mb-5">Select a saved Wi-Fi profile</Text>
 
             <View className="gap-2 mb-4">
                 {profiles.map((profile, index) => (
@@ -451,34 +460,34 @@ export function BleProvisioning() {
                         onPress={() => setSelectedProfile(profile)}
                         className={`p-4 rounded-xl border ${
                             selectedProfile === profile
-                                ? 'border-blue-500/50 bg-blue-500/10'
-                                : 'border-zinc-700/50 bg-zinc-800/80'
-                        } active:bg-zinc-700`}
+                                ? 'border-primary/50 bg-primary/10'
+                                : 'border-border bg-card'
+                        } active:bg-accent`}
                     >
                         <View className="flex-row items-center justify-between">
                             <View className="flex-row items-center">
                                 <View className={`w-10 h-10 rounded-full items-center justify-center mr-3 ${
-                                    selectedProfile === profile ? 'bg-blue-500/20' : 'bg-zinc-700/50'
+                                    selectedProfile === profile ? 'bg-primary/20' : 'bg-muted'
                                 }`}>
                                     <IconSymbol
                                         name={profile.type === 'eduroam' ? 'building.2.fill' : 'wifi'}
                                         size={18}
-                                        color={selectedProfile === profile ? '#60A5FA' : '#71717A'}
+                                        color={selectedProfile === profile ? 'hsl(165, 50%, 55%)' : 'hsl(165, 8%, 45%)'}
                                     />
                                 </View>
                                 <View>
                                     <Text className={`font-medium text-sm ${
-                                        selectedProfile === profile ? 'text-blue-400' : 'text-zinc-200'
+                                        selectedProfile === profile ? 'text-primary' : 'text-card-foreground'
                                     }`}>
                                         {profile.ssid}
                                     </Text>
-                                    <Text className="text-xs text-zinc-500 mt-0.5">
+                                    <Text className="text-xs text-muted-foreground mt-0.5">
                                         {profile.type === 'eduroam' ? 'Eduroam' : 'Standard Wi-Fi'}
                                     </Text>
                                 </View>
                             </View>
                             {selectedProfile === profile && (
-                                <IconSymbol name="checkmark.circle.fill" size={20} color="#60A5FA" />
+                                <IconSymbol name="checkmark.circle.fill" size={20} color="hsl(165, 50%, 55%)" />
                             )}
                         </View>
                     </Pressable>
@@ -486,8 +495,11 @@ export function BleProvisioning() {
             </View>
 
             <Link href="/wifi" asChild>
-                <Button variant="outline" className="border-zinc-700 mb-4">
-                    <Text className="text-zinc-300">+ Add New Profile</Text>
+                <Button variant="outline" className="border-border mb-4">
+                    <View className="flex-row items-center gap-2">
+                        <IconSymbol name="plus" size={14} color="hsl(165, 10%, 65%)" />
+                        <Text className="text-muted-foreground">Add New Profile</Text>
+                    </View>
                 </Button>
             </Link>
 
@@ -511,18 +523,24 @@ export function BleProvisioning() {
                 <Button
                     variant="outline"
                     onPress={() => setStep(ProvisioningStep.DEVICE_SELECTED)}
-                    className="flex-1 border-zinc-700"
+                    className="flex-1 border-border"
                 >
-                    <Text className="text-zinc-300">Back</Text>
+                    <View className="flex-row items-center gap-2">
+                        <IconSymbol name="chevron.left" size={14} color="hsl(165, 10%, 65%)" />
+                        <Text className="text-muted-foreground">Back</Text>
+                    </View>
                 </Button>
                 <Button
                     onPress={handleProvision}
                     disabled={!selectedProfile || provisioning.isProvisioning}
                     className="flex-1"
                 >
-                    <Text className="text-white font-medium">
-                        {provisioning.isProvisioning ? 'Provisioning...' : 'Provision Device'}
-                    </Text>
+                    <View className="flex-row items-center gap-2">
+                        <IconSymbol name="bolt.fill" size={14} color="hsl(165, 50%, 8%)" />
+                        <Text className="text-primary-foreground font-medium">
+                            {provisioning.isProvisioning ? 'Provisioning...' : 'Provision'}
+                        </Text>
+                    </View>
                 </Button>
             </View>
         </View>
@@ -530,17 +548,17 @@ export function BleProvisioning() {
 
     const renderProvisioningStep = () => (
         <View className="flex-1 items-center justify-center py-12">
-            <View className="w-20 h-20 rounded-full bg-blue-500/15 items-center justify-center mb-6">
-                <ActivityIndicator size="large" color="#60A5FA" />
+            <View className="w-20 h-20 rounded-full bg-primary/15 items-center justify-center mb-6">
+                <ActivityIndicator size="large" color="hsl(165, 50%, 55%)" />
             </View>
-            <Text className="text-white font-semibold text-lg mb-2">Provisioning Device</Text>
-            <Text className="text-zinc-400 text-sm text-center mb-6">
+            <Text className="text-foreground font-semibold text-lg mb-2">Provisioning Device</Text>
+            <Text className="text-muted-foreground text-sm text-center mb-6">
                 {provisioning.status || 'Connecting to device...'}
             </Text>
 
             {provisioning.error && (
-                <View className="w-full p-3 bg-red-500/10 rounded-xl border border-red-500/20">
-                    <Text className="text-red-400 text-sm">{provisioning.error}</Text>
+                <View className="w-full p-3 bg-destructive/10 rounded-xl border border-destructive/20">
+                    <Text className="text-destructive text-sm">{provisioning.error}</Text>
                 </View>
             )}
         </View>
@@ -548,45 +566,51 @@ export function BleProvisioning() {
 
     const renderCompleteStep = () => (
         <View className="flex-1 items-center justify-center py-12">
-            <View className="w-20 h-20 rounded-full bg-green-500/15 items-center justify-center mb-6">
-                <IconSymbol name="checkmark" size={36} color="#4ADE80" />
+            <View className="w-20 h-20 rounded-full bg-primary/15 items-center justify-center mb-6">
+                <IconSymbol name="checkmark" size={36} color="hsl(165, 50, 55)" />
             </View>
-            <Text className="text-white font-semibold text-lg mb-2">All Done!</Text>
-            <Text className="text-zinc-400 text-sm text-center mb-8 px-4">
+            <Text className="text-foreground font-semibold text-lg mb-2">All Done!</Text>
+            <Text className="text-muted-foreground text-sm text-center mb-8 px-4">
                 The device has been provisioned and should now be connecting to your Wi-Fi network.
                 {token && ' It will register with Arkitekt automatically.'}
             </Text>
 
             <Button onPress={handleReset} className="w-full">
-                <Text className="text-white font-medium">Provision Another Device</Text>
+                <View className="flex-row items-center gap-2">
+                    <IconSymbol name="arrow.clockwise" size={14} color="hsl(165, 50%, 8%)" />
+                    <Text className="text-primary-foreground font-medium">Provision Another Device</Text>
+                </View>
             </Button>
         </View>
     );
 
     if (profilesLoading) {
         return (
-            <View className="flex-1 items-center justify-center bg-zinc-950">
-                <View className="w-16 h-16 rounded-full bg-zinc-800 items-center justify-center mb-4">
-                    <ActivityIndicator size="large" color="#60A5FA" />
+            <View className="flex-1 items-center justify-center bg-background">
+                <View className="w-16 h-16 rounded-full bg-card items-center justify-center mb-4">
+                    <ActivityIndicator size="large" color="hsl(165, 50%, 55%)" />
                 </View>
-                <Text className="text-zinc-400 text-sm">Loading profiles...</Text>
+                <Text className="text-muted-foreground text-sm">Loading profiles...</Text>
             </View>
         );
     }
 
     if (profiles.length === 0) {
         return (
-            <View className="flex-1 bg-zinc-950 p-6 items-center justify-center">
-                <View className="w-16 h-16 rounded-full bg-zinc-800 items-center justify-center mb-4">
-                    <IconSymbol name="wifi" size={28} color="#52525B" />
+            <View className="flex-1 bg-background p-6 items-center justify-center">
+                <View className="w-16 h-16 rounded-full bg-card items-center justify-center mb-4">
+                    <IconSymbol name="wifi" size={28} color="hsl(165, 8%, 35%)" />
                 </View>
-                <Text className="text-white font-semibold text-lg mb-2 text-center">No Wi-Fi Profiles</Text>
-                <Text className="text-zinc-400 text-sm text-center mb-6">
+                <Text className="text-foreground font-semibold text-lg mb-2 text-center">No Wi-Fi Profiles</Text>
+                <Text className="text-muted-foreground text-sm text-center mb-6">
                     Configure at least one Wi-Fi profile before provisioning devices.
                 </Text>
                 <Link href="/wifi" asChild>
                     <Button className="w-full max-w-xs">
-                        <Text className="text-white font-medium">Configure Wi-Fi</Text>
+                        <View className="flex-row items-center gap-2">
+                            <IconSymbol name="wifi" size={14} color="hsl(165, 50%, 8%)" />
+                            <Text className="text-primary-foreground font-medium">Configure Wi-Fi</Text>
+                        </View>
                     </Button>
                 </Link>
             </View>
@@ -594,7 +618,7 @@ export function BleProvisioning() {
     }
 
     return (
-        <View className="flex-1 bg-zinc-950">
+        <View className="flex-1 bg-background">
             <ScrollView className="flex-1" contentContainerClassName="p-5 pb-10">
                 <StepIndicator currentStep={step} />
 

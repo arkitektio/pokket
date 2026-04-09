@@ -39,53 +39,53 @@ export default function StandardWifiScreen() {
     };
 
     return (
-        <View className="flex-1 bg-zinc-950">
+        <View className="flex-1 bg-background">
             <Stack.Screen options={{ title: params.ssid ? 'Edit Standard Wi-Fi' : 'Add Standard Wi-Fi' }} />
             <ScrollView className="flex-1" contentContainerClassName="p-5 gap-5">
                 <View>
-                    <Text className="text-lg font-semibold text-white mb-1">Wi-Fi Details</Text>
-                    <Text className="text-sm text-zinc-400">Enter your network credentials</Text>
+                    <Text className="text-lg font-semibold text-foreground mb-1">Wi-Fi Details</Text>
+                    <Text className="text-sm text-muted-foreground">Enter your network credentials</Text>
                 </View>
 
                 <View className="gap-4">
                     <View>
-                        <Text className="text-sm font-medium text-zinc-300 mb-2">Network Name (SSID)</Text>
+                        <Text className="text-sm font-medium text-foreground mb-2">Network Name (SSID)</Text>
                         <TextInput
                             value={ssid}
                             onChangeText={setSsid}
                             placeholder="Enter Wi-Fi SSID"
-                            placeholderTextColor="#52525B"
+                            placeholderTextColor="hsl(165, 8%, 35%)"
                             autoCapitalize="none"
                             autoCorrect={false}
-                            className="border border-zinc-700/50 rounded-xl px-4 py-3 bg-zinc-800/80 text-zinc-100"
+                            className="border border-border rounded-xl px-4 py-3 bg-card text-card-foreground"
                         />
                     </View>
 
                     <View>
-                        <Text className="text-sm font-medium text-zinc-300 mb-2">Password</Text>
+                        <Text className="text-sm font-medium text-foreground mb-2">Password</Text>
                         <View className="relative">
                             <TextInput
                                 value={password}
                                 onChangeText={setPassword}
                                 placeholder="Enter Wi-Fi password"
-                                placeholderTextColor="#52525B"
+                                placeholderTextColor="hsl(165, 8%, 35%)"
                                 secureTextEntry={!showPassword}
                                 autoCapitalize="none"
                                 autoCorrect={false}
-                                className="border border-zinc-700/50 rounded-xl px-4 py-3 bg-zinc-800/80 text-zinc-100 pr-16"
+                                className="border border-border rounded-xl px-4 py-3 bg-card text-card-foreground pr-16"
                             />
                             <Button
                                 variant="ghost"
                                 onPress={() => setShowPassword(!showPassword)}
                                 className="absolute right-1 top-1"
                             >
-                                <Text className="text-xs text-zinc-400">{showPassword ? 'Hide' : 'Show'}</Text>
+                                <Text className="text-xs text-muted-foreground">{showPassword ? 'Hide' : 'Show'}</Text>
                             </Button>
                         </View>
                     </View>
 
                     <Button onPress={handleSave} className="mt-2">
-                        <Text className="text-white font-medium">Save Configuration</Text>
+                        <Text className="text-primary-foreground font-medium">Save Configuration</Text>
                     </Button>
                 </View>
             </ScrollView>

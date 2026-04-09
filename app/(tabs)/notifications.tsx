@@ -1,25 +1,23 @@
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { IconSymbol } from '@/components/ui/IconSymbol';
-import { ScrollView } from 'react-native';
+import { Text } from '@/components/ui/text';
+import { ScrollView, View } from 'react-native';
 
 export default function NotificationsScreen() {
   return (
-    <ThemedView className="flex-1">
-      <ScrollView className="flex-1 p-4">
-        <Card className="mb-4">
-          <CardHeader className="flex-row items-center space-x-2">
-            <IconSymbol name="bell.fill" size={24} color="#666" />
-            <CardTitle>Notifications</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ThemedText className="text-gray-500 text-center py-8">
-              No new notifications
-            </ThemedText>
-          </CardContent>
-        </Card>
+    <View className="flex-1 bg-background">
+      <ScrollView className="flex-1 p-4" contentContainerClassName="flex-1">
+        <View className="flex-1 items-center justify-center px-6">
+          <View className="p-5 rounded-2xl bg-muted mb-5">
+            <IconSymbol name="bell.slash" size={40} color="hsl(165, 10%, 65%)" />
+          </View>
+          <Text className="text-xl font-semibold text-foreground mb-2">
+            No notifications
+          </Text>
+          <Text className="text-muted-foreground text-center text-sm leading-5">
+            When you receive notifications from your devices or team, they'll appear here.
+          </Text>
+        </View>
       </ScrollView>
-    </ThemedView>
+    </View>
   );
 }

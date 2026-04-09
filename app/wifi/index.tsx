@@ -11,33 +11,33 @@ export default function WifiIndexScreen() {
     const alert = useAlertDialog();
 
     return (
-        <View className="flex-1 bg-zinc-950">
+        <View className="flex-1 bg-background">
             <Stack.Screen options={{ title: 'Wi-Fi Profiles' }} />
             
             <View className="p-5 gap-4">
                 <View className="flex-row gap-2">
                     <Link href="/wifi/standard" asChild>
-                        <Button className="flex-1 flex-row items-center gap-2 bg-zinc-800 border border-zinc-700/50 rounded-xl" variant="outline">
-                            <IconSymbol name="wifi" size={18} color="#60A5FA" />
-                            <Text className="text-zinc-200 text-sm font-medium">Add Wi-Fi</Text>
+                        <Button className="flex-1 flex-row items-center gap-2 bg-card border border-border rounded-xl" variant="outline">
+                            <IconSymbol name="wifi" size={18} color="hsl(165, 50%, 55%)" />
+                            <Text className="text-card-foreground text-sm font-medium">Add Wi-Fi</Text>
                         </Button>
                     </Link>
                     <Link href="/wifi/eduroam" asChild>
-                        <Button className="flex-1 flex-row items-center gap-2 bg-zinc-800 border border-zinc-700/50 rounded-xl" variant="outline">
-                            <IconSymbol name="building.2.fill" size={18} color="#60A5FA" />
-                            <Text className="text-zinc-200 text-sm font-medium">Add Eduroam</Text>
+                        <Button className="flex-1 flex-row items-center gap-2 bg-card border border-border rounded-xl" variant="outline">
+                            <IconSymbol name="building.2.fill" size={18} color="hsl(165, 50%, 55%)" />
+                            <Text className="text-card-foreground text-sm font-medium">Add Eduroam</Text>
                         </Button>
                     </Link>
                 </View>
 
-                <Text className="font-semibold text-base text-zinc-300 mt-2">Saved Profiles</Text>
+                <Text className="font-semibold text-base text-foreground mt-2">Saved Profiles</Text>
                 
                 {profiles.length === 0 ? (
                     <View className="py-12 items-center">
-                        <View className="w-16 h-16 rounded-full bg-zinc-800 items-center justify-center mb-4">
-                            <IconSymbol name="wifi" size={28} color="#52525B" />
+                        <View className="w-16 h-16 rounded-full bg-card items-center justify-center mb-4">
+                            <IconSymbol name="wifi" size={28} color="hsl(165, 8%, 35%)" />
                         </View>
-                        <Text className="text-zinc-500 text-sm">No saved profiles</Text>
+                        <Text className="text-muted-foreground text-sm">No saved profiles</Text>
                     </View>
                 ) : (
                     <FlatList
@@ -45,20 +45,20 @@ export default function WifiIndexScreen() {
                         keyExtractor={(item, index) => index.toString()}
                         ItemSeparatorComponent={() => <View className="h-2" />}
                         renderItem={({ item }) => (
-                            <View className="flex-row items-center justify-between p-4 bg-zinc-800/80 rounded-xl border border-zinc-700/50">
+                            <View className="flex-row items-center justify-between p-4 bg-card rounded-xl border border-border">
                                 <View className="flex-row items-center flex-1">
-                                    <View className="w-10 h-10 rounded-full bg-blue-500/15 items-center justify-center mr-3">
+                                    <View className="w-10 h-10 rounded-full bg-primary/15 items-center justify-center mr-3">
                                         <IconSymbol
                                             name={item.type === 'eduroam' ? 'building.2.fill' : 'wifi'}
                                             size={18}
-                                            color="#60A5FA"
+                                            color="hsl(165, 50%, 55%)"
                                         />
                                     </View>
                                     <View>
-                                        <Text className="font-medium text-sm text-zinc-200">
+                                        <Text className="font-medium text-sm text-card-foreground">
                                             {item.type === 'eduroam' ? item.universityName : item.ssid}
                                         </Text>
-                                        <Text className="text-xs text-zinc-500 mt-0.5">
+                                        <Text className="text-xs text-muted-foreground mt-0.5">
                                             {item.type === 'eduroam' ? 'Eduroam' : 'Standard Wi-Fi'}
                                         </Text>
                                     </View>
@@ -78,7 +78,7 @@ export default function WifiIndexScreen() {
                                         }
                                     }} asChild>
                                         <Button variant="ghost" size="sm">
-                                            <IconSymbol name="square.and.pencil" size={18} color="#71717A" />
+                                            <IconSymbol name="square.and.pencil" size={18} color="hsl(165, 10%, 65%)" />
                                         </Button>
                                     </Link>
                                     <Button

@@ -84,22 +84,22 @@ export default function EduroamWifiScreen() {
     };
 
     return (
-        <View className="flex-1 bg-zinc-950">
+        <View className="flex-1 bg-background">
             <Stack.Screen options={{ title: params.universityId ? 'Edit Eduroam Profile' : 'Add Eduroam Profile' }} />
             <ScrollView className="flex-1" contentContainerClassName="p-5 gap-5">
                 {/* University Section */}
                 <View>
-                    <Text className="text-lg font-semibold text-white mb-1">University / Organization</Text>
-                    <Text className="text-sm text-zinc-400 mb-4">Select your institution</Text>
+                    <Text className="text-lg font-semibold text-foreground mb-1">University / Organization</Text>
+                    <Text className="text-sm text-muted-foreground mb-4">Select your institution</Text>
 
                     {university ? (
-                        <View className="flex-row items-center justify-between p-4 bg-blue-500/10 rounded-xl border border-blue-500/20">
+                        <View className="flex-row items-center justify-between p-4 bg-primary/10 rounded-xl border border-primary/20">
                             <View className="flex-1">
-                                <Text className="font-semibold text-blue-400">{university.name}</Text>
-                                <Text className="text-xs text-blue-400/60 mt-0.5">{university.country}</Text>
+                                <Text className="font-semibold text-primary">{university.name}</Text>
+                                <Text className="text-xs text-primary/60 mt-0.5">{university.country}</Text>
                             </View>
                             <Pressable onPress={() => setUniversity(null)} className="p-2">
-                                <Text className="text-blue-400 font-semibold text-sm">Change</Text>
+                                <Text className="text-primary font-semibold text-sm">Change</Text>
                             </Pressable>
                         </View>
                     ) : (
@@ -108,17 +108,17 @@ export default function EduroamWifiScreen() {
                                 value={eduroamSearch}
                                 onChangeText={setEduroamSearch}
                                 placeholder="Search for your university..."
-                                placeholderTextColor="#52525B"
-                                className="border border-zinc-700/50 rounded-xl px-4 py-3 bg-zinc-800/80 text-zinc-100 mb-2"
+                                placeholderTextColor="hsl(165, 8%, 35%)"
+                                className="border border-border rounded-xl px-4 py-3 bg-card text-card-foreground mb-2"
                             />
                             {loading && (
                                 <View className="py-4 items-center">
-                                    <ActivityIndicator size="small" color="#60A5FA" />
-                                    <Text className="text-zinc-400 text-xs mt-2">Searching...</Text>
+                                    <ActivityIndicator size="small" color="hsl(165, 50%, 55%)" />
+                                    <Text className="text-muted-foreground text-xs mt-2">Searching...</Text>
                                 </View>
                             )}
                             {!loading && searchResults.length > 0 && (
-                                <View className="border border-zinc-700/50 rounded-xl bg-zinc-800/80 max-h-48 overflow-hidden">
+                                <View className="border border-border rounded-xl bg-card max-h-48 overflow-hidden">
                                     <ScrollView nestedScrollEnabled>
                                         {searchResults.map((inst) => (
                                             <Pressable
@@ -127,10 +127,10 @@ export default function EduroamWifiScreen() {
                                                     setUniversity(inst);
                                                     setEduroamSearch('');
                                                 }}
-                                                className="p-3 border-b border-zinc-700/30 active:bg-zinc-700"
+                                                className="p-3 border-b border-border active:bg-accent"
                                             >
-                                                <Text className="font-medium text-zinc-200 text-sm">{inst.name}</Text>
-                                                <Text className="text-xs text-zinc-500">{inst.country}</Text>
+                                                <Text className="font-medium text-card-foreground text-sm">{inst.name}</Text>
+                                                <Text className="text-xs text-muted-foreground">{inst.country}</Text>
                                             </Pressable>
                                         ))}
                                     </ScrollView>
@@ -143,64 +143,64 @@ export default function EduroamWifiScreen() {
                 {/* Credentials Section */}
                 {university && (
                     <View>
-                        <Text className="text-lg font-semibold text-white mb-1">Credentials</Text>
-                        <Text className="text-sm text-zinc-400 mb-4">Enter your login details</Text>
+                        <Text className="text-lg font-semibold text-foreground mb-1">Credentials</Text>
+                        <Text className="text-sm text-muted-foreground mb-4">Enter your login details</Text>
 
                         <View className="gap-4">
                             <View>
-                                <Text className="text-sm font-medium text-zinc-300 mb-2">Identity (Username)</Text>
+                                <Text className="text-sm font-medium text-foreground mb-2">Identity (Username)</Text>
                                 <TextInput
                                     value={identity}
                                     onChangeText={setIdentity}
                                     placeholder="user@university.edu"
-                                    placeholderTextColor="#52525B"
+                                    placeholderTextColor="hsl(165, 8%, 35%)"
                                     autoCapitalize="none"
                                     autoCorrect={false}
-                                    className="border border-zinc-700/50 rounded-xl px-4 py-3 bg-zinc-800/80 text-zinc-100"
+                                    className="border border-border rounded-xl px-4 py-3 bg-card text-card-foreground"
                                 />
                             </View>
                             
                             <View>
-                                <Text className="text-sm font-medium text-zinc-300 mb-2">Anonymous Identity (Optional)</Text>
+                                <Text className="text-sm font-medium text-foreground mb-2">Anonymous Identity (Optional)</Text>
                                 <TextInput
                                     value={anonymousIdentity}
                                     onChangeText={setAnonymousIdentity}
                                     placeholder="anonymous@university.edu"
-                                    placeholderTextColor="#52525B"
+                                    placeholderTextColor="hsl(165, 8%, 35%)"
                                     autoCapitalize="none"
                                     autoCorrect={false}
-                                    className="border border-zinc-700/50 rounded-xl px-4 py-3 bg-zinc-800/80 text-zinc-100"
+                                    className="border border-border rounded-xl px-4 py-3 bg-card text-card-foreground"
                                 />
-                                <Text className="text-xs text-zinc-500 mt-1">
+                                <Text className="text-xs text-muted-foreground mt-1">
                                     Leave blank to use the default anonymous identity
                                 </Text>
                             </View>
 
                             <View>
-                                <Text className="text-sm font-medium text-zinc-300 mb-2">Password</Text>
+                                <Text className="text-sm font-medium text-foreground mb-2">Password</Text>
                                 <View className="relative">
                                     <TextInput
                                         value={password}
                                         onChangeText={setPassword}
                                         placeholder="Password"
-                                        placeholderTextColor="#52525B"
+                                        placeholderTextColor="hsl(165, 8%, 35%)"
                                         secureTextEntry={!showPassword}
                                         autoCapitalize="none"
                                         autoCorrect={false}
-                                        className="border border-zinc-700/50 rounded-xl px-4 py-3 bg-zinc-800/80 text-zinc-100 pr-16"
+                                        className="border border-border rounded-xl px-4 py-3 bg-card text-card-foreground pr-16"
                                     />
                                     <Button
                                         variant="ghost"
                                         onPress={() => setShowPassword(!showPassword)}
                                         className="absolute right-1 top-1"
                                     >
-                                        <Text className="text-xs text-zinc-400">{showPassword ? 'Hide' : 'Show'}</Text>
+                                        <Text className="text-xs text-muted-foreground">{showPassword ? 'Hide' : 'Show'}</Text>
                                     </Button>
                                 </View>
                             </View>
 
                             <Button onPress={handleSave} className="mt-2">
-                                <Text className="text-white font-medium">Save Configuration</Text>
+                                <Text className="text-primary-foreground font-medium">Save Configuration</Text>
                             </Button>
                         </View>
                     </View>
