@@ -5,8 +5,8 @@ import { z } from "zod";
 export const DeviceRequirementSchema = z.object({
   key: z.string().min(1, "Requirement key must not be empty"),
   service: z.string().min(1, "Requirement service must not be empty"),
-  description: z.string(),
-  optional: z.boolean(),
+  description: z.string().optional(),
+  optional: z.boolean().default(false),
 });
 
 export const DeviceManifestSchema = z.object({
@@ -17,13 +17,7 @@ export const DeviceManifestSchema = z.object({
       /^[a-zA-Z0-9._-]+$/,
       "Manifest identifier must only contain alphanumeric characters, dots, hyphens, and underscores",
     ),
-  version: z
-    .string()
-    .min(1, "Manifest version must not be empty")
-    .regex(
-      /^\d+\.\d+\.\d+/,
-      "Manifest version must follow semver (e.g. 1.0.0)",
-    ),
+  version: z.string().min(1, "Manifest version must not be empty"),
   scopes: z.array(z.string()).optional(),
   logo: z.string().url("Manifest logo must be a valid URL").optional(),
   device_id: z.string().min(1, "Manifest device_id must not be empty"),

@@ -10,7 +10,7 @@ import { CreateClientDocument, CreateClientMutation, CreateClientMutationVariabl
 import { useMutation } from '@/lib/lok/funcs';
 import { Link } from 'expo-router';
 import React, { useCallback, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 import { Device } from 'react-native-ble-plx';
 import { IconSymbol } from './ui/IconSymbol';
 
@@ -32,7 +32,7 @@ enum ProvisioningStep {
 export function BleProvisioning() {
     const [step, setStep] = useState<ProvisioningStep>(ProvisioningStep.SCANNING);
     const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
-    const [displayName, setDisplayName] = useState('');
+    const [manifestLoading, setManifestLoading] = useState(false);
     
     // Wifi Config State
     const [selectedProfile, setSelectedProfile] = useState<WifiProfile | null>(null);
@@ -71,7 +71,7 @@ export function BleProvisioning() {
         setStep(ProvisioningStep.SCANNING);
         setSelectedDevice(null);
         setSelectedProfile(null);
-        setDisplayName('');
+        setManifestLoading(false);
         scanner.clearDevices();
         provisioning.reset();
     }, [scanner, provisioning]);
@@ -80,8 +80,9 @@ export function BleProvisioning() {
         scanner.stopScan();
         setSelectedDevice(device);
         setStep(ProvisioningStep.DEVICE_SELECTED);
+        setManifestLoading(true);
 
-        // Try to get and validate device manifest
+        // Fetch and validate device manifest upfront
         try {
             const manifest = await provisioning.getManifest(device.id);
             if (!manifest) {
@@ -100,11 +101,14 @@ export function BleProvisioning() {
                 message,
                 [{ label: 'Back to Scan', onPress: handleReset }],
             );
+        } finally {
+            setManifestLoading(false);
         }
     }, [scanner, provisioning, handleReset]);
 
     const handleContinueToCredentials = useCallback(() => {
         if (!selectedDevice) return;
+        if (manifestLoading) return;
         if (!provisioning.manifest) {
             alert.show(
                 'Invalid Device',
@@ -113,7 +117,7 @@ export function BleProvisioning() {
             return;
         }
         setStep(ProvisioningStep.CREDENTIALS);
-    }, [selectedDevice, provisioning.manifest]);
+    }, [selectedDevice, manifestLoading, provisioning.manifest]);
 
     const handleProvision = useCallback(async () => {
         if (!selectedDevice) {
@@ -156,10 +160,8 @@ export function BleProvisioning() {
             // Step 0: If Eduroam, fetch EAP config to get anonymous identity if not set
             let finalAnonymousIdentity = selectedProfile.anonymousIdentity;
             
-            // Step 1: Create a client with the device manifest to get fakts-token
-            const deviceName = displayName || selectedDevice?.name || 'Unnamed Device';
-            const manifest = await provisioning.getManifest(selectedDevice.id);
-
+            // Use the manifest already fetched and validated in step 2
+            const manifest = provisioning.manifest;
             if (!manifest) {
                 throw new Error('Device returned an invalid or empty manifest. Cannot proceed with provisioning.');
             }
@@ -191,7 +193,6 @@ export function BleProvisioning() {
                 ssid: selectedProfile.ssid,
                 password: selectedProfile.password || '',
                 arkitektToken: faktsToken,
-                displayName: deviceName,
                 baseUrl: provisionBaseUrl,
                 identity: selectedProfile.identity,
                 anonymousIdentity: finalAnonymousIdentity,
@@ -220,7 +221,7 @@ export function BleProvisioning() {
                 [{ label: 'Try Again' }],
             );
         }
-    }, [selectedDevice, selectedProfile, displayName, token, provisioning, createClient, handleReset]);
+    }, [selectedDevice, selectedProfile, token, provisioning, createClient, handleReset]);
 
     const renderScanningStep = () => (
         <Card className="mb-4">
@@ -359,9 +360,9 @@ export function BleProvisioning() {
                     <Button
                         onPress={handleContinueToCredentials}
                         className="flex-1"
-                        disabled={provisioning.isProvisioning}
+                        disabled={provisioning.isProvisioning || manifestLoading || !provisioning.manifest}
                     >
-                        <Text className="text-white">Continue</Text>
+                        <Text className="text-white">{manifestLoading ? 'Reading manifest...' : 'Continue'}</Text>
                     </Button>
                 </View>
             </CardContent>
@@ -378,23 +379,6 @@ export function BleProvisioning() {
             </CardHeader>
             <CardContent>
                 <View className="space-y-4">
-                    {/* Display Name Input */}
-                    <View>
-                        <ThemedText className="mb-2 font-medium">Device Name</ThemedText>
-                        <TextInput
-                            value={displayName}
-                            onChangeText={setDisplayName}
-                            placeholder={selectedDevice?.name || 'My ESP32 Device'}
-                            autoCapitalize="words"
-                            autoCorrect={false}
-                            className="border border-gray-300 rounded-lg px-4 py-3 bg-white dark:bg-zinc-800 dark:text-white dark:border-zinc-700"
-                            placeholderTextColor="#9CA3AF"
-                        />
-                        <ThemedText className="text-xs text-gray-500 mt-1">
-                            Give your device a friendly name (optional)
-                        </ThemedText>
-                    </View>
-
                     {/* Profile Selection */}
                     <View>
                         <ThemedText className="mb-2 font-medium">Wi-Fi Profile</ThemedText>
