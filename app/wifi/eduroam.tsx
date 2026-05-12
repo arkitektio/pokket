@@ -5,7 +5,7 @@ import { EduroamInstance } from '@/lib/eduroam/types';
 import { extractPemCertificate, useEduroam } from '@/lib/eduroam/useEduroam';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, Switch, Text, TextInput, View } from 'react-native';
 
 export default function EduroamWifiScreen() {
     const [university, setUniversity] = useState<EduroamInstance | null>(null);
@@ -15,7 +15,9 @@ export default function EduroamWifiScreen() {
     const [showPassword, setShowPassword] = useState(false);
     const [eduroamSearch, setEduroamSearch] = useState('');
     const [pemCertificate, setPemCertificate] = useState('');
-    
+    const [skipCertValidation, setSkipCertValidation] = useState(false);
+    const [showManualCert, setShowManualCert] = useState(false);
+
     const { saveProfile } = useWifiProfiles();
     const { initialize, search, searchResults, fetchEapConfig, loading } = useEduroam();
     const router = useRouter();
@@ -40,17 +42,17 @@ export default function EduroamWifiScreen() {
         if (params.identity) setIdentity(params.identity as string);
         if (params.anonymousIdentity) setAnonymousIdentity(params.anonymousIdentity as string);
         if (params.password) setPassword(params.password as string);
-    }, [params.universityId, params.universityName, params.universityCountry, params.identity, params.anonymousIdentity, params.password, params.pemCertificate]);
+        if (params.skipCertValidation === 'true') setSkipCertValidation(true);
+    }, [params.universityId, params.universityName, params.universityCountry, params.identity, params.anonymousIdentity, params.password, params.pemCertificate, params.skipCertValidation]);
 
-    // Fetch EAP config to get PEM certificate when university is selected
     useEffect(() => {
         if (university && university.profiles.length > 0 && !pemCertificate) {
-            fetchEapConfig(university.profiles[0]).then((eapConfig) => {
+            fetchEapConfig(university.profiles[0]).then((eapConfig: unknown) => {
                 if (eapConfig) {
-                    const pem = extractPemCertificate(eapConfig);
+                    const pem = extractPemCertificate(eapConfig as Parameters<typeof extractPemCertificate>[0]);
                     if (pem) setPemCertificate(pem);
                 }
-            }).catch((err) => {
+            }).catch((err: unknown) => {
                 console.warn('Failed to fetch EAP config for PEM certificate:', err);
             });
         }
@@ -74,10 +76,11 @@ export default function EduroamWifiScreen() {
             password,
             identity,
             anonymousIdentity,
+            skipCertValidation,
             universityId: university.id,
             universityName: university.name,
             universityCountry: university.country,
-            pemCertificate,
+            pemCertificate: skipCertValidation ? undefined : pemCertificate,
         });
 
         router.back();
@@ -87,7 +90,6 @@ export default function EduroamWifiScreen() {
         <View className="flex-1 bg-background">
             <Stack.Screen options={{ title: params.universityId ? 'Edit Eduroam Profile' : 'Add Eduroam Profile' }} />
             <ScrollView className="flex-1" contentContainerClassName="p-5 gap-5">
-                {/* University Section */}
                 <View>
                     <Text className="text-lg font-semibold text-foreground mb-1">University / Organization</Text>
                     <Text className="text-sm text-muted-foreground mb-4">Select your institution</Text>
@@ -120,7 +122,7 @@ export default function EduroamWifiScreen() {
                             {!loading && searchResults.length > 0 && (
                                 <View className="border border-border rounded-xl bg-card max-h-48 overflow-hidden">
                                     <ScrollView nestedScrollEnabled>
-                                        {searchResults.map((inst) => (
+                                        {searchResults.map((inst: EduroamInstance) => (
                                             <Pressable
                                                 key={inst.id}
                                                 onPress={() => {
@@ -140,7 +142,6 @@ export default function EduroamWifiScreen() {
                     )}
                 </View>
 
-                {/* Credentials Section */}
                 {university && (
                     <View>
                         <Text className="text-lg font-semibold text-foreground mb-1">Credentials</Text>
@@ -159,7 +160,7 @@ export default function EduroamWifiScreen() {
                                     className="border border-border rounded-xl px-4 py-3 bg-card text-card-foreground"
                                 />
                             </View>
-                            
+
                             <View>
                                 <Text className="text-sm font-medium text-foreground mb-2">Anonymous Identity (Optional)</Text>
                                 <TextInput
@@ -197,6 +198,76 @@ export default function EduroamWifiScreen() {
                                         <Text className="text-xs text-muted-foreground">{showPassword ? 'Hide' : 'Show'}</Text>
                                     </Button>
                                 </View>
+                            </View>
+
+                            {/* Certificate Section */}
+                            <View className="p-4 bg-card rounded-xl border border-border gap-3">
+                                <Text className="text-sm font-medium text-foreground">Certificate</Text>
+
+                                <View className="flex-row items-center justify-between">
+                                    <View className="flex-1 mr-3">
+                                        <Text className="text-sm text-foreground">Skip certificate validation</Text>
+                                        <Text className="text-xs text-muted-foreground mt-0.5">
+                                            Use when your institution's CAT profile is unavailable
+                                        </Text>
+                                    </View>
+                                    <Switch
+                                        value={skipCertValidation}
+                                        onValueChange={(val: boolean) => {
+                                            setSkipCertValidation(val);
+                                            if (val) setShowManualCert(false);
+                                        }}
+                                        trackColor={{ false: 'hsl(165, 8%, 20%)', true: 'hsl(165, 50%, 40%)' }}
+                                        thumbColor={skipCertValidation ? 'hsl(165, 50%, 55%)' : 'hsl(165, 8%, 45%)'}
+                                    />
+                                </View>
+
+                                {!skipCertValidation && (
+                                    <View className="gap-2">
+                                        {pemCertificate ? (
+                                            <View className="flex-row items-center justify-between p-3 bg-green-500/10 rounded-lg border border-green-500/20">
+                                                <Text className="text-green-400 text-xs flex-1">
+                                                    Certificate loaded ({pemCertificate.length} bytes)
+                                                </Text>
+                                                <Pressable onPress={() => setShowManualCert((v: boolean) => !v)} className="ml-2">
+                                                    <Text className="text-primary text-xs font-medium">
+                                                        {showManualCert ? 'Hide' : 'Edit'}
+                                                    </Text>
+                                                </Pressable>
+                                            </View>
+                                        ) : (
+                                            <View className="p-3 bg-yellow-500/10 rounded-lg border border-yellow-500/20">
+                                                <Text className="text-yellow-400 text-xs">
+                                                    No certificate found for this institution. Paste one manually or enable skip above.
+                                                </Text>
+                                            </View>
+                                        )}
+
+                                        <Pressable
+                                            onPress={() => setShowManualCert((v: boolean) => !v)}
+                                            className="py-2"
+                                        >
+                                            <Text className="text-primary text-xs font-medium">
+                                                {showManualCert ? 'Hide manual entry' : 'Paste certificate manually'}
+                                            </Text>
+                                        </Pressable>
+
+                                        {showManualCert && (
+                                            <TextInput
+                                                value={pemCertificate}
+                                                onChangeText={setPemCertificate}
+                                                placeholder="-----BEGIN CERTIFICATE-----&#10;...&#10;-----END CERTIFICATE-----"
+                                                placeholderTextColor="hsl(165, 8%, 35%)"
+                                                multiline
+                                                numberOfLines={6}
+                                                autoCapitalize="none"
+                                                autoCorrect={false}
+                                                className="border border-border rounded-xl px-4 py-3 bg-background text-card-foreground font-mono text-xs"
+                                                style={{ minHeight: 120, textAlignVertical: 'top' }}
+                                            />
+                                        )}
+                                    </View>
+                                )}
                             </View>
 
                             <Button onPress={handleSave} className="mt-2">
