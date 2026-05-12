@@ -1,3 +1,10 @@
+# [1.2.0](https://github.com/arkitektio/pokket/compare/v1.1.0...v1.2.0) (2026-05-12)
+
+
+### Features
+
+* **eduroam:** add skip-cert-validation option and manual PEM entry ([dd32603](https://github.com/arkitektio/pokket/commit/dd3260357a12cd8ddea3fc14b5b81fa8e5433c22))
+
 # [1.1.0](https://github.com/arkitektio/pokket/compare/v1.0.1...v1.1.0) (2026-04-09)
 
 
