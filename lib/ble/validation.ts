@@ -54,18 +54,31 @@ export const EduroamWifiProfileSchema = BaseWifiFields.extend({
       "Eduroam identity must be a valid user@domain format",
     ),
   anonymousIdentity: z.string().optional(),
-  pemCertificate: z
-    .string()
-    .min(1, "PEM certificate must not be empty")
-    .refine(
-      (pem) =>
-        pem.includes("-----BEGIN CERTIFICATE-----") &&
-        pem.includes("-----END CERTIFICATE-----"),
-      "PEM certificate must contain valid BEGIN/END CERTIFICATE markers",
-    ),
+  skipCertValidation: z.boolean().optional(),
+  pemCertificate: z.string().optional(),
   universityId: z.string().optional(),
   universityName: z.string().optional(),
   universityCountry: z.string().optional(),
+}).superRefine((data, ctx) => {
+  if (data.skipCertValidation) return;
+  if (!data.pemCertificate || data.pemCertificate.length === 0) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["pemCertificate"],
+      message: 'PEM certificate must not be empty (or enable "Skip certificate validation")',
+    });
+    return;
+  }
+  if (
+    !data.pemCertificate.includes("-----BEGIN CERTIFICATE-----") ||
+    !data.pemCertificate.includes("-----END CERTIFICATE-----")
+  ) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["pemCertificate"],
+      message: "PEM certificate must contain valid BEGIN/END CERTIFICATE markers",
+    });
+  }
 });
 
 export const WifiProfileSchema = z.discriminatedUnion("type", [
@@ -91,19 +104,7 @@ export const ProvisioningConfigSchema = z
     displayName: z.string().optional(),
     baseUrl: z.string().url("Base URL must be a valid URL").optional(),
   })
-  .refine(
-    (config) => {
-      // If identity is set (Eduroam), pemCertificate must also be set
-      if (config.identity && !config.pemCertificate) {
-        return false;
-      }
-      return true;
-    },
-    {
-      message:
-        "Eduroam configuration requires a PEM certificate when identity is provided",
-    },
-  );
+  ;
 
 export type ValidatedProvisioningConfig = z.infer<
   typeof ProvisioningConfigSchema

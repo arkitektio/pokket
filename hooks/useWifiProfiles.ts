@@ -7,6 +7,7 @@ export type WifiProfile = {
   type: "standard" | "eduroam";
   identity?: string;
   anonymousIdentity?: string;
+  skipCertValidation?: boolean;
   pemCertificate?: string;
   universityId?: string;
   universityName?: string;
