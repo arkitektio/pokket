@@ -235,7 +235,7 @@ export function WifiForm({ onConfigChange, initialConfig, showSaveOption = true 
                                 <TextInput
                                     value={identity}
                                     onChangeText={setIdentity}
-                                    placeholder="user@university.edu"
+                                    placeholder="Username"
                                     autoCapitalize="none"
                                     autoCorrect={false}
                                     className="border border-gray-300 rounded-lg px-4 py-3 bg-white"

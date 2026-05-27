@@ -46,13 +46,7 @@ export const StandardWifiProfileSchema = BaseWifiFields.extend({
 export const EduroamWifiProfileSchema = BaseWifiFields.extend({
   type: z.literal("eduroam"),
   password: z.string().min(1, "Eduroam password must not be empty"),
-  identity: z
-    .string()
-    .min(1, "Eduroam identity must not be empty")
-    .regex(
-      /^[^@]+@[^@]+\.[^@]+$/,
-      "Eduroam identity must be a valid user@domain format",
-    ),
+  identity: z.string().min(1, "Eduroam identity must not be empty"),
   anonymousIdentity: z.string().optional(),
   skipCertValidation: z.boolean().optional(),
   pemCertificate: z.string().optional(),
@@ -65,7 +59,8 @@ export const EduroamWifiProfileSchema = BaseWifiFields.extend({
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       path: ["pemCertificate"],
-      message: 'PEM certificate must not be empty (or enable "Skip certificate validation")',
+      message:
+        'PEM certificate must not be empty (or enable "Skip certificate validation")',
     });
     return;
   }
@@ -76,7 +71,8 @@ export const EduroamWifiProfileSchema = BaseWifiFields.extend({
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       path: ["pemCertificate"],
-      message: "PEM certificate must contain valid BEGIN/END CERTIFICATE markers",
+      message:
+        "PEM certificate must contain valid BEGIN/END CERTIFICATE markers",
     });
   }
 });
@@ -90,21 +86,19 @@ export type ValidatedWifiProfile = z.infer<typeof WifiProfileSchema>;
 
 // ---------- Provisioning Config Validation ----------
 
-export const ProvisioningConfigSchema = z
-  .object({
-    ssid: z
-      .string()
-      .min(1, "SSID must not be empty")
-      .max(32, "SSID must not exceed 32 characters"),
-    password: z.string().min(1, "Password must not be empty"),
-    identity: z.string().optional(),
-    anonymousIdentity: z.string().optional(),
-    pemCertificate: z.string().optional(),
-    arkitektToken: z.string().optional(),
-    displayName: z.string().optional(),
-    baseUrl: z.string().url("Base URL must be a valid URL").optional(),
-  })
-  ;
+export const ProvisioningConfigSchema = z.object({
+  ssid: z
+    .string()
+    .min(1, "SSID must not be empty")
+    .max(32, "SSID must not exceed 32 characters"),
+  password: z.string().min(1, "Password must not be empty"),
+  identity: z.string().optional(),
+  anonymousIdentity: z.string().optional(),
+  pemCertificate: z.string().optional(),
+  arkitektToken: z.string().optional(),
+  displayName: z.string().optional(),
+  baseUrl: z.string().url("Base URL must be a valid URL").optional(),
+});
 
 export type ValidatedProvisioningConfig = z.infer<
   typeof ProvisioningConfigSchema
