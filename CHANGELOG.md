@@ -1,3 +1,10 @@
+## [1.2.1](https://github.com/arkitektio/pokket/compare/v1.2.0...v1.2.1) (2026-05-27)
+
+
+### Bug Fixes
+
+* fix uneccsary strict eduroam validation ([8b8196b](https://github.com/arkitektio/pokket/commit/8b8196b922dd8af6f46bfb6b9dc46a8463437d98))
+
 # [1.2.0](https://github.com/arkitektio/pokket/compare/v1.1.0...v1.2.0) (2026-05-12)
 
 
