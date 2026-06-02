@@ -9,5 +9,5 @@ export const mikroServiceDefinition: ServiceDefinition = {
   description: "Mikro is a service for managing microservices.",
   key: "mikro",
   service: "live.arkitekt.mikro",
-  optional: false,
+  optional: true,
 };

@@ -3,6 +3,10 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as WebBrowser from "expo-web-browser";
 import { buildArkitekt } from "../arkitekt";
 import { lokServiceBuilder } from "../lok/service";
+import { lovekitServiceDefinition } from "../lovekit/service";
+import { mikroServiceDefinition } from "../mikro/service";
+import { rekuestServiceDefinition } from "../rekuest/service";
+
 
 
 let asyncStorageProvider = {
@@ -63,7 +67,12 @@ const windowPopper = {
 
 export const App = buildArkitekt({
   manifest,
-  serviceBuilderMap: {},
+  serviceBuilderMap: {
+    rekuest: rekuestServiceDefinition,
+    lovekit: lovekitServiceDefinition,
+    mikro: mikroServiceDefinition ,
+
+  },
   selfServiceBuilder: lokServiceBuilder,
   storageProvider: asyncStorageProvider,
   windowPopper: windowPopper,
@@ -74,5 +83,8 @@ export const App = buildArkitekt({
 
 export const Guard = {
   Lok: App.Guard,
+  Mikro: App.buildServiceGuard("mikro"),
+  Rekuest: App.buildServiceGuard("rekuest"),
+  Lovekit: App.buildServiceGuard("lovekit"),
 };
 
