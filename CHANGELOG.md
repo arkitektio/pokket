@@ -1,3 +1,11 @@
+## [1.2.2](https://github.com/arkitektio/pokket/compare/v1.2.1...v1.2.2) (2026-06-02)
+
+
+### Bug Fixes
+
+* with lovekit support ([6588f6f](https://github.com/arkitektio/pokket/commit/6588f6fea9079b45d74631a958ff32beb935a6a0))
+* with video ([1242ed9](https://github.com/arkitektio/pokket/commit/1242ed98a10ec3a04c2e33715020b00c44445bf0))
+
 ## [1.2.1](https://github.com/arkitektio/pokket/compare/v1.2.0...v1.2.1) (2026-05-27)
 
 
