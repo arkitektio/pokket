@@ -9,5 +9,5 @@ export const rekuestServiceDefinition: ServiceDefinition = {
   key: "rekuest",
   name: "Rekuest",
   service: "live.arkitekt.rekuest",
-  optional: false,
+  optional: true,
 };

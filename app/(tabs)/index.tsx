@@ -57,6 +57,14 @@ export default function HomeScreen() {
             borderClassName="border-t-2 border-t-chart-3/40"
           />
           <HomeCard
+            href="/broadcasts"
+            title="Broadcasts"
+            icon="antenna.radiowaves.left.and.right"
+            color="hsl(170, 36%, 43%)"
+            iconBgClassName="bg-chart-2/10"
+            borderClassName="border-t-2 border-t-chart-2/40"
+          />
+          <HomeCard
             href="/debug"
             title="Debug"
             icon="ant.fill"

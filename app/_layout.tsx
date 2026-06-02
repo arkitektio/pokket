@@ -4,19 +4,21 @@ import { AlertDialogProvider } from '@/components/ui/alert-dialog';
 import { App } from '@/lib/app/App';
 import { useArkitekt } from '@/lib/arkitekt/provider';
 import { useColorScheme } from '@/lib/useColorScheme';
-import { DarkTheme, DefaultTheme, Theme, ThemeProvider } from '@react-navigation/native';
+import { registerGlobals } from '@livekit/react-native';
 import * as Notifications from 'expo-notifications';
 import { Stack } from 'expo-router';
+import { DarkTheme, DefaultTheme, Theme, ThemeProvider } from 'expo-router/react-navigation';
 import { StatusBar } from 'expo-status-bar';
 import * as React from 'react';
 import { Platform } from 'react-native';
 import { NAV_THEME } from '~/lib/constants';
 
+registerGlobals();
 
 
 export {
-  // Catch any errors thrown by the Layout component.
-  ErrorBoundary
+    // Catch any errors thrown by the Layout component.
+    ErrorBoundary
 } from 'expo-router';
 
 
@@ -50,6 +52,9 @@ export const AppLayout = () => {
     <Stack>
       <Stack.Protected guard={isLoggedIn}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false, title: "Pokket" }} />
+        <Stack.Screen name="broadcasts" options={{ title: 'Broadcasts' }} />
+        <Stack.Screen name="solo-broadcast/start" options={{ title: 'Start Solo Broadcast' }} />
+        <Stack.Screen name="solo-broadcast/[id]" options={{ title: 'Solo Broadcast' }} />
         <Stack.Screen name="debug" options={{ title: 'Debug' }} />
         <Stack.Screen name="provision" options={{ title: 'Provision' }} />
         <Stack.Screen name="tasks" options={{ title: 'Tasks' }} />
