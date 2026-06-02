@@ -37,7 +37,7 @@ jobs:
           distribution: "temurin"
 
       - name: Install Dependencies
-        run: npm install
+        run: npm ci --force
 
       - name: Setup Expo
         uses: expo/expo-github-action@v8
