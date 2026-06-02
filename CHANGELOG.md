@@ -1,3 +1,10 @@
+## [1.2.3](https://github.com/arkitektio/pokket/compare/v1.2.2...v1.2.3) (2026-06-02)
+
+
+### Bug Fixes
+
+* force install ([7e57940](https://github.com/arkitektio/pokket/commit/7e5794063faf5546c522b200f2418de7222d0f66))
+
 ## [1.2.2](https://github.com/arkitektio/pokket/compare/v1.2.1...v1.2.2) (2026-06-02)
 
 

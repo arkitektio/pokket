@@ -1,7 +1,7 @@
 {
   "name": "pokket",
   "main": "expo-router/entry",
-  "version": "1.2.2",
+  "version": "1.2.3",
   "scripts": {
     "start": "expo start",
     "tstart": "REACT_NATIVE_PACKAGER_HOSTNAME=jhnnsrs-lab npx expo start --dev-client",
