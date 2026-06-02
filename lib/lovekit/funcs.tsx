@@ -9,7 +9,7 @@ import {
   useSubscription as useApolloSubscription,
 } from "@apollo/client";
 import { useService } from "../arkitekt/provider";
-import { toast } from "sonner";
+
 type MutationFuncType = typeof useApolloMutation;
 type QueryFuncType = typeof useApolloQuery;
 type LazyQueryFuncType = typeof useApolloLazyQuery;
@@ -19,10 +19,10 @@ export type {
   LazyQueryHookOptions,
   MutationHookOptions,
   QueryHookOptions,
-  SubscriptionHookOptions,
+  SubscriptionHookOptions
 };
 
-export const ServiceName = "mikro";
+export const ServiceName = "lovekit";
 
 export const useMutation: MutationFuncType = (doc, options) => {
   const service = useService(ServiceName);
@@ -30,9 +30,6 @@ export const useMutation: MutationFuncType = (doc, options) => {
   return useApolloMutation(doc, {
     ...options,
     client: service.client,
-    onError: (error) => {
-      toast.error("Error in useMutation: " + error.message);
-    },
   });
 };
 

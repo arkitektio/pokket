@@ -15,7 +15,7 @@ generates:
     config:
       withHooks: true
       reactApolloVersion: 3
-      apolloReactHooksImportFrom: "@site/src/lib/mikro/funcs"
+      apolloReactHooksImportFrom: "@/lib/lovekit/funcs"
 
   lib/lovekit/graphql.schema.json:
     plugins:

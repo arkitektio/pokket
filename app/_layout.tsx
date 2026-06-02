@@ -17,8 +17,8 @@ registerGlobals();
 
 
 export {
-  // Catch any errors thrown by the Layout component.
-  ErrorBoundary
+    // Catch any errors thrown by the Layout component.
+    ErrorBoundary
 } from 'expo-router';
 
 
@@ -52,6 +52,9 @@ export const AppLayout = () => {
     <Stack>
       <Stack.Protected guard={isLoggedIn}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false, title: "Pokket" }} />
+        <Stack.Screen name="broadcasts" options={{ title: 'Broadcasts' }} />
+        <Stack.Screen name="solo-broadcast/start" options={{ title: 'Start Solo Broadcast' }} />
+        <Stack.Screen name="solo-broadcast/[id]" options={{ title: 'Solo Broadcast' }} />
         <Stack.Screen name="debug" options={{ title: 'Debug' }} />
         <Stack.Screen name="provision" options={{ title: 'Provision' }} />
         <Stack.Screen name="tasks" options={{ title: 'Tasks' }} />
