@@ -120,6 +120,10 @@ export const buildArkitekt = <T extends ServiceBuilderMap, S extends ServiceBuil
       const arkitekt = useArkitekt();
       return arkitekt.connection?.token?.access_token || arkitekt.storedSession?.token?.access_token || null;
     },
+    useEndpoint: () => {
+      const arkitekt = useArkitekt();
+      return arkitekt.connection?.endpoint ?? arkitekt.storedSession?.endpoint ?? null;
+    },
     useArkitekt: useArkitekt,
   };
 };

@@ -1,0 +1,11 @@
+query Hubs {
+  hubs {
+    id
+    name
+    description
+    organization {
+      id
+      slug
+    }
+  }
+}

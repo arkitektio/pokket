@@ -24,6 +24,7 @@ export type {
 export {
     DeviceManifestSchema,
     ManifestValidationError,
+    ProvisioningBlobSchema,
     ProvisioningConfigSchema,
     ProvisioningConfigValidationError, validateManifest,
     validateProvisioningConfig,
@@ -32,6 +33,7 @@ export {
 } from "./validation";
 export type {
     ValidatedDeviceManifest,
+    ValidatedProvisioningBlob,
     ValidatedProvisioningConfig,
     ValidatedWifiProfile
 } from "./validation";
@@ -41,26 +43,28 @@ export {
     ARKITEKT_MANIFEST_UUID,
     ARKITEKT_SERVICE_UUID,
     ARKITEKT_TOKEN_UUID,
-    BASE_URL_UUID, buildArkitektTokenPayload,
+    BASE_URL_UUID,
+    buildArkitektTokenPayload,
     buildBaseURLPayload,
     buildImprovWifiPayload,
     buildManifestRequestPayload,
+    buildProvisioningPayload,
     buildRedeemTokenPayload,
     buildWifiPasswordPayload,
     buildWifiSSIDPayload,
-    decodeResponse, IMPROV_CAPABILITIES_UUID,
-    IMPROV_ERROR_UUID,
-    IMPROV_RPC_COMMAND_UUID,
-    IMPROV_RPC_RESULT_UUID,
-    IMPROV_SERVICE_UUID,
-    IMPROV_STATUS_UUID,
+    decodeResponse,
+    FAKTS_TOKEN_UUID,
     ImprovCommand,
     ImprovError,
-    ImprovStatus, parseImprovError,
+    ImprovStatus,
+    MANIFEST_UUID,
+    parseImprovError,
     parseImprovStatus,
-    parseStatus, REDEEM_TOKEN_UUID,
+    parseManifest,
+    parseStatus,
+    PROVISIONING_UUID,
+    REDEEM_TOKEN_UUID,
     STATUS_UUID,
     WIFI_PASSWORD_UUID,
     WIFI_SSID_UUID
 } from "./improvProtocol";
-

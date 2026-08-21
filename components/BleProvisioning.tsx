@@ -4,8 +4,8 @@ import { WifiProfile, useWifiProfiles } from '@/hooks/useWifiProfiles';
 import { App } from '@/lib/app/App';
 import { ARKITEKT_SERVICE_UUID, useBLEScanner, useImprovProvisioning } from '@/lib/ble';
 import { ManifestValidationError, WifiProfileValidationError, validateWifiProfile } from '@/lib/ble/validation';
-import { CreateClientDocument, CreateClientMutation, CreateClientMutationVariables } from '@/lib/lok/api/graphql';
-import { useMutation } from '@/lib/lok/funcs';
+import { useDeviceEnrollment } from '@/hooks/useDeviceEnrollment';
+import { Hub, useHubsQuery } from '@/lib/lok/deviceCode';
 import { Link } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
@@ -82,7 +82,7 @@ function PulsingDot({ color = 'bg-blue-500' }: { color?: string }) {
  * 
  * Complete flow for provisioning ESP32 devices with:
  * - Wi-Fi credentials
- * - Arkitekt base URL and redeem token
+ * - a pre-approved, single-use fakts device code the device redeems itself
  */
 export function BleProvisioning() {
     const [step, setStep] = useState<ProvisioningStep>(ProvisioningStep.SCANNING);
@@ -92,8 +92,13 @@ export function BleProvisioning() {
     // Wifi Config State
     const [selectedProfile, setSelectedProfile] = useState<WifiProfile | null>(null);
 
-    // Get token from Arkitekt connection
-    const token = App.useToken();
+    // The hub the device is enrolled into. Its organization is what the device
+    // ends up belonging to, so it is an explicit choice, never a default.
+    const [selectedHub, setSelectedHub] = useState<Hub | null>(null);
+
+    // The deployment Pokket is connected to — the device is provisioned against
+    // the same one, and its endpoint is where the enrolment is staged.
+    const endpoint = App.useEndpoint();
 
     // Scan for devices with Arkitekt service
     const scanner = useBLEScanner([ARKITEKT_SERVICE_UUID]);
@@ -107,8 +112,12 @@ export function BleProvisioning() {
     // Custom alert dialog
     const alert = useAlertDialog();
 
-    // GraphQL mutation to create client and get fakts-token
-    const [createClient] = useMutation<CreateClientMutation, CreateClientMutationVariables>(CreateClientDocument);
+    // Hubs the operator can enroll a device into
+    const { data: hubsData, loading: hubsLoading } = useHubsQuery();
+    const hubs = hubsData?.hubs ?? [];
+
+    // Stages an authorization for the device and approves it on our authority
+    const enrollment = useDeviceEnrollment();
 
 
     const handleStartScan = useCallback(() => {
@@ -126,6 +135,7 @@ export function BleProvisioning() {
         setStep(ProvisioningStep.SCANNING);
         setSelectedDevice(null);
         setSelectedProfile(null);
+        setSelectedHub(null);
         setManifestLoading(false);
         scanner.clearDevices();
         provisioning.reset();
@@ -185,8 +195,13 @@ export function BleProvisioning() {
             return;
         }
 
-        if (!token) {
+        if (!endpoint) {
             alert.show('Error', 'Not connected to Arkitekt. Please connect first.');
+            return;
+        }
+
+        if (!selectedHub) {
+            alert.show('Error', 'Please select a hub to enroll the device into.');
             return;
         }
 
@@ -208,47 +223,41 @@ export function BleProvisioning() {
 
         setStep(ProvisioningStep.PROVISIONING);
 
-        // Get base URL from fakts or use custom one
-        const provisionBaseUrl = 'https://go.arkitekt.live';
-
         try {
             // Step 0: If Eduroam, fetch EAP config to get anonymous identity if not set
             let finalAnonymousIdentity = selectedProfile.anonymousIdentity;
-            
+
             // Use the manifest already fetched and validated in step 2
             const manifest = provisioning.manifest;
             if (!manifest) {
                 throw new Error('Device returned an invalid or empty manifest. Cannot proceed with provisioning.');
             }
 
-            const { data } = await createClient({
-                variables: {
-                    input: {
-                        manifest: {
-                            identifier: manifest?.identifier || `esp32-${selectedDevice?.id.substring(0, 8)}`,
-                            version: manifest?.version || '1.0.0',
-                            scopes: manifest?.scopes || ['read', 'write'],
-                            nodeId: selectedDevice.id,
-                            requirements: manifest?.requirements.map((r) => ({ ...r })) || [],
-                        }
-                    }
-                }
+            // Stage an authorization using the device's own manifest and
+            // approve it as the signed-in operator. What comes back is a
+            // single-use device code the device redeems itself — never a token.
+            const blob = await enrollment.enrollDevice({
+                manifest: {
+                    identifier: manifest.identifier,
+                    version: manifest.version,
+                    // The device's stable hardware identity, not the BLE
+                    // peripheral id (which iOS randomises per install).
+                    device_id: manifest.device_id,
+                    scopes: manifest.scopes,
+                    logo: manifest.logo,
+                    requirements: manifest.requirements.map((r) => ({ ...r })),
+                },
+                hubId: selectedHub.id,
+                deviceName: selectedDevice.name ?? undefined,
             });
 
-            if (!data?.createDevelopmentalClient?.token) {
-                throw new Error('Failed to create client token');
-            }
-
-            const faktsToken = data.createDevelopmentalClient.token;
-            console.log('Obtained fakts-token:', faktsToken);
-
-            // Step 2: Provision device with WiFi and fakts-token
+            // Step 2: Provision the device with Wi-Fi and its device code
             try {
             await provisioning.provision(selectedDevice.id, {
                 ssid: selectedProfile.ssid,
                 password: selectedProfile.password || '',
-                arkitektToken: faktsToken,
-                baseUrl: provisionBaseUrl,
+                provisioning: blob,
+                baseUrl: blob.base_url,
                 identity: selectedProfile.identity,
                 anonymousIdentity: finalAnonymousIdentity,
                 pemCertificate: selectedProfile.pemCertificate,
@@ -276,7 +285,7 @@ export function BleProvisioning() {
                 [{ label: 'Try Again' }],
             );
         }
-    }, [selectedDevice, selectedProfile, token, provisioning, createClient, handleReset]);
+    }, [selectedDevice, selectedProfile, selectedHub, endpoint, provisioning, enrollment, handleReset]);
 
     const renderScanningStep = () => (
         <View className="flex-1">
@@ -495,7 +504,7 @@ export function BleProvisioning() {
             </View>
 
             <Link href="/wifi" asChild>
-                <Button variant="outline" className="border-border mb-4">
+                <Button variant="outline" className="border-border mb-6">
                     <View className="flex-row items-center gap-2">
                         <IconSymbol name="plus" size={14} color="hsl(165, 10%, 65%)" />
                         <Text className="text-muted-foreground">Add New Profile</Text>
@@ -503,15 +512,76 @@ export function BleProvisioning() {
                 </Button>
             </Link>
 
-            {token && (
-                <View className="p-3 bg-green-500/10 rounded-xl border border-green-500/20 mb-3">
-                    <Text className="text-green-400 text-xs">
-                        ✓ Arkitekt token will be sent to device
+            <Text className="text-lg font-semibold text-foreground mb-1">Hub</Text>
+            <Text className="text-sm text-muted-foreground mb-4">
+                The device joins this hub&apos;s organization
+            </Text>
+
+            {hubsLoading && (
+                <View className="flex-row items-center p-3 bg-card rounded-xl border border-border mb-4">
+                    <ActivityIndicator size="small" color="hsl(165, 50%, 55%)" />
+                    <Text className="ml-3 text-muted-foreground text-sm">Loading hubs...</Text>
+                </View>
+            )}
+
+            {!hubsLoading && hubs.length === 0 && (
+                <View className="p-3 bg-yellow-500/10 rounded-xl border border-yellow-500/20 mb-4">
+                    <Text className="text-yellow-400 text-xs">
+                        No hubs available. You need to belong to an organization with a hub before you can enroll a device.
                     </Text>
                 </View>
             )}
 
-            {!token && (
+            <View className="gap-2 mb-4">
+                {hubs.map((hub) => (
+                    <Pressable
+                        key={hub.id}
+                        onPress={() => setSelectedHub(hub)}
+                        className={`p-4 rounded-xl border ${
+                            selectedHub?.id === hub.id
+                                ? 'border-primary/50 bg-primary/10'
+                                : 'border-border bg-card'
+                        } active:bg-accent`}
+                    >
+                        <View className="flex-row items-center justify-between">
+                            <View className="flex-row items-center flex-1">
+                                <View className={`w-10 h-10 rounded-full items-center justify-center mr-3 ${
+                                    selectedHub?.id === hub.id ? 'bg-primary/20' : 'bg-muted'
+                                }`}>
+                                    <IconSymbol
+                                        name="square.grid.2x2"
+                                        size={18}
+                                        color={selectedHub?.id === hub.id ? 'hsl(165, 50%, 55%)' : 'hsl(165, 8%, 45%)'}
+                                    />
+                                </View>
+                                <View className="flex-1">
+                                    <Text className={`font-medium text-sm ${
+                                        selectedHub?.id === hub.id ? 'text-primary' : 'text-card-foreground'
+                                    }`}>
+                                        {hub.name}
+                                    </Text>
+                                    <Text className="text-xs text-muted-foreground mt-0.5">
+                                        {hub.organization.slug}
+                                    </Text>
+                                </View>
+                            </View>
+                            {selectedHub?.id === hub.id && (
+                                <IconSymbol name="checkmark.circle.fill" size={20} color="hsl(165, 50%, 55%)" />
+                            )}
+                        </View>
+                    </Pressable>
+                ))}
+            </View>
+
+            {endpoint && selectedHub && (
+                <View className="p-3 bg-green-500/10 rounded-xl border border-green-500/20 mb-3">
+                    <Text className="text-green-400 text-xs">
+                        ✓ Device will be enrolled into {selectedHub.name} on {endpoint.name}
+                    </Text>
+                </View>
+            )}
+
+            {!endpoint && (
                 <View className="p-3 bg-yellow-500/10 rounded-xl border border-yellow-500/20 mb-3">
                     <Text className="text-yellow-400 text-xs">
                         ⚠ Not connected to Arkitekt. Device will not be registered.
@@ -532,7 +602,7 @@ export function BleProvisioning() {
                 </Button>
                 <Button
                     onPress={handleProvision}
-                    disabled={!selectedProfile || provisioning.isProvisioning}
+                    disabled={!selectedProfile || !selectedHub || provisioning.isProvisioning || enrollment.enrolling}
                     className="flex-1"
                 >
                     <View className="flex-row items-center gap-2">
@@ -553,7 +623,7 @@ export function BleProvisioning() {
             </View>
             <Text className="text-foreground font-semibold text-lg mb-2">Provisioning Device</Text>
             <Text className="text-muted-foreground text-sm text-center mb-6">
-                {provisioning.status || 'Connecting to device...'}
+                {provisioning.status || enrollment.status || 'Connecting to device...'}
             </Text>
 
             {provisioning.error && (
@@ -572,7 +642,7 @@ export function BleProvisioning() {
             <Text className="text-foreground font-semibold text-lg mb-2">All Done!</Text>
             <Text className="text-muted-foreground text-sm text-center mb-8 px-4">
                 The device has been provisioned and should now be connecting to your Wi-Fi network.
-                {token && ' It will register with Arkitekt automatically.'}
+                {endpoint && ' It will redeem its device code and register with Arkitekt automatically.'}
             </Text>
 
             <Button onPress={handleReset} className="w-full">

@@ -4,16 +4,16 @@ import {
     ARKITEKT_SERVICE_UUID,
     BASE_URL_UUID,
     buildBaseURLPayload,
-    buildFaktsTokenPayload,
+    buildProvisioningPayload,
     buildWifiAnonymousIdentityPayload,
     buildWifiIdentityPayload,
     buildWifiPasswordPayload,
     buildWifiPemCertificatePayload,
     buildWifiSSIDPayload,
-    FAKTS_TOKEN_UUID,
     MANIFEST_UUID,
     parseManifest,
     parseStatus,
+    PROVISIONING_UUID,
     STATUS_UUID,
     WIFI_ANONYMOUS_IDENTITY_UUID,
     WIFI_IDENTITY_UUID,
@@ -26,6 +26,7 @@ import {
     ManifestValidationError,
     validateProvisioningConfig,
     type ValidatedDeviceManifest,
+    type ValidatedProvisioningBlob,
 } from "./validation";
 
 export type { ValidatedDeviceManifest as DeviceManifest };
@@ -36,7 +37,11 @@ export interface ProvisioningConfig {
   identity?: string;
   anonymousIdentity?: string;
   pemCertificate?: string;
-  arkitektToken?: string;
+  /**
+   * The pre-approved device-code credentials. Absent when provisioning Wi-Fi
+   * only — the device then has no way to reach Arkitekt and says so.
+   */
+  provisioning?: ValidatedProvisioningBlob;
   displayName?: string;
   baseUrl?: string;
 }
@@ -243,7 +248,7 @@ export function useImprovProvisioning(): UseImprovProvisioningResult {
    * 3. Write WiFi SSID to WIFI_SSID_UUID
    * 4. Write WiFi Password to WIFI_PASSWORD_UUID
    * 5. Write Base URL to BASE_URL_UUID (optional)
-   * 6. Write Fakts Token to FAKTS_TOKEN_UUID (triggers config save)
+   * 6. Write the provisioning blob to PROVISIONING_UUID (triggers config save)
    */
   const provision = useCallback(
     async (deviceId: string, config: ProvisioningConfig) => {
@@ -265,7 +270,8 @@ export function useImprovProvisioning(): UseImprovProvisioningResult {
         hasPemCertificate: !!config.pemCertificate,
         pemCertificateLength: config.pemCertificate?.length ?? 0,
         baseUrl: config.baseUrl ?? "(none)",
-        hasArkitektToken: !!config.arkitektToken,
+        hasProvisioning: !!config.provisioning,
+        provisioningClientId: config.provisioning?.client_id ?? "(none)",
       });
 
       try {
@@ -440,31 +446,38 @@ export function useImprovProvisioning(): UseImprovProvisioningResult {
           console.log("[Provision] Step 5: No base URL provided, skipping");
         }
 
-        // Step 6: Write Fakts Token (this triggers config save on Arduino)
-        if (config.arkitektToken) {
-          setStatus("Sending fakts token...");
+        // Step 6: Write the provisioning blob. One atomic write carrying the
+        // deployment, the client identity and the pre-approved device code —
+        // and the signal to commit the config on the device.
+        if (config.provisioning) {
+          setStatus("Sending provisioning credentials...");
           console.log(
-            "[Provision] Step 6: Writing fakts token (length:",
-            config.arkitektToken.length,
-            ")",
+            "[Provision] Step 6: Writing provisioning blob for client",
+            config.provisioning.client_id,
           );
-          const tokenPayload = buildFaktsTokenPayload(config.arkitektToken);
+          const provisioningPayload = buildProvisioningPayload(
+            config.provisioning,
+          );
           await writeCharacteristic(
             deviceId,
             ARKITEKT_SERVICE_UUID,
-            FAKTS_TOKEN_UUID,
-            tokenPayload,
+            PROVISIONING_UUID,
+            provisioningPayload,
           );
-          setStatus("Fakts token sent - configuration saved on device");
+          setStatus(
+            "Provisioning credentials sent - configuration saved on device",
+          );
           console.log(
-            "[Provision] Step 6: Fakts token written - configuration saved on device",
+            "[Provision] Step 6: Provisioning blob written - configuration saved on device",
           );
         } else {
-          console.log("[Provision] Step 6: No fakts token provided, skipping");
+          console.log(
+            "[Provision] Step 6: No provisioning credentials provided, skipping",
+          );
         }
 
         console.log(
-          "[Provision] All steps complete. Device should now connect to Wi-Fi and Arkitekt.",
+          "[Provision] All steps complete. Device should now connect to Wi-Fi and exchange its device code.",
         );
         setStatus(
           "Provisioning complete! Device is connecting to Wi-Fi and Arkitekt...",

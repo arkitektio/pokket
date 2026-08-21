@@ -1,0 +1,5 @@
+mutation AcceptDeviceCode($input: AcceptDeviceCodeInput!) {
+  acceptDeviceCode(input: $input) {
+    id
+  }
+}

@@ -23,16 +23,35 @@ export const DeviceAuthorizationSchema = z.object({
 
 export type DeviceAuthorization = z.infer<typeof DeviceAuthorizationSchema>;
 
+/**
+ * The client kinds the fakts server knows (`ClientKindVanilla`). Sending
+ * anything else is rejected at the authorization endpoint, so the union is
+ * spelled out here rather than left as a bare string.
+ */
+export type RequestedClientKind =
+  | "website"
+  | "development"
+  | "desktop"
+  | "hub"
+  | "relying_party";
+
+/** The operational role of the client, orthogonal to its kind. */
+export type RequestedClientRole = "interface" | "agent";
+
 export const deviceAuthorization = async ({
   endpoint,
   controller,
   manifest,
   expirationTime,
+  requestedClientKind = "desktop",
+  requestedClientRole = "interface",
 }: {
   endpoint: FaktsEndpoint;
   controller: AbortController;
   manifest: EnhancedManifest;
   expirationTime?: number;
+  requestedClientKind?: RequestedClientKind;
+  requestedClientRole?: RequestedClientRole;
 }): Promise<DeviceAuthorization> => {
   const response = await fetch(endpoint.device_authorization_endpoint, {
     method: "POST",
@@ -40,9 +59,12 @@ export const deviceAuthorization = async ({
     body: JSON.stringify({
       manifest,
       expiration_time_seconds: expirationTime,
-      // Pokket is an Expo/React Native app; the kind is a label on the
-      // registered client (the grant is the same either way).
-      requested_client_kind: "mobile",
+      // The kind is a label on the registered client (the grant is the same
+      // either way). Pokket itself registers as `desktop` — a public client
+      // driven by a human; the ESP32s it provisions register as unattended
+      // `development`/`agent` clients.
+      requested_client_kind: requestedClientKind,
+      requested_client_role: requestedClientRole,
     }),
     signal: controller.signal,
   });

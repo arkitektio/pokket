@@ -3,7 +3,7 @@ import { ThemedView } from '@/components/ThemedView';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Text } from '@/components/ui/text';
-import { IMPROV_SERVICE_UUID, useBLEScanner, useImprovProvisioning } from '@/lib/ble';
+import { ARKITEKT_SERVICE_UUID, useBLEScanner, useImprovProvisioning } from '@/lib/ble';
 import React, { useState } from 'react';
 import { ActivityIndicator, ScrollView, View } from 'react-native';
 import { Device } from 'react-native-ble-plx';
@@ -23,7 +23,7 @@ export function BleProvisioningDemo() {
     const [wifiPassword, setWifiPassword] = useState('');
 
     // Scan for devices with Improv service
-    const scanner = useBLEScanner([IMPROV_SERVICE_UUID]);
+    const scanner = useBLEScanner([ARKITEKT_SERVICE_UUID]);
 
     // Provisioning hook
     const provisioning = useImprovProvisioning(selectedDevice?.id);

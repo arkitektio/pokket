@@ -89,5 +89,17 @@ export const useToken = () => {
 
 export const useManifest = () => useArkitektStore((state) => state.manifest);
 
+/**
+ * The discovered fakts endpoint of the deployment we are connected to.
+ *
+ * Needed by anything that has to talk to the deployment outside the service
+ * clients — device provisioning stages an authorization at
+ * `device_authorization_endpoint` and hands the device `base_url`.
+ */
+export const useEndpoint = () =>
+  useArkitektStore(
+    (state) => state.connection?.endpoint ?? state.storedSession?.endpoint ?? null,
+  );
+
 export const useConfigurationIssues = (): string[] =>
   useArkitektStore((state) => state.configurationIssues);

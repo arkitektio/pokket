@@ -1,0 +1,8 @@
+query DeviceCodeByCode($deviceCode: String!) {
+  deviceCodeByCode(deviceCode: $deviceCode) {
+    id
+    code
+    expiresAt
+    denied
+  }
+}

@@ -86,6 +86,20 @@ export type ValidatedWifiProfile = z.infer<typeof WifiProfileSchema>;
 
 // ---------- Provisioning Config Validation ----------
 
+/**
+ * What Pokket hands a device to complete its own fakts grant.
+ *
+ * Not a token: a pre-approved, single-use device code plus the public client
+ * identity it was issued against, and the deployment to present them to.
+ */
+export const ProvisioningBlobSchema = z.object({
+  base_url: z.string().url("Provisioning base_url must be a valid URL"),
+  client_id: z.string().min(1, "Provisioning client_id must not be empty"),
+  device_code: z.string().min(1, "Provisioning device_code must not be empty"),
+});
+
+export type ValidatedProvisioningBlob = z.infer<typeof ProvisioningBlobSchema>;
+
 export const ProvisioningConfigSchema = z.object({
   ssid: z
     .string()
@@ -95,7 +109,7 @@ export const ProvisioningConfigSchema = z.object({
   identity: z.string().optional(),
   anonymousIdentity: z.string().optional(),
   pemCertificate: z.string().optional(),
-  arkitektToken: z.string().optional(),
+  provisioning: ProvisioningBlobSchema.optional(),
   displayName: z.string().optional(),
   baseUrl: z.string().url("Base URL must be a valid URL").optional(),
 });

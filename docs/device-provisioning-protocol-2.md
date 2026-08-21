@@ -1,211 +1,159 @@
 # Provisioning a device through Pokket under fakts protocol 2
 
-Status: evaluation / proposal. No code changed yet.
+Implemented. This documents the flow, the BLE contract change it requires, and
+what the firmware has to do.
 
 ## Summary
 
-Pokket's own login has migrated to protocol 2 (`7a92fda`): RFC 8628 device
-authorization, dynamic client registration, and a token response that carries the
-fakts envelope. **Device provisioning has not.** `BleProvisioning.tsx` still mints a
-permanent opaque client token over GraphQL and writes it to the ESP32, which is a
-protocol-1 construct that protocol 2 deliberately removes.
+Pokket provisions an ESP32 by **enrolling it on its behalf and handing it a
+pre-approved device code**. Pokket stages an RFC 8628 authorization using the
+*device's* manifest, approves it as the signed-in operator, and writes the
+resulting `device_code` — not a token — across BLE. The firmware then performs
+one ordinary `grant_type=device_code` exchange, which returns immediately
+because approval already happened.
 
-The recommendation is to provision with a **pre-approved device code**: Pokket runs
-the device authorization request on the device's behalf, approves it as the
-signed-in user, and writes the resulting `device_code` (not a token) over BLE. The
-firmware then performs one entirely standard `grant_type=device_code` exchange,
-which returns immediately because approval already happened.
+This replaces the protocol-1 path, where Pokket minted a permanent opaque client
+token via `createDevelopmentalClient` and the device redeemed it at `/f/claim/`.
+Protocol 2 removes both the claim endpoint and the opaque token.
 
-This requires no new grant type. It does require the protocol-2 server, which does
-not exist yet in `lok-server-next`.
+No server changes were needed: `lok-server-next` on `next` already serves
+`/o/app-authorization/`, the device-code grant at `/o/token/`, and the
+`acceptDeviceCode` mutation this flow approves through.
 
-## Where things stand
+## The flow
 
-| Capability | pokket | lok-server-next |
-|---|---|---|
-| `.well-known/fakts` protocol-2 fields | required by `FaktsEndpointSchema` | **not emitted** — only `claim`/`base_url`/`frontend_url` |
-| RFC 8628 device authorization | implemented (`fakts/start.tsx`) | **absent** |
-| `grant_type=device_code` | implemented (`fakts/pollToken.tsx`) | **absent** — `authapp/server.py` registers client_credentials, authorization_code+OIDC, refresh_token only |
-| Envelope on token response | expected (`faktsSchema.tsx`) | **absent** — envelope still comes from `POST /f/claim/` |
-| Device provisioning | protocol 1 (`createDevelopmentalClient` → opaque token) | protocol 1 (`/f/claim/`, `/f/redeem/`) |
-
-`FAKTS_PROTOCOL_VERSION` in `lok_server/settings.py` is still `"0.1.0"`. Pokket's
-discovery requires `configure`, `device_authorization_endpoint` and `token_endpoint`
-and fails loudly without them — by design, per the comment in `discover.tsx`. So
-**Pokket on `main` cannot connect to lok on `main` at all today.** Device
-provisioning is downstream of finishing the server migration; nothing below is
-buildable before that lands.
-
-## Why the current provisioning breaks
-
-Today (`components/BleProvisioning.tsx`):
-
-1. Read the manifest from the `MANIFEST` characteristic over BLE.
-2. Call `createDevelopmentalClient` with `nodeId: selectedDevice.id`.
-3. Receive `client.token` — a `uuid4().hex` that never expires.
-4. Write Wi-Fi credentials, `baseUrl` and that token over BLE. Writing the token
-   characteristic is what commits the config on the ESP32.
-5. The device later exchanges the token at `POST /f/claim/` for its configuration.
-
-Protocol 2 removes step 5's contract. There is no `/f/claim/`, and the opaque
-`client_token` is gone — the commit message for `7a92fda` says so explicitly.
-Configuration now arrives *inside* an OAuth2 token response, reachable only by a
-client that holds a `client_id` and either a device code or a refresh token. A
-long-lived bearer secret at rest is exactly the thing protocol 2 got rid of.
-
-So the design question is what replaces a static secret for a headless device that
-has no browser, may have no network until after provisioning, and must survive
-refresh-token rotation across power cuts.
-
-## Options considered
-
-### A. Pokket as authorization proxy
-
-Pokket runs the full flow for the device and writes the resulting `client_id` +
-`refresh_token` over BLE. The device only ever refreshes.
-
-Reuses code Pokket already has, and one BLE visit completes provisioning. But the
-secret crossing BLE is a long-lived refresh token — no better than today's opaque
-token if BLE is sniffed — and refresh rotation on hardware that can brown out
-mid-flash-write will silently break the chain.
-
-### B. Device runs RFC 8628 itself
-
-Pokket writes only Wi-Fi credentials and `base_url`. The device boots, joins the
-network, requests device authorization itself, and surfaces its `user_code` back
-over BLE for Pokket to approve.
-
-The best security story — BLE never carries anything but Wi-Fi credentials — and
-the device is genuinely the OAuth client. But provisioning becomes two-phase across
-two transports: the device must be online *before* it can be authorized, and the
-operator has to stay in range or come back. It also puts the whole polling loop,
-with its `slow_down` and `authorization_pending` handling, into firmware.
-
-### C. A pre-authorized redeem grant
-
-Keep the shape of today's flow but mint a one-shot, short-lived, node-bound code
-instead of a permanent token, redeemed at the token endpoint via a new grant type.
-`fakts.models.RedeemToken` already carries `user`, `composition`, `expires_at`,
-`manifest_hash` and `allow_reredeem`, so the storage is largely built.
-
-Good ergonomics, minimal firmware. The cost is a non-standard grant type on lok,
-which is avoidable — see below.
-
-### D. Pre-approved device code (recommended)
-
-C's ergonomics with no new grant type. A pre-authorized code *is* a device code
-that has already been approved; so issue a real device code, approve it server-side
-on the user's authority, and hand the device code itself across BLE.
-
-## Recommendation: pre-approved device code
-
-1. **Pokket → device (BLE).** Read the `MANIFEST` characteristic. Use
-   `manifest.device_id` as the node identity.
-2. **Pokket → lok.** `POST device_authorization_endpoint` with the *device's*
-   manifest and `node_id = manifest.device_id`, `requested_client_kind: "device"`.
-   lok dynamically registers a client and stages a device code, returning
-   `device_code`, `user_code`, `client_id`, `interval`, `expires_in`.
-3. **Pokket → lok.** `approveDeviceCode(userCode, ...)` — an authenticated GraphQL
-   mutation. Pokket is already signed in, so no browser round trip. The web
-   configure page calls the same resolver.
-4. **Pokket → device (BLE).** Write one JSON blob:
-   `{ base_url, client_id, device_code }`, plus Wi-Fi credentials.
-5. **Device → lok.** On boot, one standard
-   `grant_type=urn:ietf:params:oauth:grant-type:device_code` exchange. It returns
-   immediately with `access_token`, `refresh_token` and the fakts envelope, because
-   step 3 already approved it.
-6. **Device.** Persist the refresh token, discard the device code, and refresh from
-   then on. Refresh re-renders the envelope, so instance changes land without
+1. **BLE.** Read the `MANIFEST` characteristic. `manifest.device_id` is the
+   device's stable hardware identity.
+2. **`POST` `device_authorization_endpoint`.** Pokket sends the *device's*
+   manifest with `node_id = manifest.device_id`,
+   `requested_client_kind: "development"` and `requested_client_role: "agent"` —
+   a client authorized once that then runs unattended. lok dynamically registers
+   a public OAuth2 client and stages a `DeviceCode`, returning `device_code`,
+   `user_code`, `client_id`, `expires_in`.
+3. **`deviceCodeByCode(deviceCode: user_code)`.** A pending code has no
+   organization yet and is deliberately unreachable by id; the user code is the
+   capability that resolves it.
+4. **`acceptDeviceCode`.** With the staged id, the same user code as
+   proof-of-possession, and the chosen hub. Binds the staged client to the
+   operator's membership in that hub's organization.
+5. **BLE.** Write `{ base_url, client_id, device_code }` to the provisioning
+   characteristic, alongside the Wi-Fi credentials.
+6. **Device.** On boot, one `grant_type=urn:ietf:params:oauth:grant-type:device_code`
+   exchange returns access token, refresh token and the rendered instances
+   together. Persist the refresh token, discard the device code, refresh from
+   then on — refresh re-renders the envelope, so instance changes land without
    re-provisioning.
 
-Why this one:
+The `user_code` never reaches the device. It is the proof the accept mutation
+requires, and it stays in Pokket.
 
-- **The secret on the wire is short-lived and single-use.** A sniffed device code is
-  useful for minutes, once, and only for a client bound to that node. Today's
-  equivalent is a permanent org credential.
-- **Firmware implements exactly one HTTP call shape.** The device-code exchange and
-  the refresh call are the same POST to the same endpoint with different form
-  fields. No polling loop, no `slow_down`, no BLE round trip after the write.
-- **One BLE visit, works offline.** Pokket has cellular; the device does not need
-  the network until after it has been provisioned. This matters for bulk
-  provisioning of a rack of sensors.
+## Why this shape
+
+- **The secret on the wire is short-lived and single-use.** A sniffed blob is
+  useful for minutes, once, and only for a client bound to that node. The
+  protocol-1 equivalent was a permanent organization credential.
+- **Firmware implements exactly one HTTP call shape.** The device-code exchange
+  and the refresh call are the same POST to the same endpoint with different
+  form fields. No polling loop, no `slow_down`, no BLE round trip after the write.
+- **One BLE visit, and it works offline.** Pokket has cellular; the device needs
+  no network until after it is provisioned. That is what makes provisioning a
+  rack of sensors practical.
 - **No new grant type.** It is RFC 8628 with the approval step moved off the
-  device, which is the same accommodation RFC 8628 already makes for input-
-  constrained clients.
+  device — the accommodation the spec already makes for input-constrained clients.
 
-The trade-off worth stating: the device never independently consents, and Pokket's
-operator is the sole authority for what that hardware becomes. That is already true
-today. Option B is the only one that changes it, at a real cost in field ergonomics.
+The trade-off worth stating: the device never independently consents, and the
+Pokket operator is the sole authority for what that hardware becomes. That was
+already true under protocol 1. Having the device run its own device-code flow
+(joining Wi-Fi first, then surfacing a `user_code` for approval) is the only
+option that changes it, at the cost of a two-phase provisioning across two
+transports.
 
-## Work required
+## BLE contract change
 
-### lok-server-next — protocol-2 server (blocking, none of it exists)
+Protocol 1 wrote a single token to `FAKTS_TOKEN_UUID`, and that write doubled as
+the implicit signal to commit the config. Protocol 2 needs three values, so they
+travel as one JSON object on a new characteristic, and that single atomic write
+is the commit:
 
-- Emit `configure`, `device_authorization_endpoint`, `token_endpoint`, `issuer`,
-  `jwks_uri` from `WellKnownFakts`; bump `FAKTS_PROTOCOL_VERSION`.
-- Device authorization endpoint: dynamic registration from a manifest + staged
-  device code. `DeviceCode` needs `user_code` and `client_id` columns.
-- Register a device-code grant in `authapp/server.py` (authlib ships `rfc8628`), and
-  append the fakts envelope to its token response.
-- Have the refresh grant re-render the envelope — Pokket already depends on this.
+```
+PROVISIONING_UUID = beb5483e-36e1-4688-b7f5-ea07361b26b1
+payload           = base64(JSON.stringify({ base_url, client_id, device_code }))
+```
 
-### lok-server-next — device-specific
+Comfortably inside the 512-byte characteristic limit, so it never needs the
+chunking the PEM certificate does. The Wi-Fi, base-URL and manifest
+characteristics are unchanged.
 
-- Add `device` to `ClientKindVanilla` / `ClientKindChoices`. Note that Pokket
-  already sends `requested_client_kind: "mobile"`, which is also not in the enum.
-- `services/device_codes.validate_device_code` raises `Unknown client kind or no
-  longer supported` for anything but `development`; it needs to build a config for
-  device clients. The `node_id` → `Device.objects.get_or_create(...)` binding there
-  is already correct and should carry through.
-- `approveDeviceCode` mutation for headless approval by an authenticated user.
-- Decide refresh-token rotation for `kind=device`. Rotation plus flash writes plus
-  power loss is a bricking risk; either don't rotate for devices, or specify a
-  two-slot persistence scheme in firmware.
+**The firmware must implement this characteristic.** Until it does, a device
+provisioned by this build receives Wi-Fi credentials and nothing else.
 
-### pokket
+### Firmware responsibilities
 
-- Replace the `createDevelopmentalClient` call in `BleProvisioning.tsx` with
-  `deviceAuthorization` → `approveDeviceCode` → BLE write.
-- Send `manifest.device_id`, not `selectedDevice.id` — see bugs below.
-- Take `baseUrl` from the active fakts session instead of the hardcoded
-  `https://go.arkitekt.live`.
-- Write a single JSON provisioning blob rather than relying on the token
-  characteristic as an implicit commit trigger. It fits well inside the 512-byte
-  characteristic limit and makes the commit atomic.
+- Accept the JSON blob and commit config on that write.
+- On boot, `POST` to `{base_url}` → the deployment's token endpoint with
+  `grant_type=urn:ietf:params:oauth:grant-type:device_code`, `device_code` and
+  `client_id`.
+- Persist the refresh token; discard the device code (the server burns it at
+  first exchange).
+- On `expired_token`, return to BLE provisioning mode — the code was never
+  redeemed in time and a new enrolment is needed.
 
-### firmware (outside these repos)
+Refresh tokens rotate on every use. A write that has not landed before a power
+cut leaves an already-consumed token in flash and kills the refresh chain, so
+persist with two slots and only mark a slot valid after the write completes.
 
-- Accept the JSON blob; exchange the device code on first boot; persist the refresh
-  token; handle `expired_token` by returning to BLE provisioning mode.
+## Re-provisioning
 
-## Bugs and gaps found while evaluating
+`bind_client` rotates identity: re-approving a device code for the same
+`(release, membership, node, hub)` **deletes** the previously bound client, so
+the old installation's `client_id` and refresh chain die. Re-provisioning a board
+is a revoke-and-re-register, not a reuse. That is the desired behaviour for
+handing hardware to someone else; it also means a re-provision cannot be undone
+by power-cycling back to the old firmware state.
 
-- **`nodeId` is the wrong identifier.** `BleProvisioning.tsx` sends
-  `nodeId: selectedDevice.id`, the BLE peripheral id. On iOS that is a per-install
-  random UUID, not stable hardware identity, so re-provisioning the same board
-  creates a second `Device` row. The manifest's `device_id` is the intended value.
-- **`device_id` vs `node_id` naming.** The BLE manifest schema in
-  `lib/ble/validation.ts` requires `device_id`; `fakts.base_models.Manifest` calls it
-  `node_id`. Nothing translates between them today.
-- **Hardcoded deployment.** `provisionBaseUrl = 'https://go.arkitekt.live'` means a
-  device is provisioned against a deployment that may not be the one Pokket is
-  connected to.
-- **`requested_client_kind: "mobile"`** in `fakts/start.tsx` matches no member of
-  `ClientKindVanilla`.
-- **Physical hardware registered as `development` clients.** A dedicated `device`
-  kind would let an admin revoke a fleet without touching developer credentials.
-- **BLE transport is unauthenticated.** Nothing in `useImprovProvisioning` bonds or
-  pairs. Under the current design a permanent org credential crosses that link in
-  the clear. The proposal reduces the exposure to a one-shot code; bonding, or
-  gating characteristic writes behind a physical button press, would be worth
-  adding regardless.
+## What changed in Pokket
 
-## Open questions
+| File | Change |
+|---|---|
+| `lib/arkitekt/fakts/provisionDevice.ts` | New. Stages an authorization from a BLE manifest and assembles the blob. |
+| `hooks/useDeviceEnrollment.ts` | New. Stage → resolve → accept, returning the blob. |
+| `lib/lok/deviceCode.ts` | New. `hubs`, `deviceCodeByCode`, `acceptDeviceCode`. |
+| `lib/arkitekt/fakts/start.tsx` | `requested_client_kind` / `_role` are parameters. |
+| `lib/ble/improvProtocol.ts` | `PROVISIONING_UUID` + `buildProvisioningPayload`. |
+| `lib/ble/validation.ts` | `ProvisioningBlobSchema`; config carries `provisioning` instead of `arkitektToken`. |
+| `lib/ble/useImprovProvisioning.ts` | Writes the blob instead of a token. |
+| `components/BleProvisioning.tsx` | Enrolment flow + hub picker. |
+| `lib/arkitekt/hooks.tsx`, `index.tsx` | `useEndpoint()`. |
 
-- Should a device client be `role: agent`? It is authorized once and then runs
-  unattended, which is what the `AGENT` description in `fakts/enums.py` describes.
-- Should a device code issued for provisioning have a longer `expires_in` than the
-  interactive default of 300s, to cover an operator provisioning a batch?
-- Does re-provisioning an existing device reuse its client, or revoke and re-register?
-  `validate_device_code` currently looks up an existing client by manifest + node +
-  tenant + org, which would reuse it.
+Bugs fixed on the way:
+
+- **`nodeId` carried the BLE peripheral id.** On iOS that is a per-install
+  random UUID, so re-provisioning the same board registered a second `Device`.
+  It is now `manifest.device_id`.
+- **The deployment was hardcoded** to `https://go.arkitekt.live`. It now comes
+  from the session, so a device always lands where its operator is connected.
+- **`requested_client_kind: "mobile"`** matched no member of `ClientKindVanilla`,
+  so Pokket's own authorization request would have been rejected. It is now
+  `desktop`.
+- **`lib/ble/index.ts` re-exported six names that do not exist** in
+  `improvProtocol.ts` (`IMPROV_SERVICE_UUID` and friends), six compile errors.
+  Removed; the one consumer, the unreferenced `BleProvisioningDemo`, now uses
+  `ARKITEKT_SERVICE_UUID`.
+
+## Known gaps
+
+- **`lib/lok/deviceCode.ts` is hand-written.** `codegen` pulls its schema from a
+  live deployment and the checked-in `lib/lok/api/graphql.ts` predates the
+  protocol-2 schema, so these operations have no generated types. Documents are
+  in `graphql/lok/**`; delete the module once codegen has run against a `next`
+  deployment.
+- **`BleProvisioningDemo.tsx` is stale.** Unreferenced, and still calls the
+  pre-refactor `useImprovProvisioning(deviceId)` / `provision(config)` signatures
+  (three pre-existing compile errors). It demonstrates the protocol-1 flow and
+  should probably be deleted.
+- **The BLE transport is unauthenticated.** Nothing bonds or pairs, so the blob
+  crosses in the clear. This flow reduces the exposure from a permanent
+  credential to a one-shot code, but bonding — or gating characteristic writes
+  behind a physical button press — is still worth adding.
+- **There is no `device` client kind.** Hardware registers as `development`,
+  so an admin cannot revoke a device fleet without touching developer clients.

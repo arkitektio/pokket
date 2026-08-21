@@ -20,6 +20,18 @@ export const WIFI_ANONYMOUS_IDENTITY_UUID =
   "beb5483e-36e1-4688-b7f5-ea07361b26af";
 export const WIFI_PEM_CERTIFICATE_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26b0";
 
+/**
+ * The protocol-2 provisioning characteristic.
+ *
+ * Under protocol 1 the device was handed a permanent client token on
+ * FAKTS_TOKEN_UUID, and writing it was also the implicit signal to commit the
+ * config. Protocol 2 has no such token: the device gets a pre-approved,
+ * single-use device code plus the client identity it must present, which is
+ * more than one value — so it travels as one JSON object, and that single
+ * atomic write is the commit.
+ */
+export const PROVISIONING_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26b1";
+
 // Legacy aliases for backward compatibility
 export const REDEEM_TOKEN_UUID = FAKTS_TOKEN_UUID;
 export const ARKITEKT_TOKEN_UUID = FAKTS_TOKEN_UUID;
@@ -77,6 +89,22 @@ export function buildBaseURLPayload(baseUrl: string): string {
  */
 export function buildFaktsTokenPayload(token: string): string {
   return btoa(token);
+}
+
+/**
+ * Build the protocol-2 provisioning payload.
+ *
+ * Base64 of the JSON `{ base_url, client_id, device_code }`. The three values
+ * together are what the firmware needs to run its own device-code exchange:
+ * where to go, who to say it is, and the pre-approved code to present. Well
+ * inside the 512-byte characteristic limit, so it never needs chunking.
+ */
+export function buildProvisioningPayload(blob: {
+  base_url: string;
+  client_id: string;
+  device_code: string;
+}): string {
+  return btoa(JSON.stringify(blob));
 }
 
 /**
