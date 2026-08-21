@@ -40,11 +40,23 @@ export type Service<T = unknown> = {
   ward?: Ward;
 };
 
+/**
+ * How every client obtains a usable access token.
+ *
+ * Normally this refreshes only when the token is near expiry. `forceRefresh`
+ * is for the one case that cannot be decided from the clock: the server just
+ * rejected the token we hold, so the cached one — however fresh it looks — is
+ * exactly the one that must not be reused.
+ */
+export type GetToken = (options?: {
+  forceRefresh?: boolean;
+}) => Promise<TokenResponse>;
+
 export type ServiceBuilder<T extends Service = Service> = (options: {
   manifest: Manifest;
   alias: Alias;
   fakts: ActiveFakts;
-  getToken: () => Promise<TokenResponse>;
+  getToken: GetToken;
 }) => T;
 
 export type ServiceDefinition<T extends Service = Service> = {
@@ -80,7 +92,6 @@ export type AliasReport = {
 
 export type ReportRequest = {
   alias_reports: { [key: string]: AliasReport };
-  token: string;
   functional: boolean;
 };
 

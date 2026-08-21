@@ -1,4 +1,4 @@
-import { ActiveFakts } from "../fakts/faktsSchema";
+import { splitRefreshResponse, type RefreshResult } from "../fakts/pollToken";
 import { TokenResponse } from "../fakts/tokenSchema";
 
 const TOKEN_REFRESH_SKEW_MS = 60_000;
@@ -31,16 +31,26 @@ export const isAbortLikeError = (error: unknown): boolean => {
   );
 };
 
+/**
+ * Refresh as a public client: `client_id` only, no secret.
+ *
+ * The refresh token rotates on every use, so the returned one must always be
+ * persisted. The response also carries a freshly re-rendered fakts envelope
+ * (instance aliases are resolved against the requesting host), which is how
+ * configuration changes reach us without a human re-approving — hence the
+ * `fakts` half of the result — which is `null` when the server could not
+ * render one, in which case the caller keeps the config it already has.
+ */
 export const refreshAccessToken = async (
-  fakts: ActiveFakts,
+  tokenEndpoint: string,
   currentToken: TokenResponse,
   controller?: AbortController,
-): Promise<TokenResponse> => {
+): Promise<RefreshResult> => {
   if (!currentToken.refresh_token) {
     throw new Error("No refresh token available – cannot refresh");
   }
 
-  const response = await fetch(`${fakts.auth.token_url}`, {
+  const response = await fetch(tokenEndpoint, {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
@@ -48,8 +58,7 @@ export const refreshAccessToken = async (
     body: new URLSearchParams({
       grant_type: "refresh_token",
       refresh_token: currentToken.refresh_token,
-      client_id: fakts.auth.client_id,
-      client_secret: fakts.auth.client_secret,
+      client_id: currentToken.client_id,
     }),
     signal: controller?.signal,
   });
@@ -61,5 +70,5 @@ export const refreshAccessToken = async (
     );
   }
 
-  return normalizeToken(json as TokenResponse);
+  return splitRefreshResponse(json);
 };

@@ -1,22 +1,23 @@
 import { WindowPopper } from "../types";
-import { FaktsEndpoint } from "./endpointSchema";
 
 export interface Closable {
   close: () => Promise<void>;
 }
 
+/**
+ * Open the deployment's configure page so a human can approve the device code.
+ * The URL is `verification_uri_complete` straight from the authorization
+ * response — the server builds it from its own configure template, so a
+ * deployment can relocate the page without us knowing.
+ */
 export const popOutWindowOpen = async ({
-  endpoint,
-  code,
+  verificationUri,
   windowPopper,
 }: {
-  endpoint: FaktsEndpoint;
-  code: string;
+  verificationUri: string;
   windowPopper: WindowPopper;
 }): Promise<Closable> => {
-  const url = `${endpoint.frontend_url}configure/${code}`;
-
-  const win = windowPopper.open(url);
+  const win = windowPopper.open(verificationUri);
 
   if (!win) throw new Error("Could not open window");
 

@@ -1,9 +1,9 @@
 import { ActiveFakts, Alias } from "../fakts/faktsSchema";
 import { StoredArkitektSession } from "../fakts/sessionStorageSchema";
-import { TokenResponse } from "../fakts/tokenSchema";
 import {
   ConnectedContext,
   EnhancedManifest,
+  GetToken,
   Service,
   ServiceBuilder,
   ServiceBuilderMap,
@@ -25,7 +25,7 @@ export const buildServiceMap = ({
   manifest: EnhancedManifest;
   aliasMap: AliasMap;
   fakts: ActiveFakts;
-  getToken: () => Promise<TokenResponse>;
+  getToken: GetToken;
 }): ServiceMap => {
   const services: ServiceMap = {};
 
@@ -56,7 +56,7 @@ export const instantiateConnection = <
   manifest: EnhancedManifest,
   serviceBuilderMap: T,
   selfServiceBuilder: S,
-  getToken: () => Promise<TokenResponse>,
+  getToken: GetToken,
 ): ConnectedContext<T, S> => {
   const token = normalizeToken(storedSession.token);
   const serviceMap = buildServiceMap({
