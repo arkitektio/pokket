@@ -1,3 +1,10 @@
+# [1.3.0](https://github.com/arkitektio/pokket/compare/v1.2.3...v1.3.0) (2026-08-21)
+
+
+### Features
+
+* **fakts:** migrate to protocol 2 device-code grant ([7a92fda](https://github.com/arkitektio/pokket/commit/7a92fdaebf49355040107ccf34c3818b8f48d55b))
+
 ## [1.2.3](https://github.com/arkitektio/pokket/compare/v1.2.2...v1.2.3) (2026-06-02)
 
 

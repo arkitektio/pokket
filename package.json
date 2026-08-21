@@ -1,7 +1,7 @@
 {
   "name": "pokket",
   "main": "expo-router/entry",
-  "version": "1.2.3",
+  "version": "1.3.0",
   "packageManager": "pnpm@11.6.0",
   "scripts": {
     "start": "expo start",
