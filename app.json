@@ -7,12 +7,7 @@
     "icon": "./assets/images/icon.png",
     "scheme": "pokket",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
     "ios": {
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
-      },
       "supportsTablet": true,
       "bundleIdentifier": "live.arkitekt.pokket",
       "infoPlist": {
@@ -26,7 +21,6 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true,
       "package": "live.arkitekt.pokket",
       "googleServicesFile": "google-services.json",
       "permissions": [
