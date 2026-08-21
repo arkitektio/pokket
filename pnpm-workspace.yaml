@@ -1,0 +1,20 @@
+# pnpm 10+/11 reads these settings from here, NOT from .npmrc — the equivalent
+# .npmrc keys are silently ignored (`pnpm config get node-linker` -> undefined).
+
+# React Native's Metro bundler and Expo's native autolinking both resolve
+# modules by walking a flat node_modules tree. pnpm's default `isolated`
+# layout symlinks everything and breaks that, so link the way npm did.
+nodeLinker: hoisted
+
+# Was `legacy-peer-deps=true` under npm, and CI ran `npm ci --force`: this
+# dependency tree has peer conflicts that predate the pnpm switch. Keep
+# resolution non-fatal so migrating package managers doesn't turn into a
+# dependency-upgrade project.
+strictPeerDependencies: false
+
+# pnpm does not run dependency build scripts unless approved here.
+# `unrs-resolver` is the native resolver behind eslint-import-resolver-typescript
+# (via eslint-config-expo); its postinstall selects the right prebuilt binary,
+# and ESLint's import resolution fails without it.
+allowBuilds:
+  unrs-resolver: true

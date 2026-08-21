@@ -24,11 +24,16 @@ jobs:
         with:
           persist-credentials: false # Required for semantic-release
 
+      # Must precede setup-node: `cache: "pnpm"` resolves the store path by
+      # invoking pnpm, so pnpm has to be on PATH before that step runs.
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: "npm"
+          cache: "pnpm"
 
       - name: Setup Java
         uses: actions/setup-java@v4
@@ -37,7 +42,7 @@ jobs:
           distribution: "temurin"
 
       - name: Install Dependencies
-        run: npm ci --force
+        run: pnpm install --frozen-lockfile
 
       - name: Setup Expo
         uses: expo/expo-github-action@v8

@@ -2,6 +2,7 @@
   "name": "pokket",
   "main": "expo-router/entry",
   "version": "1.2.2",
+  "packageManager": "pnpm@11.6.0",
   "scripts": {
     "start": "expo start",
     "tstart": "REACT_NATIVE_PACKAGER_HOSTNAME=jhnnsrs-lab npx expo start --dev-client",
@@ -17,7 +18,7 @@
   },
   "dependencies": {
     "@apollo/client": "^3.13.9",
-    "@config-plugins/react-native-webrtc": "^14.0.0",
+    "@config-plugins/react-native-webrtc": "^15.0.0",
     "@expo/vector-icons": "^15.0.3",
     "@livekit/react-native": "^2.11.0",
     "@livekit/react-native-expo-plugin": "^1.0.2",

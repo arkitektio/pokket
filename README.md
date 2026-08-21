@@ -33,14 +33,17 @@ Currently available for Android devices with BLE support. Just download the APK 
 
 1. **Install dependencies**
 
+   This project uses [pnpm](https://pnpm.io). If you don't have it,
+   `corepack enable` picks up the version pinned in `package.json`.
+
    ```bash
-   npm install
+   pnpm install
    ```
 
 2. **Start the app**
 
    ```bash
-   npx expo start
+   pnpm expo start
    ```
 
 ## Tech Stack
