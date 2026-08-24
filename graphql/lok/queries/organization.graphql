@@ -1,0 +1,12 @@
+query MyOrganization {
+  mycontext {
+    organization {
+      id
+      slug
+      profile {
+        id
+        name
+      }
+    }
+  }
+}

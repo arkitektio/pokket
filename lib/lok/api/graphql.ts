@@ -2413,6 +2413,11 @@ export type MyActiveMessagesQueryVariables = Exact<{ [key: string]: never; }>;
 
 export type MyActiveMessagesQuery = { __typename?: 'Query', myActiveMessages: Array<{ __typename?: 'SystemMessage', id: string, title?: string | null, message?: string | null, action: string }> };
 
+export type MyOrganizationQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type MyOrganizationQuery = { __typename?: 'Query', mycontext: { __typename?: 'Context', organization: { __typename?: 'Organization', id: string, slug: string, profile: { __typename?: 'OrganizationProfile', id: string, name?: string | null } } } };
+
 export type RedeemTokensQueryVariables = Exact<{
   filters?: InputMaybe<RedeemTokenFilter>;
   pagination?: InputMaybe<OffsetPaginationInput>;
@@ -4334,6 +4339,47 @@ export function useMyActiveMessagesLazyQuery(baseOptions?: ApolloReactHooks.Lazy
 export type MyActiveMessagesQueryHookResult = ReturnType<typeof useMyActiveMessagesQuery>;
 export type MyActiveMessagesLazyQueryHookResult = ReturnType<typeof useMyActiveMessagesLazyQuery>;
 export type MyActiveMessagesQueryResult = Apollo.QueryResult<MyActiveMessagesQuery, MyActiveMessagesQueryVariables>;
+export const MyOrganizationDocument = gql`
+    query MyOrganization {
+  mycontext {
+    organization {
+      id
+      slug
+      profile {
+        id
+        name
+      }
+    }
+  }
+}
+    `;
+
+/**
+ * __useMyOrganizationQuery__
+ *
+ * To run a query within a React component, call `useMyOrganizationQuery` and pass it any options that fit your needs.
+ * When your component renders, `useMyOrganizationQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useMyOrganizationQuery({
+ *   variables: {
+ *   },
+ * });
+ */
+export function useMyOrganizationQuery(baseOptions?: ApolloReactHooks.QueryHookOptions<MyOrganizationQuery, MyOrganizationQueryVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return ApolloReactHooks.useQuery<MyOrganizationQuery, MyOrganizationQueryVariables>(MyOrganizationDocument, options);
+      }
+export function useMyOrganizationLazyQuery(baseOptions?: ApolloReactHooks.LazyQueryHookOptions<MyOrganizationQuery, MyOrganizationQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return ApolloReactHooks.useLazyQuery<MyOrganizationQuery, MyOrganizationQueryVariables>(MyOrganizationDocument, options);
+        }
+export type MyOrganizationQueryHookResult = ReturnType<typeof useMyOrganizationQuery>;
+export type MyOrganizationLazyQueryHookResult = ReturnType<typeof useMyOrganizationLazyQuery>;
+export type MyOrganizationQueryResult = Apollo.QueryResult<MyOrganizationQuery, MyOrganizationQueryVariables>;
 export const RedeemTokensDocument = gql`
     query RedeemTokens($filters: RedeemTokenFilter, $pagination: OffsetPaginationInput) {
   redeemTokens(filters: $filters, pagination: $pagination) {
