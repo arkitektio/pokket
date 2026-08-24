@@ -1,3 +1,10 @@
+## [1.4.1](https://github.com/arkitektio/pokket/compare/v1.4.0...v1.4.1) (2026-08-24)
+
+
+### Bug Fixes
+
+* org name as header ([5db8a89](https://github.com/arkitektio/pokket/commit/5db8a899da1361c9bb8d478fd9933ca746557b1a))
+
 # [1.4.0](https://github.com/arkitektio/pokket/compare/v1.3.0...v1.4.0) (2026-08-24)
 
 
