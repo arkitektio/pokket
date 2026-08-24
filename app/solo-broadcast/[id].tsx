@@ -18,6 +18,7 @@ import { Stack, useLocalSearchParams } from 'expo-router';
 import { Track } from 'livekit-client';
 import * as React from 'react';
 import { ActivityIndicator, View } from 'react-native';
+import { useThemeColors } from '@/lib/theme/BrandProvider';
 
 function EmptyState({
   title,
@@ -26,6 +27,7 @@ function EmptyState({
   title: string;
   description: string;
 }) {
+  const colors = useThemeColors();
   return (
     <Card className="border-border bg-card">
       <CardContent className="items-center py-8">
@@ -33,7 +35,7 @@ function EmptyState({
           <IconSymbol
             name="antenna.radiowaves.left.and.right"
             size={24}
-            color="hsl(170, 36%, 43%)"
+            color={colors.primary}
           />
         </View>
         <Text className="text-center text-lg font-semibold text-card-foreground">{title}</Text>
@@ -44,9 +46,10 @@ function EmptyState({
 }
 
 function LoadingState({ message }: { message: string }) {
+  const colors = useThemeColors();
   return (
     <View className="items-center justify-center py-16">
-      <ActivityIndicator size="large" color="hsl(170, 36%, 43%)" />
+      <ActivityIndicator size="large" color={colors.primary} />
       <Text className="mt-4 text-sm text-muted-foreground">{message}</Text>
     </View>
   );

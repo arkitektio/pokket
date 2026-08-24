@@ -5,9 +5,6 @@ fragment Layer on Layer {
   logo {
     presignedUrl
   }
-  instances {
-    ...ListServiceInstance
-  }
 }
 
 fragment ListLayer on Layer {

@@ -4,14 +4,23 @@ import { Text } from '@/components/ui/text';
 import { Guard } from '@/lib/app/App';
 import { useMeQuery } from '@/lib/lok/api/graphql';
 import { ScrollView, View } from 'react-native';
+import { useThemeColors } from '@/lib/theme/BrandProvider';
 
 function Greeting() {
-  const { data } = useMeQuery({});
+  const { data, loading, error } = useMeQuery({});
+
+  /* An empty name had three causes that looked identical: still loading, the
+     query failed, or it succeeded with no user. Say which. */
+  const name = data?.me?.username;
+
   return (
     <View className="mb-2">
       <Text className="text-3xl font-bold text-foreground">
-        Hi, {data?.me?.username}
+        Hi, {name ?? (loading ? '…' : 'there')}
       </Text>
+      {!name && error ? (
+        <Text className="text-destructive text-sm">Could not load your user: {error.message}</Text>
+      ) : null}
       <Text className="text-muted-foreground text-lg">
         Welcome back to Pokket
       </Text>
@@ -20,6 +29,7 @@ function Greeting() {
 }
 
 export default function HomeScreen() {
+  const colors = useThemeColors();
   return (
     <ScrollView className="flex-1 bg-background">
       <View className="flex-1 px-4 pt-6">
@@ -36,7 +46,7 @@ export default function HomeScreen() {
             href="/tasks"
             title="Tasks"
             icon="list.bullet"
-            color="hsl(170, 36%, 43%)"
+            color={colors.primary}
             iconBgClassName="bg-chart-1/10"
             borderClassName="border-t-2 border-t-chart-1/40"
           />
@@ -44,7 +54,7 @@ export default function HomeScreen() {
             href="/wifi"
             title="Wi-Fi"
             icon="wifi"
-            color="hsl(170, 36%, 43%)"
+            color={colors.primary}
             iconBgClassName="bg-chart-2/10"
             borderClassName="border-t-2 border-t-chart-2/40"
           />
@@ -52,7 +62,7 @@ export default function HomeScreen() {
             href="/provision"
             title="Provision"
             icon="antenna.radiowaves.left.and.right"
-            color="hsl(170, 36%, 43%)"
+            color={colors.primary}
             iconBgClassName="bg-chart-3/10"
             borderClassName="border-t-2 border-t-chart-3/40"
           />
@@ -60,7 +70,7 @@ export default function HomeScreen() {
             href="/broadcasts"
             title="Broadcasts"
             icon="antenna.radiowaves.left.and.right"
-            color="hsl(170, 36%, 43%)"
+            color={colors.primary}
             iconBgClassName="bg-chart-2/10"
             borderClassName="border-t-2 border-t-chart-2/40"
           />
@@ -68,7 +78,7 @@ export default function HomeScreen() {
             href="/debug"
             title="Debug"
             icon="ant.fill"
-            color="hsl(170, 36%, 43%)"
+            color={colors.primary}
             iconBgClassName="bg-chart-1/10"
             borderClassName="border-t-2 border-t-chart-1/40"
           />

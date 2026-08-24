@@ -5,6 +5,7 @@ import { useBLEDevice, useBLEScanner } from '@/lib/ble';
 import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
 import { Device } from 'react-native-ble-plx';
+import { useThemeColors } from '@/lib/theme/BrandProvider';
 
 /**
  * BLE Debug Component
@@ -16,6 +17,7 @@ import { Device } from 'react-native-ble-plx';
  * - Characteristic properties (read, write, notify, etc.)
  */
 export function BleDebug() {
+  const colors = useThemeColors();
     const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
     const [expandedServices, setExpandedServices] = useState<Set<string>>(new Set());
 
@@ -95,7 +97,7 @@ export function BleDebug() {
 
                 {scanner.isScanning && (
                     <View className="flex-row items-center mb-4 p-3 bg-primary/10 rounded-xl">
-                        <ActivityIndicator size="small" color="hsl(165, 50%, 55%)" />
+                        <ActivityIndicator size="small" color={colors.primary} />
                         <Text className="ml-3 text-primary text-sm">
                             Scanning for BLE devices...
                         </Text>
@@ -165,7 +167,7 @@ export function BleDebug() {
             {scanner.devices.length === 0 && !scanner.isScanning && (
                 <View className="py-8 items-center">
                     <View className="p-4 rounded-2xl bg-muted mb-4">
-                        <IconSymbol name="antenna.radiowaves.left.and.right" size={32} color="hsl(165, 10%, 65%)" />
+                        <IconSymbol name="antenna.radiowaves.left.and.right" size={32} color={colors.mutedForeground} />
                     </View>
                     <Text className="text-muted-foreground text-sm text-center">
                         No devices found. Tap scan to search.
@@ -286,7 +288,7 @@ export function BleDebug() {
                                             <IconSymbol
                                                 name={expandedServices.has(service.uuid) ? "chevron.right" : "chevron.right"}
                                                 size={14}
-                                                color="hsl(165, 10%, 65%)"
+                                                color={colors.mutedForeground}
                                                 style={{ transform: [{ rotate: expandedServices.has(service.uuid) ? '90deg' : '0deg' }] }}
                                             />
                                         </View>

@@ -3,8 +3,10 @@ import { App } from "@/lib/app/App";
 import { Modal, Pressable, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useThemeColors } from '@/lib/theme/BrandProvider';
 
 export const SettingsButton = () => {
+  const colors = useThemeColors();
   const disconnect = App.useDisconnect();
   const [visible, setVisible] = useState(false);
   const insets = useSafeAreaInsets();
@@ -27,10 +29,22 @@ export const SettingsButton = () => {
         onRequestClose={() => setVisible(false)}
       >
         <Pressable style={styles.overlay} onPress={() => setVisible(false)}>
-            <View style={[styles.menu, { marginTop: insets.top + 40 }]}>
+            {/* Colors come from the live theme; only layout stays in the
+                StyleSheet, which cannot see the hook. This menu was hardcoded
+                white on a dark app. */}
+            <View
+                style={[
+                    styles.menu,
+                    {
+                        marginTop: insets.top + 40,
+                        backgroundColor: colors.card,
+                        borderWidth: 1,
+                        borderColor: colors.border,
+                    },
+                ]}>
                 <TouchableOpacity style={styles.menuItem} onPress={handleLogout}>
-                    <IconSymbol name="rectangle.portrait.and.arrow.right" size={20} color="#EF4444" />
-                    <Text style={styles.menuText}>Logout</Text>
+                    <IconSymbol name="rectangle.portrait.and.arrow.right" size={20} color={colors.destructive} />
+                    <Text style={[styles.menuText, { color: colors.destructive }]}>Logout</Text>
                 </TouchableOpacity>
             </View>
         </Pressable>
@@ -48,7 +62,6 @@ const styles = StyleSheet.create({
     },
     menu: {
         marginRight: 15,
-        backgroundColor: 'white',
         borderRadius: 12,
         padding: 4,
         shadowColor: '#000',
@@ -68,6 +81,5 @@ const styles = StyleSheet.create({
         marginLeft: 12,
         fontSize: 16,
         fontWeight: '500',
-        color: '#EF4444',
     }
 });

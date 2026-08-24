@@ -1,22 +1,28 @@
+import { Theme } from "expo-router/react-navigation";
 import { Manifest } from "./arkitekt/fakts/manifestSchema";
+import { buildBrandTokens } from "./theme/brandTokens";
 
-export const NAV_THEME = {
-    light: {
-        background: 'hsl(0 0% 100%)', // background
-        border: 'hsl(240 5.9% 90%)', // border
-        card: 'hsl(0 0% 100%)', // card
-        notification: 'hsl(0 84.2% 60.2%)', // destructive
-        primary: 'hsla(240, 20%, 40%, 1.00)', // primary
-        text: 'hsl(240 10% 3.9%)', // foreground
-    },
-    dark: {
-        background: 'hsl(240 10% 3.9%)', // background
-        border: 'hsl(240 3.7% 15.9%)', // border
-        card: 'hsl(240 10% 3.9%)', // card
-        notification: 'hsl(0 72% 51%)', // destructive
-        primary: 'hsl(0 0% 98%)', // primary
-        text: 'hsl(0 0% 98%)', // foreground
-    },
+/**
+ * react-navigation's chrome (stack header, tab bar) is styled from a plain JS
+ * object, not from CSS variables — `vars()` cannot reach it. So the nav theme
+ * is built from the SAME token table as everything else, and rebuilt whenever
+ * the brand changes; see lib/theme/BrandProvider.tsx.
+ */
+export const buildNavTheme = (
+    hue?: number,
+    chroma?: number,
+): Theme["colors"] => {
+    const t = buildBrandTokens(hue, chroma);
+    const hsl = (token: string) => `hsl(${t[token]})`;
+
+    return {
+        background: hsl("--background"),
+        border: hsl("--border"),
+        card: hsl("--card"),
+        notification: hsl("--destructive"),
+        primary: hsl("--primary"),
+        text: hsl("--foreground"),
+    };
 };
 
 export const manifest: Manifest = {

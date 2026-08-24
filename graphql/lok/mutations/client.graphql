@@ -1,6 +1,6 @@
 mutation CreateClient($input: DevelopmentClientInput!) {
   createDevelopmentalClient(input: $input) {
     id
-    token
+    clientId
   }
 }

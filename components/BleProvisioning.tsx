@@ -11,6 +11,7 @@ import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 import { Device } from 'react-native-ble-plx';
 import { IconSymbol } from './ui/IconSymbol';
+import { useThemeColors } from '@/lib/theme/BrandProvider';
 
 enum ProvisioningStep {
     SCANNING = 'scanning',
@@ -33,6 +34,7 @@ function getStepIndex(step: ProvisioningStep): number {
 }
 
 function StepIndicator({ currentStep }: { currentStep: ProvisioningStep }) {
+  const colors = useThemeColors();
     const activeIndex = getStepIndex(currentStep);
     return (
         <View className="flex-row items-center justify-between mb-6 px-2">
@@ -51,7 +53,7 @@ function StepIndicator({ currentStep }: { currentStep: ProvisioningStep }) {
                                 } ${isActive ? 'border-2 border-primary' : isCompleted ? 'border border-primary/50' : 'border border-zinc-700'}`}
                             >
                                 {isCompleted ? (
-                                    <IconSymbol name="checkmark" size={12} color="hsl(165, 50%, 55%)" />
+                                    <IconSymbol name="checkmark" size={12} color={colors.primary} />
                                 ) : (
                                     <View className={`w-2 h-2 rounded-full ${isActive ? 'bg-white' : 'bg-zinc-600'}`} />
                                 )}
@@ -84,7 +86,22 @@ function PulsingDot({ color = 'bg-blue-500' }: { color?: string }) {
  * - Wi-Fi credentials
  * - Arkitekt base URL and redeem token
  */
+/**
+ * lok removed `Client.token`: `createDevelopmentalClient` now returns a client
+ * identity, not a bearer token a device can present. Until a replacement grant
+ * exists this fails loudly rather than provisioning a device with nothing —
+ * and the rest of the flow below stays intact and typed for that redesign.
+ */
+const requireFaktsToken = (clientId: string): string => {
+    throw new Error(
+        'BLE provisioning is out of service: lok no longer issues a fakts-token from ' +
+        `createDevelopmentalClient (got client ${clientId}). ` +
+        'The device-provisioning grant needs to be redesigned.',
+    );
+};
+
 export function BleProvisioning() {
+  const colors = useThemeColors();
     const [step, setStep] = useState<ProvisioningStep>(ProvisioningStep.SCANNING);
     const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
     const [manifestLoading, setManifestLoading] = useState(false);
@@ -235,12 +252,15 @@ export function BleProvisioning() {
                 }
             });
 
-            if (!data?.createDevelopmentalClient?.token) {
-                throw new Error('Failed to create client token');
+            /* lok removed `Client.token`: `createDevelopmentalClient` now returns
+               a client identity, not a bearer token the device can present. BLE
+               provisioning needs a replacement grant — this stops here on
+               purpose rather than provisioning a device with nothing. */
+            if (!data?.createDevelopmentalClient?.clientId) {
+                throw new Error('Failed to create developmental client');
             }
 
-            const faktsToken = data.createDevelopmentalClient.token;
-            console.log('Obtained fakts-token:', faktsToken);
+            const faktsToken = requireFaktsToken(data.createDevelopmentalClient.clientId);
 
             // Step 2: Provision device with WiFi and fakts-token
             try {
@@ -298,7 +318,7 @@ export function BleProvisioning() {
 
             {scanner.isScanning && (
                 <View className="flex-row items-center mb-4 p-3 bg-primary/10 rounded-xl border border-primary/20">
-                    <ActivityIndicator size="small" color="hsl(165, 50%, 55%)" />
+                    <ActivityIndicator size="small" color={colors.primary} />
                     <Text className="ml-3 text-primary text-sm">
                         Scanning for nearby devices...
                     </Text>
@@ -319,7 +339,7 @@ export function BleProvisioning() {
                         className="flex-row items-center p-4 bg-card rounded-xl border border-border active:bg-accent"
                     >
                         <View className="w-10 h-10 rounded-full bg-primary/15 items-center justify-center mr-3">
-                            <IconSymbol name="wifi" size={18} color="hsl(165, 50%, 55%)" />
+                            <IconSymbol name="wifi" size={18} color={colors.primary} />
                         </View>
                         <View className="flex-1">
                             <Text className="font-semibold text-card-foreground text-sm">
@@ -339,7 +359,7 @@ export function BleProvisioning() {
             {scanner.devices.length === 0 && !scanner.isScanning && (
                 <View className="py-12 items-center">
                     <View className="w-16 h-16 rounded-full bg-card items-center justify-center mb-4">
-                        <IconSymbol name="wifi" size={28} color="hsl(165, 8%, 35%)"/>
+                        <IconSymbol name="wifi" size={28} color={colors.mutedForeground}/>
                     </View>
                     <Text className="text-muted-foreground text-center text-sm">
                         No devices found.{'\n'}Make sure your device is in pairing mode.
@@ -373,7 +393,7 @@ export function BleProvisioning() {
 
             {manifestLoading && (
                 <View className="p-5 bg-primary/10 rounded-xl border border-primary/20 mb-4 items-center">
-                    <ActivityIndicator size="small" color="hsl(165, 50%, 55%)" />
+                    <ActivityIndicator size="small" color={colors.primary} />
                     <Text className="text-primary text-sm mt-3">Reading device manifest...</Text>
                 </View>
             )}
@@ -382,7 +402,7 @@ export function BleProvisioning() {
                 <View className="p-4 bg-card rounded-xl border border-border mb-4">
                     <View className="flex-row items-center mb-3">
                         <View className="w-8 h-8 rounded-lg bg-primary/15 items-center justify-center mr-3">
-                            <IconSymbol name="doc.text" size={16} color="hsl(165, 50%, 55%)" />
+                            <IconSymbol name="doc.text" size={16} color={colors.primary} />
                         </View>
                         <Text className="font-semibold text-foreground text-sm">Manifest</Text>
                     </View>
@@ -423,7 +443,7 @@ export function BleProvisioning() {
                     disabled={provisioning.isProvisioning}
                 >
                     <View className="flex-row items-center gap-2">
-                        <IconSymbol name="chevron.left" size={14} color="hsl(165, 10%, 65%)" />
+                        <IconSymbol name="chevron.left" size={14} color={colors.mutedForeground} />
                         <Text className="text-muted-foreground">Back</Text>
                     </View>
                 </Button>
@@ -440,7 +460,7 @@ export function BleProvisioning() {
                     ) : (
                         <View className="flex-row items-center gap-2">
                             <Text className="text-primary-foreground font-medium">Continue</Text>
-                            <IconSymbol name="arrow.right" size={14} color="hsl(165, 50%, 8%)" />
+                            <IconSymbol name="arrow.right" size={14} color={colors.primaryForeground} />
                         </View>
                     )}
                 </Button>
@@ -472,7 +492,7 @@ export function BleProvisioning() {
                                     <IconSymbol
                                         name={profile.type === 'eduroam' ? 'building.2.fill' : 'wifi'}
                                         size={18}
-                                        color={selectedProfile === profile ? 'hsl(165, 50%, 55%)' : 'hsl(165, 8%, 45%)'}
+                                        color={selectedProfile === profile ? colors.primary : colors.mutedForeground}
                                     />
                                 </View>
                                 <View>
@@ -487,7 +507,7 @@ export function BleProvisioning() {
                                 </View>
                             </View>
                             {selectedProfile === profile && (
-                                <IconSymbol name="checkmark.circle.fill" size={20} color="hsl(165, 50%, 55%)" />
+                                <IconSymbol name="checkmark.circle.fill" size={20} color={colors.primary} />
                             )}
                         </View>
                     </Pressable>
@@ -497,7 +517,7 @@ export function BleProvisioning() {
             <Link href="/wifi" asChild>
                 <Button variant="outline" className="border-border mb-4">
                     <View className="flex-row items-center gap-2">
-                        <IconSymbol name="plus" size={14} color="hsl(165, 10%, 65%)" />
+                        <IconSymbol name="plus" size={14} color={colors.mutedForeground} />
                         <Text className="text-muted-foreground">Add New Profile</Text>
                     </View>
                 </Button>
@@ -526,7 +546,7 @@ export function BleProvisioning() {
                     className="flex-1 border-border"
                 >
                     <View className="flex-row items-center gap-2">
-                        <IconSymbol name="chevron.left" size={14} color="hsl(165, 10%, 65%)" />
+                        <IconSymbol name="chevron.left" size={14} color={colors.mutedForeground} />
                         <Text className="text-muted-foreground">Back</Text>
                     </View>
                 </Button>
@@ -536,7 +556,7 @@ export function BleProvisioning() {
                     className="flex-1"
                 >
                     <View className="flex-row items-center gap-2">
-                        <IconSymbol name="bolt.fill" size={14} color="hsl(165, 50%, 8%)" />
+                        <IconSymbol name="bolt.fill" size={14} color={colors.primaryForeground} />
                         <Text className="text-primary-foreground font-medium">
                             {provisioning.isProvisioning ? 'Provisioning...' : 'Provision'}
                         </Text>
@@ -549,7 +569,7 @@ export function BleProvisioning() {
     const renderProvisioningStep = () => (
         <View className="flex-1 items-center justify-center py-12">
             <View className="w-20 h-20 rounded-full bg-primary/15 items-center justify-center mb-6">
-                <ActivityIndicator size="large" color="hsl(165, 50%, 55%)" />
+                <ActivityIndicator size="large" color={colors.primary} />
             </View>
             <Text className="text-foreground font-semibold text-lg mb-2">Provisioning Device</Text>
             <Text className="text-muted-foreground text-sm text-center mb-6">
@@ -567,7 +587,7 @@ export function BleProvisioning() {
     const renderCompleteStep = () => (
         <View className="flex-1 items-center justify-center py-12">
             <View className="w-20 h-20 rounded-full bg-primary/15 items-center justify-center mb-6">
-                <IconSymbol name="checkmark" size={36} color="hsl(165, 50, 55)" />
+                <IconSymbol name="checkmark" size={36} color={colors.primary} />
             </View>
             <Text className="text-foreground font-semibold text-lg mb-2">All Done!</Text>
             <Text className="text-muted-foreground text-sm text-center mb-8 px-4">
@@ -577,7 +597,7 @@ export function BleProvisioning() {
 
             <Button onPress={handleReset} className="w-full">
                 <View className="flex-row items-center gap-2">
-                    <IconSymbol name="arrow.clockwise" size={14} color="hsl(165, 50%, 8%)" />
+                    <IconSymbol name="arrow.clockwise" size={14} color={colors.primaryForeground} />
                     <Text className="text-primary-foreground font-medium">Provision Another Device</Text>
                 </View>
             </Button>
@@ -588,7 +608,7 @@ export function BleProvisioning() {
         return (
             <View className="flex-1 items-center justify-center bg-background">
                 <View className="w-16 h-16 rounded-full bg-card items-center justify-center mb-4">
-                    <ActivityIndicator size="large" color="hsl(165, 50%, 55%)" />
+                    <ActivityIndicator size="large" color={colors.primary} />
                 </View>
                 <Text className="text-muted-foreground text-sm">Loading profiles...</Text>
             </View>
@@ -599,7 +619,7 @@ export function BleProvisioning() {
         return (
             <View className="flex-1 bg-background p-6 items-center justify-center">
                 <View className="w-16 h-16 rounded-full bg-card items-center justify-center mb-4">
-                    <IconSymbol name="wifi" size={28} color="hsl(165, 8%, 35%)" />
+                    <IconSymbol name="wifi" size={28} color={colors.mutedForeground} />
                 </View>
                 <Text className="text-foreground font-semibold text-lg mb-2 text-center">No Wi-Fi Profiles</Text>
                 <Text className="text-muted-foreground text-sm text-center mb-6">
@@ -608,7 +628,7 @@ export function BleProvisioning() {
                 <Link href="/wifi" asChild>
                     <Button className="w-full max-w-xs">
                         <View className="flex-row items-center gap-2">
-                            <IconSymbol name="wifi" size={14} color="hsl(165, 50%, 8%)" />
+                            <IconSymbol name="wifi" size={14} color={colors.primaryForeground} />
                             <Text className="text-primary-foreground font-medium">Configure Wi-Fi</Text>
                         </View>
                     </Button>

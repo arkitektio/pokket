@@ -6,8 +6,10 @@ import { extractPemCertificate, useEduroam } from '@/lib/eduroam/useEduroam';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Switch, Text, TextInput, View } from 'react-native';
+import { useThemeColors } from '@/lib/theme/BrandProvider';
 
 export default function EduroamWifiScreen() {
+  const colors = useThemeColors();
     const [university, setUniversity] = useState<EduroamInstance | null>(null);
     const [identity, setIdentity] = useState('');
     const [anonymousIdentity, setAnonymousIdentity] = useState('');
@@ -110,12 +112,12 @@ export default function EduroamWifiScreen() {
                                 value={eduroamSearch}
                                 onChangeText={setEduroamSearch}
                                 placeholder="Search for your university..."
-                                placeholderTextColor="hsl(165, 8%, 35%)"
+                                placeholderTextColor={colors.mutedForeground}
                                 className="border border-border rounded-xl px-4 py-3 bg-card text-card-foreground mb-2"
                             />
                             {loading && (
                                 <View className="py-4 items-center">
-                                    <ActivityIndicator size="small" color="hsl(165, 50%, 55%)" />
+                                    <ActivityIndicator size="small" color={colors.primary} />
                                     <Text className="text-muted-foreground text-xs mt-2">Searching...</Text>
                                 </View>
                             )}
@@ -154,7 +156,7 @@ export default function EduroamWifiScreen() {
                                     value={identity}
                                     onChangeText={setIdentity}
                                     placeholder="user@university.edu"
-                                    placeholderTextColor="hsl(165, 8%, 35%)"
+                                    placeholderTextColor={colors.mutedForeground}
                                     autoCapitalize="none"
                                     autoCorrect={false}
                                     className="border border-border rounded-xl px-4 py-3 bg-card text-card-foreground"
@@ -167,7 +169,7 @@ export default function EduroamWifiScreen() {
                                     value={anonymousIdentity}
                                     onChangeText={setAnonymousIdentity}
                                     placeholder="anonymous@university.edu"
-                                    placeholderTextColor="hsl(165, 8%, 35%)"
+                                    placeholderTextColor={colors.mutedForeground}
                                     autoCapitalize="none"
                                     autoCorrect={false}
                                     className="border border-border rounded-xl px-4 py-3 bg-card text-card-foreground"
@@ -184,7 +186,7 @@ export default function EduroamWifiScreen() {
                                         value={password}
                                         onChangeText={setPassword}
                                         placeholder="Password"
-                                        placeholderTextColor="hsl(165, 8%, 35%)"
+                                        placeholderTextColor={colors.mutedForeground}
                                         secureTextEntry={!showPassword}
                                         autoCapitalize="none"
                                         autoCorrect={false}
@@ -217,8 +219,8 @@ export default function EduroamWifiScreen() {
                                             setSkipCertValidation(val);
                                             if (val) setShowManualCert(false);
                                         }}
-                                        trackColor={{ false: 'hsl(165, 8%, 20%)', true: 'hsl(165, 50%, 40%)' }}
-                                        thumbColor={skipCertValidation ? 'hsl(165, 50%, 55%)' : 'hsl(165, 8%, 45%)'}
+                                        trackColor={{ false: colors.input, true: colors.primary }}
+                                        thumbColor={skipCertValidation ? colors.primary : colors.mutedForeground}
                                     />
                                 </View>
 
@@ -257,7 +259,7 @@ export default function EduroamWifiScreen() {
                                                 value={pemCertificate}
                                                 onChangeText={setPemCertificate}
                                                 placeholder="-----BEGIN CERTIFICATE-----&#10;...&#10;-----END CERTIFICATE-----"
-                                                placeholderTextColor="hsl(165, 8%, 35%)"
+                                                placeholderTextColor={colors.mutedForeground}
                                                 multiline
                                                 numberOfLines={6}
                                                 autoCapitalize="none"

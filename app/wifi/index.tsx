@@ -5,8 +5,10 @@ import { useWifiProfiles } from '@/hooks/useWifiProfiles';
 import { Link, Stack } from 'expo-router';
 import React from 'react';
 import { FlatList, Text, View } from 'react-native';
+import { useThemeColors } from '@/lib/theme/BrandProvider';
 
 export default function WifiIndexScreen() {
+  const colors = useThemeColors();
     const { profiles, deleteProfile } = useWifiProfiles();
     const alert = useAlertDialog();
 
@@ -18,13 +20,13 @@ export default function WifiIndexScreen() {
                 <View className="flex-row gap-2">
                     <Link href="/wifi/standard" asChild>
                         <Button className="flex-1 flex-row items-center gap-2 bg-card border border-border rounded-xl" variant="outline">
-                            <IconSymbol name="wifi" size={18} color="hsl(165, 50%, 55%)" />
+                            <IconSymbol name="wifi" size={18} color={colors.primary} />
                             <Text className="text-card-foreground text-sm font-medium">Add Wi-Fi</Text>
                         </Button>
                     </Link>
                     <Link href="/wifi/eduroam" asChild>
                         <Button className="flex-1 flex-row items-center gap-2 bg-card border border-border rounded-xl" variant="outline">
-                            <IconSymbol name="building.2.fill" size={18} color="hsl(165, 50%, 55%)" />
+                            <IconSymbol name="building.2.fill" size={18} color={colors.primary} />
                             <Text className="text-card-foreground text-sm font-medium">Add Eduroam</Text>
                         </Button>
                     </Link>
@@ -35,7 +37,7 @@ export default function WifiIndexScreen() {
                 {profiles.length === 0 ? (
                     <View className="py-12 items-center">
                         <View className="w-16 h-16 rounded-full bg-card items-center justify-center mb-4">
-                            <IconSymbol name="wifi" size={28} color="hsl(165, 8%, 35%)" />
+                            <IconSymbol name="wifi" size={28} color={colors.mutedForeground} />
                         </View>
                         <Text className="text-muted-foreground text-sm">No saved profiles</Text>
                     </View>
@@ -51,7 +53,7 @@ export default function WifiIndexScreen() {
                                         <IconSymbol
                                             name={item.type === 'eduroam' ? 'building.2.fill' : 'wifi'}
                                             size={18}
-                                            color="hsl(165, 50%, 55%)"
+                                            color={colors.primary}
                                         />
                                     </View>
                                     <View>
@@ -78,7 +80,7 @@ export default function WifiIndexScreen() {
                                         }
                                     }} asChild>
                                         <Button variant="ghost" size="sm">
-                                            <IconSymbol name="square.and.pencil" size={18} color="hsl(165, 10%, 65%)" />
+                                            <IconSymbol name="square.and.pencil" size={18} color={colors.mutedForeground} />
                                         </Button>
                                     </Link>
                                     <Button
@@ -99,7 +101,7 @@ export default function WifiIndexScreen() {
                                             );
                                         }}
                                     >
-                                        <IconSymbol name="trash" size={18} color="#EF4444" />
+                                        <IconSymbol name="trash" size={18} color={colors.destructive} />
                                     </Button>
                                 </View>
                             </View>

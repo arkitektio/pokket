@@ -24,6 +24,8 @@ export type Scalars = {
   Fakt: { input: any; output: any; }
   /** The `Identifier` scalasr typsse represents a reference to a store previously created by the user n a datalayer */
   Identifier: { input: any; output: any; }
+  /** The `JSON` scalar type represents JSON values as specified by [ECMA-404](https://ecma-international.org/wp-content/uploads/ECMA-404_2nd_edition_december_2017.pdf). */
+  JSON: { input: any; output: any; }
   /** The Service identifier is a unique identifier for a service. It is used to identify the service in the database and in the code. We encourage you to use the reverse domain name notation. E.g. `com.example.myservice` */
   ServiceIdentifier: { input: any; output: any; }
   /** The `Identifier` scalasr typsse represents a reference to a store previously created by the user n a datalayer */
@@ -67,7 +69,13 @@ export type App = {
   releases: Array<Release>;
 };
 
-/** App(id, name, identifier, logo) */
+
+/** An App is the Arkitekt equivalent of a Software Application. It is a collection of `Releases` that can be all part of the same application. E.g the App `Napari` could have the releases `0.1.0` and `0.2.0`. */
+export type AppReleasesArgs = {
+  ordering?: Array<ReleaseOrdering>;
+};
+
+/** App(id, name, identifier, organization, logo) */
 export type AppFilter = {
   AND?: InputMaybe<AppFilter>;
   DISTINCT?: InputMaybe<Scalars['Boolean']['input']>;
@@ -76,6 +84,10 @@ export type AppFilter = {
   ids?: InputMaybe<Array<Scalars['ID']['input']>>;
   search?: InputMaybe<Scalars['String']['input']>;
 };
+
+export type AppOrdering =
+  { id: Ordering; name?: never; }
+  |  { id?: never; name: Ordering; };
 
 export type CancelInviteInput = {
   id: Scalars['ID']['input'];
@@ -89,59 +101,114 @@ export type CancelInviteInput = {
  */
 export type Client = {
   __typename?: 'Client';
+  /** The OAuth2 client id this client authenticates as. */
+  clientId: Scalars['String']['output'];
   /** Is this client functional? A functional client is a client that is able to authenticate users. If a client is not functional, it will not be able to authenticate users. */
   functional: Scalars['Boolean']['output'];
   id: Scalars['ID']['output'];
   /** The issue url of the client. This is the url where users can report issues and get more information about the client. */
   issueUrl?: Maybe<Scalars['String']['output']>;
-  /** The configuration of the client. This is the configuration that will be sent to the client. It should never contain sensitive information. */
+  /** What kind of principal this client is (its authentication strategy): DEVELOPMENT, WEBSITE, DESKTOP, MOBILE, HUB or RELYING_PARTY. */
   kind: ClientKind;
   /** The logo of the release. This should be a url to a logo that can be used to represent the release. */
   logo?: Maybe<MediaStore>;
-  /** The mappings of the client. A mapping is a mapping of a service to a service instance. This is used to configure the composition. */
+  /** The mappings of the client. A mapping is a mapping of a service to a service instance. This is used to configure the hub. */
   mappings: Array<ServiceInstanceMapping>;
-  /** The name of the client. This is a human readable name of the client. */
+  /** A human-readable label for the client that folds in the app, version, operator and device — e.g. `com.example.app:v0.1.1 by Johannes on my-laptop`. */
   name: Scalars['String']['output'];
   /** The node this runs on */
-  node?: Maybe<ComputeNode>;
-  /** The real oauth2 client that is used to authenticate users with this client. */
-  oauth2Client: Oauth2Client;
-  /** Is this client public? If a client is public  */
+  node?: Maybe<Device>;
+  /** Is this client public? A public client cannot keep a secret (desktop apps, mobile apps, SPAs, hub identities) and authenticates without one, relying on PKCE / device-code flows instead. */
   public: Scalars['Boolean']['output'];
   /** The public sources of the client. These are the public sources where users can find more information about the client. */
   publicSources: Array<PublicSource>;
-  /** The release that this client belongs to. */
-  release: Release;
-  /** The user that manages this release. */
-  tenant: User;
-  /** The configuration of the client. This is the configuration that will be sent to the client. It should never contain sensitive information. */
-  token: Scalars['String']['output'];
-  /** If the client is a DEVELOPMENT client, which requires no further authentication, this is the user that is authenticated with the client. */
+  /** The release that this client belongs to. Null for clients that are not bound to an app release (hub identities, relying parties, pending registrations). */
+  release?: Maybe<Release>;
+  /** The operational role of the client. INTERFACE clients are human interfaces operated by a user in real time. AGENT clients are authorized once and then run unattended, receiving and processing tasks on the user's behalf. */
+  role: ClientRole;
+  /** The user this client acts for (derived from its membership). */
   user?: Maybe<User>;
 };
 
-/** Client(id, composition, functional, name, release, oauth2_client, kind, user, organization, membership, redirect_uris, public, token, node, public_sources, tenant, created_at, requirements_hash, logo, last_reported_at, manifest) */
+
+/**
+ * A client is a way of authenticating users with a release.
+ *  The strategy of authentication is defined by the kind of client. And allows for different authentication flow.
+ *  E.g a client can be a DESKTOP app, that might be used by multiple users, or a WEBSITE that wants to connect to a user's account,
+ *  but also a DEVELOPMENT client that is used by a developer to test the app. The client model thinly wraps the oauth2 client model, which is used to authenticate users.
+ */
+export type ClientMappingsArgs = {
+  ordering?: Array<ServiceInstanceMappingOrdering>;
+};
+
+/**
+ * The one client model: every OAuth2 principal is a row here.
+ *
+ * Kinds of rows and their lifecycle:
+ *
+ * - **App clients** (`development`/`website`/`desktop`/`mobile`): the row is created by
+ *   dynamic registration at ``/o/app-authorization/`` with identity fields
+ *   only; human approval *binds* it (membership, organization, release, hub,
+ *   mappings, scope). ``membership`` null == not yet approved.
+ * - **Hub identities** (`hub`): same lifecycle via ``/o/hub-authorization/``;
+ *   the created ``Hub`` links back via ``Hub.client`` (reverse:
+ *   ``client.hub_identity``).
+ * - **Relying parties** (`relying_party`): confidential OIDC clients
+ *   provisioned from config by ``ensureopenid``; global (no organization).
+ *
+ * Implements authlib's ``ClientMixin`` directly — there is no separate
+ * OAuth2 client table anymore.
+ */
 export type ClientFilter = {
   AND?: InputMaybe<ClientFilter>;
   DISTINCT?: InputMaybe<Scalars['Boolean']['input']>;
   NOT?: InputMaybe<ClientFilter>;
   OR?: InputMaybe<ClientFilter>;
   ids?: InputMaybe<Array<Scalars['ID']['input']>>;
+  role?: InputMaybe<ClientRole>;
   search?: InputMaybe<Scalars['String']['input']>;
 };
 
 export enum ClientKind {
   Desktop = 'DESKTOP',
   Development = 'DEVELOPMENT',
+  Hub = 'HUB',
+  Mobile = 'MOBILE',
+  RelyingParty = 'RELYING_PARTY',
   Website = 'WEBSITE'
 }
 
-/** An Organization is a group of users that can work together on a project. */
+export type ClientOrdering =
+  { createdAt: Ordering; id?: never; lastReportedAt?: never; name?: never; }
+  |  { createdAt?: never; id: Ordering; lastReportedAt?: never; name?: never; }
+  |  { createdAt?: never; id?: never; lastReportedAt: Ordering; name?: never; }
+  |  { createdAt?: never; id?: never; lastReportedAt?: never; name: Ordering; };
+
+export enum ClientRole {
+  Agent = 'AGENT',
+  Interface = 'INTERFACE'
+}
+
+/** A communication channel through which a user can be notified (e.g. a push token). */
 export type ComChannel = {
   __typename?: 'ComChannel';
   id: Scalars['ID']['output'];
   user: User;
 };
+
+/** __doc__ */
+export type ComChannelFilter = {
+  AND?: InputMaybe<ComChannelFilter>;
+  DISTINCT?: InputMaybe<Scalars['Boolean']['input']>;
+  NOT?: InputMaybe<ComChannelFilter>;
+  OR?: InputMaybe<ComChannelFilter>;
+  ids?: InputMaybe<Array<Scalars['ID']['input']>>;
+  search?: InputMaybe<Scalars['String']['input']>;
+};
+
+export type ComChannelOrdering =
+  { id: Ordering; name?: never; }
+  |  { id?: never; name: Ordering; };
 
 /**
  * Comments represent the comments of a user on a specific data item
@@ -194,50 +261,38 @@ export type Comment = {
  * of the underlying comment data including potential mentions, or links, or
  * paragraphs.
  */
+export type CommentChildrenArgs = {
+  ordering?: Array<CommentOrdering>;
+};
+
+
+/**
+ * Comments represent the comments of a user on a specific data item
+ * tart are identified by the unique combination of `identifier` and `object`.
+ * E.g a comment for an Image on the Mikro services would be serverd as
+ * `@mikro/image:imageID`.
+ *
+ * Comments always belong to the user that created it. Comments in threads
+ * get a parent attribute set, that points to the immediate parent.
+ *
+ * Each comment contains multiple descendents, that make up a *rich* representation
+ * of the underlying comment data including potential mentions, or links, or
+ * paragraphs.
+ */
 export type CommentMentionsArgs = {
   filters?: InputMaybe<UserFilter>;
+  ordering?: Array<UserOrdering>;
   pagination?: InputMaybe<OffsetPaginationInput>;
 };
+
+export type CommentOrdering =
+  { createdAt: Ordering; id?: never; }
+  |  { createdAt?: never; id: Ordering; };
 
 /** A Communication */
 export type Communication = {
   __typename?: 'Communication';
   channel: Scalars['ID']['output'];
-};
-
-/** ComputeNode(id, node_id, name, organization) */
-export type ComputeNode = {
-  __typename?: 'ComputeNode';
-  clients: Array<Client>;
-  /** The device groups that belong to this compute node. */
-  deviceGroups: Array<DeviceGroup>;
-  id: Scalars['ID']['output'];
-  name?: Maybe<Scalars['String']['output']>;
-  nodeId: Scalars['ID']['output'];
-};
-
-
-/** ComputeNode(id, node_id, name, organization) */
-export type ComputeNodeClientsArgs = {
-  filters?: InputMaybe<ClientFilter>;
-  pagination?: InputMaybe<OffsetPaginationInput>;
-};
-
-
-/** ComputeNode(id, node_id, name, organization) */
-export type ComputeNodeDeviceGroupsArgs = {
-  filters?: InputMaybe<DeviceGroupFilter>;
-  pagination?: InputMaybe<OffsetPaginationInput>;
-};
-
-/** ComputeNode(id, node_id, name, organization) */
-export type ComputeNodeFilter = {
-  AND?: InputMaybe<ComputeNodeFilter>;
-  DISTINCT?: InputMaybe<Scalars['Boolean']['input']>;
-  NOT?: InputMaybe<ComputeNodeFilter>;
-  OR?: InputMaybe<ComputeNodeFilter>;
-  ids?: InputMaybe<Array<Scalars['ID']['input']>>;
-  search?: InputMaybe<Scalars['String']['input']>;
 };
 
 export type Context = {
@@ -277,7 +332,6 @@ export type CreateInviteInput = {
 export type CreateOrganizationInput = {
   description?: InputMaybe<Scalars['String']['input']>;
   name: Scalars['String']['input'];
-  setupKommunityPartners?: Scalars['Boolean']['input'];
 };
 
 export type CreateProfileInput = {
@@ -297,10 +351,6 @@ export type CreateServiceInstanceInput = {
 export type CreateStashInput = {
   description?: InputMaybe<Scalars['String']['input']>;
   name?: InputMaybe<Scalars['String']['input']>;
-};
-
-export type CreateUserInput = {
-  name: Scalars['String']['input'];
 };
 
 export type DeclineInviteInput = {
@@ -341,18 +391,54 @@ export enum DescendantKind {
 }
 
 export type DevelopmentClientInput = {
-  composition?: InputMaybe<Scalars['ID']['input']>;
+  hub?: InputMaybe<Scalars['ID']['input']>;
   layers?: InputMaybe<Array<Scalars['String']['input']>>;
   manifest: ManifestInput;
+  role?: InputMaybe<ClientRole>;
+};
+
+/** Device(id, node_id, name, organization) */
+export type Device = {
+  __typename?: 'Device';
+  clients: Array<Client>;
+  /** The device groups that belong to this device. */
+  deviceGroups: Array<DeviceGroup>;
+  id: Scalars['ID']['output'];
+  name?: Maybe<Scalars['String']['output']>;
+  nodeId: Scalars['ID']['output'];
+};
+
+
+/** Device(id, node_id, name, organization) */
+export type DeviceClientsArgs = {
+  filters?: InputMaybe<ClientFilter>;
+  ordering?: Array<ClientOrdering>;
+  pagination?: InputMaybe<OffsetPaginationInput>;
+};
+
+
+/** Device(id, node_id, name, organization) */
+export type DeviceDeviceGroupsArgs = {
+  filters?: InputMaybe<DeviceGroupFilter>;
+  ordering?: Array<DeviceGroupOrdering>;
+  pagination?: InputMaybe<OffsetPaginationInput>;
+};
+
+/** Device(id, node_id, name, organization) */
+export type DeviceFilter = {
+  AND?: InputMaybe<DeviceFilter>;
+  DISTINCT?: InputMaybe<Scalars['Boolean']['input']>;
+  NOT?: InputMaybe<DeviceFilter>;
+  OR?: InputMaybe<DeviceFilter>;
+  ids?: InputMaybe<Array<Scalars['ID']['input']>>;
+  search?: InputMaybe<Scalars['String']['input']>;
 };
 
 /** A DeviceGroup is a group of compute nodes that can be used to run clients. DeviceGroups can be used to group compute nodes by location, hardware type, or any other criteria. */
 export type DeviceGroup = {
   __typename?: 'DeviceGroup';
-  /** The compute nodes that belong to this device group. */
-  computeNodes: Array<ComputeNode>;
-  /** The description of the device group. */
-  description?: Maybe<Scalars['String']['output']>;
+  /** The devices that belong to this device group. */
+  devices: Array<Device>;
   id: Scalars['ID']['output'];
   /** The name of the device group. */
   name: Scalars['String']['output'];
@@ -360,8 +446,9 @@ export type DeviceGroup = {
 
 
 /** A DeviceGroup is a group of compute nodes that can be used to run clients. DeviceGroups can be used to group compute nodes by location, hardware type, or any other criteria. */
-export type DeviceGroupComputeNodesArgs = {
-  filters?: InputMaybe<ComputeNodeFilter>;
+export type DeviceGroupDevicesArgs = {
+  filters?: InputMaybe<DeviceFilter>;
+  ordering?: Array<DeviceOrdering>;
   pagination?: InputMaybe<OffsetPaginationInput>;
 };
 
@@ -375,10 +462,13 @@ export type DeviceGroupFilter = {
   search?: InputMaybe<Scalars['String']['input']>;
 };
 
-export type DjangoModelType = {
-  __typename?: 'DjangoModelType';
-  pk: Scalars['ID']['output'];
-};
+export type DeviceGroupOrdering =
+  { id: Ordering; name?: never; }
+  |  { id?: never; name: Ordering; };
+
+export type DeviceOrdering =
+  { id: Ordering; name?: never; }
+  |  { id?: never; name: Ordering; };
 
 export enum Granularity {
   Day = 'DAY',
@@ -415,13 +505,14 @@ export type GroupFilter = {
   search?: InputMaybe<Scalars['String']['input']>;
 };
 
+export type GroupOrdering =
+  { id: Ordering; name?: never; }
+  |  { id?: never; name: Ordering; };
+
 /**
  *
- * A Profile of a User. A Profile can be used to display personalied information about a user.
- *
- *
- *
- *
+ * A Profile of a Group. A GroupProfile can be used to display information about a group,
+ * such as a display name, a short bio and an avatar.
  *
  */
 export type GroupProfile = {
@@ -445,17 +536,23 @@ export type InstanceAlias = {
   id: Scalars['ID']['output'];
   /** The instance that this alias belongs to. */
   instance: ServiceInstance;
-  /** The name of the alias. This is a human readable name of the alias. */
+  /** The kind of alias. If relative, the alias is resolved against the layer's domain/port/path; if absolute, it is a full URL. */
   kind: Scalars['String']['output'];
-  /** The layer that this alias belongs to. */
-  layer: Layer;
+  /** The layer that this alias belongs to, if any. */
+  layer?: Maybe<Layer>;
   /** The path of the alias, if its a ABSOLUTE alias (e.g. 'example.com/path'). If not set, the alias is relative to the layer's path. */
   path?: Maybe<Scalars['String']['output']>;
   /** The port of the alias, if its a ABSOLUTE alias (e.g. 'example.com:8080'). If not set, the alias is relative to the layer's port. */
   port?: Maybe<Scalars['Int']['output']>;
+  /** Is this alias publicly reachable? If true, the coordination server can also check the alias's health directly, enabling health checks from the kontrol interface. */
+  public: Scalars['Boolean']['output'];
   /** Is this alias using SSL? If true, the alias will be accessed via https:// instead of http://. This is used to indicate that the alias is secure and should be accessed via SSL */
   ssl: Scalars['Boolean']['output'];
 };
+
+export type InstanceAliasOrdering =
+  { id: Ordering; name?: never; }
+  |  { id?: never; name: Ordering; };
 
 /** A single-use magic invite link that allows one person to join an organization. */
 export type Invite = {
@@ -464,7 +561,7 @@ export type Invite = {
   createdAt: Scalars['DateTime']['output'];
   createdBy: User;
   createdFor: Organization;
-  createdMembershipts: Array<Membership>;
+  createdMemberships: Array<Membership>;
   declinedBy?: Maybe<User>;
   email?: Maybe<Scalars['String']['output']>;
   expiresAt?: Maybe<Scalars['DateTime']['output']>;
@@ -481,8 +578,9 @@ export type Invite = {
 
 
 /** A single-use magic invite link that allows one person to join an organization. */
-export type InviteCreatedMembershiptsArgs = {
+export type InviteCreatedMembershipsArgs = {
   filters?: InputMaybe<MembershipFilter>;
+  ordering?: Array<MembershipOrdering>;
   pagination?: InputMaybe<OffsetPaginationInput>;
 };
 
@@ -490,30 +588,37 @@ export type InviteCreatedMembershiptsArgs = {
 /** A single-use magic invite link that allows one person to join an organization. */
 export type InviteRolesArgs = {
   filters?: InputMaybe<RoleFilter>;
+  ordering?: Array<RoleOrdering>;
   pagination?: InputMaybe<OffsetPaginationInput>;
 };
 
-/** A Service is a Webservice that a Client might want to access. It is not the configured instance of the service, but the service itself. */
+/** Invite(id, token, email, created_by, created_for, created_at, expires_at, public, status, accepted_by, declined_by, responded_at) */
+export type InviteFilter = {
+  AND?: InputMaybe<InviteFilter>;
+  DISTINCT?: InputMaybe<Scalars['Boolean']['input']>;
+  NOT?: InputMaybe<InviteFilter>;
+  OR?: InputMaybe<InviteFilter>;
+  ids?: InputMaybe<Array<Scalars['ID']['input']>>;
+  search?: InputMaybe<Scalars['String']['input']>;
+  status?: InputMaybe<Scalars['String']['input']>;
+};
+
+export type InviteOrdering =
+  { createdAt: Ordering; id?: never; }
+  |  { createdAt?: never; id: Ordering; };
+
+/** A Layer is a network through which service instances can be reached (e.g. the public web, a tailnet, a VPN, or a docker network). Instance aliases are resolved relative to the layer they belong to. */
 export type Layer = {
   __typename?: 'Layer';
-  /** The description of the service. This should be a human readable description of the service. */
+  /** The description of the layer. This should be a human readable description of the layer. */
   description?: Maybe<Scalars['String']['output']>;
   id: Scalars['ID']['output'];
-  /** The identifier of the service. This should be a globally unique string that identifies the service. We encourage you to use the reverse domain name notation. E.g. `com.example.myservice` */
+  /** The identifier of the layer. This should be a globally unique string that identifies the layer. We encourage you to use the reverse domain name notation. E.g. `com.example.mylayer` */
   identifier: Scalars['ServiceIdentifier']['output'];
-  /** The instances of the service. A service instance is a configured instance of a service. It will be configured by a configuration backend and will be used to send to the client as a configuration. It should never contain sensitive information. */
-  instances: Array<ServiceInstance>;
-  /** The logo of the service. This should be a url to a logo that can be used to represent the service. */
+  /** The logo of the layer. This should be a url to a logo that can be used to represent the layer. */
   logo?: Maybe<MediaStore>;
   /** The name of the layer */
   name: Scalars['String']['output'];
-};
-
-
-/** A Service is a Webservice that a Client might want to access. It is not the configured instance of the service, but the service itself. */
-export type LayerInstancesArgs = {
-  filters?: InputMaybe<ServiceInstanceFilter>;
-  pagination?: InputMaybe<OffsetPaginationInput>;
 };
 
 /** Layer(id, name, identifier, organization, logo, description, dns_probe, get_probe, kind) */
@@ -525,6 +630,10 @@ export type LayerFilter = {
   ids?: InputMaybe<Array<Scalars['ID']['input']>>;
   search?: InputMaybe<Scalars['String']['input']>;
 };
+
+export type LayerOrdering =
+  { id: Ordering; name?: never; }
+  |  { id?: never; name: Ordering; };
 
 /** A leaf of text. This is the most basic descendant and always ends a tree. */
 export type LeafDescendant = Descendant & {
@@ -547,12 +656,19 @@ export type LinkingRequestInput = {
 };
 
 export type ManifestInput = {
+  authors?: Array<Scalars['String']['input']>;
+  description?: InputMaybe<Scalars['String']['input']>;
+  homepage?: InputMaybe<Scalars['String']['input']>;
   identifier: Scalars['String']['input'];
+  keywords?: Array<Scalars['String']['input']>;
+  license?: InputMaybe<Scalars['String']['input']>;
   logo?: InputMaybe<Scalars['String']['input']>;
   nodeId?: InputMaybe<Scalars['String']['input']>;
   publicSources?: InputMaybe<Array<PublicSourceInput>>;
+  repoUrl?: InputMaybe<Scalars['String']['input']>;
   requirements?: Array<RequirementInput>;
   scopes?: Array<Scalars['String']['input']>;
+  title?: InputMaybe<Scalars['String']['input']>;
   version: Scalars['String']['input'];
 };
 
@@ -568,7 +684,7 @@ export type MediaStore = {
   id: Scalars['ID']['output'];
   key: Scalars['String']['output'];
   /** The stodre of the image */
-  path: Scalars['String']['output'];
+  path?: Maybe<Scalars['String']['output']>;
   presignedUrl: Scalars['String']['output'];
 };
 
@@ -590,8 +706,10 @@ export type MediaStorePresignedUrlArgs = {
  */
 export type Membership = {
   __typename?: 'Membership';
-  /** The groups that the user has in the organization */
-  groups: Array<Group>;
+  /** The member's personal brand chroma (0–1) for this organization, if set. Null means they have not overridden the organization's default — fall back to `organization.brandChroma`. */
+  brandChroma?: Maybe<Scalars['Float']['output']>;
+  /** The member's personal brand hue (0–360) for this organization, if set. Null means they have not overridden the organization's default — fall back to `organization.brandHue`. */
+  brandHue?: Maybe<Scalars['Float']['output']>;
   id: Scalars['ID']['output'];
   organization: Organization;
   /** The roles that the user has in the organization */
@@ -607,6 +725,7 @@ export type Membership = {
  */
 export type MembershipRolesArgs = {
   filters?: InputMaybe<RoleFilter>;
+  ordering?: Array<RoleOrdering>;
   pagination?: InputMaybe<OffsetPaginationInput>;
 };
 
@@ -617,9 +736,11 @@ export type MembershipFilter = {
   NOT?: InputMaybe<MembershipFilter>;
   OR?: InputMaybe<MembershipFilter>;
   ids?: InputMaybe<Array<Scalars['ID']['input']>>;
-  name?: InputMaybe<StrFilterLookup>;
   search?: InputMaybe<Scalars['String']['input']>;
 };
+
+export type MembershipOrdering =
+  { id: Ordering; };
 
 /** A mention of a user */
 export type MentionDescendant = Descendant & {
@@ -642,7 +763,6 @@ export type Mutation = {
   createComment: Comment;
   createDevelopmentalClient: Client;
   createGroupProfile: GroupProfile;
-  createInstanceAlias: InstanceAlias;
   createInvite: Invite;
   createOrganization: Organization;
   createProfile: Profile;
@@ -650,7 +770,6 @@ export type Mutation = {
   createServiceInstance: ServiceInstance;
   /** Create a new stash */
   createStash: Stash;
-  createUser: User;
   declineInvite: Invite;
   deleteStash: Scalars['ID']['output'];
   /** Delete items from a stash */
@@ -661,9 +780,9 @@ export type Mutation = {
   replyTo: Comment;
   requestMediaUpload: PresignedPostCredentials;
   resolveComment: Comment;
-  updateComputeNode: ComputeNode;
+  updateDevice: Device;
   updateGroupProfile: GroupProfile;
-  updateInstanceAlias: InstanceAlias;
+  updateMembershipColors: Membership;
   updateOrganization: Organization;
   updateProfile: Profile;
   updateServiceInstance: ServiceInstance;
@@ -712,11 +831,6 @@ export type MutationCreateGroupProfileArgs = {
 };
 
 
-export type MutationCreateInstanceAliasArgs = {
-  input: CreateServiceInstanceInput;
-};
-
-
 export type MutationCreateInviteArgs = {
   input: CreateInviteInput;
 };
@@ -744,11 +858,6 @@ export type MutationCreateServiceInstanceArgs = {
 
 export type MutationCreateStashArgs = {
   input: CreateStashInput;
-};
-
-
-export type MutationCreateUserArgs = {
-  input: CreateUserInput;
 };
 
 
@@ -797,8 +906,8 @@ export type MutationResolveCommentArgs = {
 };
 
 
-export type MutationUpdateComputeNodeArgs = {
-  input: UpdateComputeNodeInput;
+export type MutationUpdateDeviceArgs = {
+  input: UpdateDeviceInput;
 };
 
 
@@ -807,8 +916,8 @@ export type MutationUpdateGroupProfileArgs = {
 };
 
 
-export type MutationUpdateInstanceAliasArgs = {
-  input: UpdateServiceInstanceInput;
+export type MutationUpdateMembershipColorsArgs = {
+  input: UpdateMembershipColorsInput;
 };
 
 
@@ -837,17 +946,19 @@ export type NotifyUserInput = {
   user: Scalars['ID']['input'];
 };
 
-/** OAuth2Client(id, membership, client_id, client_secret, redirect_uris, scope, token_endpoint_auth_method, grant_types, response_types, id_token_signed_response_alg) */
-export type Oauth2Client = {
-  __typename?: 'Oauth2Client';
-  clientId: Scalars['String']['output'];
-  id: Scalars['String']['output'];
-};
-
 export type OffsetPaginationInput = {
   limit?: InputMaybe<Scalars['Int']['input']>;
   offset?: Scalars['Int']['input'];
 };
+
+export enum Ordering {
+  Asc = 'ASC',
+  AscNullsFirst = 'ASC_NULLS_FIRST',
+  AscNullsLast = 'ASC_NULLS_LAST',
+  Desc = 'DESC',
+  DescNullsFirst = 'DESC_NULLS_FIRST',
+  DescNullsLast = 'DESC_NULLS_LAST'
+}
 
 /** An Organization is a group of users that can work together on a project. */
 export type Organization = {
@@ -856,6 +967,10 @@ export type Organization = {
   activeUsers: Array<User>;
   /** The logo of the organization */
   avatar?: Maybe<MediaStore>;
+  /** The organization's default brand chroma (0–1), if set. Members can override it per-membership. */
+  brandChroma?: Maybe<Scalars['Float']['output']>;
+  /** The organization's default brand hue (0–360), if set. Members can override it per-membership. */
+  brandHue?: Maybe<Scalars['Float']['output']>;
   /** A short description of the organization */
   description?: Maybe<Scalars['String']['output']>;
   id: Scalars['ID']['output'];
@@ -877,13 +992,15 @@ export type Organization = {
 /** An Organization is a group of users that can work together on a project. */
 export type OrganizationActiveUsersArgs = {
   filters?: InputMaybe<UserFilter>;
+  ordering?: Array<UserOrdering>;
   pagination?: InputMaybe<OffsetPaginationInput>;
 };
 
 
 /** An Organization is a group of users that can work together on a project. */
 export type OrganizationInvitesArgs = {
-  filters?: InputMaybe<OrganizationFilter>;
+  filters?: InputMaybe<InviteFilter>;
+  ordering?: Array<InviteOrdering>;
   pagination?: InputMaybe<OffsetPaginationInput>;
 };
 
@@ -891,13 +1008,7 @@ export type OrganizationInvitesArgs = {
 /** An Organization is a group of users that can work together on a project. */
 export type OrganizationMembershipsArgs = {
   filters?: InputMaybe<MembershipFilter>;
-  pagination?: InputMaybe<OffsetPaginationInput>;
-};
-
-
-/** An Organization is a group of users that can work together on a project. */
-export type OrganizationUsersArgs = {
-  filters?: InputMaybe<UserFilter>;
+  ordering?: Array<MembershipOrdering>;
   pagination?: InputMaybe<OffsetPaginationInput>;
 };
 
@@ -912,20 +1023,24 @@ export type OrganizationFilter = {
   search?: InputMaybe<Scalars['String']['input']>;
 };
 
+export type OrganizationOrdering =
+  { id: Ordering; name?: never; }
+  |  { id?: never; name: Ordering; };
+
 /**
  *
- * A Profile of a User. A Profile can be used to display personalied information about a user.
- *
+ * A Profile of an Organization. An OrganizationProfile can be used to display public information
+ * about an organization, such as a display name, a short bio and an avatar (logo).
  *
  */
 export type OrganizationProfile = {
   __typename?: 'OrganizationProfile';
-  /** The avatar of the user */
+  /** The avatar (logo) of the organization */
   avatar?: Maybe<MediaStore>;
-  /** A short bio of the user */
+  /** A short bio of the organization */
   bio?: Maybe<Scalars['String']['output']>;
   id: Scalars['ID']['output'];
-  /** The name of the user */
+  /** The display name of the organization */
   name?: Maybe<Scalars['String']['output']>;
 };
 
@@ -955,8 +1070,8 @@ export type PresignedPostCredentials = {
 
 /**
  *
- * A Profile of a User. A Profile can be used to display personalied information about a user.
- *
+ * A Profile of a User. A Profile can be used to display personalised information about a user,
+ * such as a display name, a short bio and an avatar.
  *
  */
 export type Profile = {
@@ -998,10 +1113,12 @@ export type Query = {
   comment: Comment;
   comments: Array<Comment>;
   commentsFor: Array<Comment>;
-  computeNode: ComputeNode;
-  computeNodes: Array<ComputeNode>;
+  device: Device;
+  /** Look a device up by its raw device id, as reported by the client. Device ids are stored as a per-organization hash, so the raw id is hashed with the caller's organization before lookup. */
+  deviceByDeviceId: Device;
   deviceGroup: DeviceGroup;
   deviceGroups: Array<DeviceGroup>;
+  devices: Array<Device>;
   group: Group;
   groups: Array<Group>;
   hallo: Scalars['String']['output'];
@@ -1011,7 +1128,7 @@ export type Query = {
   me: User;
   message: SystemMessage;
   myActiveMessages: Array<SystemMessage>;
-  myManagedClients: Client;
+  myManagedClients: Array<Client>;
   myMentions: Array<Comment>;
   myRedeemTokens: Array<RedeemToken>;
   myStashes: Array<Stash>;
@@ -1051,6 +1168,7 @@ export type QueryAppArgs = {
 
 export type QueryAppsArgs = {
   filters?: InputMaybe<AppFilter>;
+  ordering?: Array<AppOrdering>;
   pagination?: InputMaybe<OffsetPaginationInput>;
 };
 
@@ -1063,6 +1181,7 @@ export type QueryClientArgs = {
 
 export type QueryClientsArgs = {
   filters?: InputMaybe<ClientFilter>;
+  ordering?: Array<ClientOrdering>;
   pagination?: InputMaybe<OffsetPaginationInput>;
 };
 
@@ -1072,20 +1191,24 @@ export type QueryCommentArgs = {
 };
 
 
+export type QueryCommentsArgs = {
+  ordering?: Array<CommentOrdering>;
+};
+
+
 export type QueryCommentsForArgs = {
   identifier: Scalars['Identifier']['input'];
   object: Scalars['ID']['input'];
 };
 
 
-export type QueryComputeNodeArgs = {
+export type QueryDeviceArgs = {
   id: Scalars['ID']['input'];
 };
 
 
-export type QueryComputeNodesArgs = {
-  filters?: InputMaybe<ComputeNodeFilter>;
-  pagination?: InputMaybe<OffsetPaginationInput>;
+export type QueryDeviceByDeviceIdArgs = {
+  id: Scalars['ID']['input'];
 };
 
 
@@ -1096,6 +1219,14 @@ export type QueryDeviceGroupArgs = {
 
 export type QueryDeviceGroupsArgs = {
   filters?: InputMaybe<DeviceGroupFilter>;
+  ordering?: Array<DeviceGroupOrdering>;
+  pagination?: InputMaybe<OffsetPaginationInput>;
+};
+
+
+export type QueryDevicesArgs = {
+  filters?: InputMaybe<DeviceFilter>;
+  ordering?: Array<DeviceOrdering>;
   pagination?: InputMaybe<OffsetPaginationInput>;
 };
 
@@ -1107,12 +1238,14 @@ export type QueryGroupArgs = {
 
 export type QueryGroupsArgs = {
   filters?: InputMaybe<GroupFilter>;
+  ordering?: Array<GroupOrdering>;
   pagination?: InputMaybe<OffsetPaginationInput>;
 };
 
 
 export type QueryInvitesArgs = {
-  filters?: InputMaybe<OrganizationFilter>;
+  filters?: InputMaybe<InviteFilter>;
+  ordering?: Array<InviteOrdering>;
   pagination?: InputMaybe<OffsetPaginationInput>;
 };
 
@@ -1124,6 +1257,7 @@ export type QueryLayerArgs = {
 
 export type QueryLayersArgs = {
   filters?: InputMaybe<LayerFilter>;
+  ordering?: Array<LayerOrdering>;
   pagination?: InputMaybe<OffsetPaginationInput>;
 };
 
@@ -1145,6 +1279,7 @@ export type QueryOrganizationArgs = {
 
 export type QueryOrganizationsArgs = {
   filters?: InputMaybe<OrganizationFilter>;
+  ordering?: Array<OrganizationOrdering>;
   pagination?: InputMaybe<OffsetPaginationInput>;
 };
 
@@ -1156,6 +1291,7 @@ export type QueryRedeemTokenArgs = {
 
 export type QueryRedeemTokensArgs = {
   filters?: InputMaybe<RedeemTokenFilter>;
+  ordering?: Array<RedeemTokenOrdering>;
   pagination?: InputMaybe<OffsetPaginationInput>;
 };
 
@@ -1168,6 +1304,11 @@ export type QueryReleaseArgs = {
 };
 
 
+export type QueryReleasesArgs = {
+  ordering?: Array<ReleaseOrdering>;
+};
+
+
 export type QueryRoleArgs = {
   id: Scalars['ID']['input'];
 };
@@ -1175,6 +1316,7 @@ export type QueryRoleArgs = {
 
 export type QueryRolesArgs = {
   filters?: InputMaybe<RoleFilter>;
+  ordering?: Array<RoleOrdering>;
   pagination?: InputMaybe<OffsetPaginationInput>;
 };
 
@@ -1191,6 +1333,7 @@ export type QueryServiceInstanceArgs = {
 
 export type QueryServiceInstancesArgs = {
   filters?: InputMaybe<ServiceInstanceFilter>;
+  ordering?: Array<ServiceInstanceOrdering>;
   pagination?: InputMaybe<OffsetPaginationInput>;
 };
 
@@ -1202,12 +1345,14 @@ export type QueryServiceReleaseArgs = {
 
 export type QueryServiceReleasesArgs = {
   filters?: InputMaybe<ServiceReleaseFilter>;
+  ordering?: Array<ServiceReleaseOrdering>;
   pagination?: InputMaybe<OffsetPaginationInput>;
 };
 
 
 export type QueryServicesArgs = {
   filters?: InputMaybe<ServiceFilter>;
+  ordering?: Array<ServiceOrdering>;
   pagination?: InputMaybe<OffsetPaginationInput>;
 };
 
@@ -1224,12 +1369,14 @@ export type QueryStashItemArgs = {
 
 export type QueryStashItemsArgs = {
   filters?: InputMaybe<StashItemFilter>;
+  ordering?: Array<StashItemOrdering>;
   pagination?: InputMaybe<OffsetPaginationInput>;
 };
 
 
 export type QueryStashesArgs = {
   filters?: InputMaybe<StashFilter>;
+  ordering?: Array<StashOrdering>;
   pagination?: InputMaybe<OffsetPaginationInput>;
 };
 
@@ -1246,6 +1393,7 @@ export type QueryUserStatsArgs = {
 
 export type QueryUsersArgs = {
   filters?: InputMaybe<UserFilter>;
+  ordering?: Array<UserOrdering>;
   pagination?: InputMaybe<OffsetPaginationInput>;
 };
 
@@ -1287,6 +1435,10 @@ export type RedeemTokenInput = {
   token?: InputMaybe<Scalars['String']['input']>;
 };
 
+export type RedeemTokenOrdering =
+  { createdAt: Ordering; id?: never; }
+  |  { createdAt?: never; id: Ordering; };
+
 export type RegisterComChannelInput = {
   token: Scalars['String']['input'];
 };
@@ -1303,8 +1455,8 @@ export type Release = {
   logo?: Maybe<MediaStore>;
   /** The name of the release. This should be a string that identifies the release beyond the version number. E.g. `canary`. */
   name: Scalars['String']['output'];
-  /** The requirements of the release. Requirements are used to limit the access of a client to a user's data. They represent app-level permissions. */
-  requirements: Array<Scalars['String']['output']>;
+  /** The requirements of the release: the services (by key and service identifier) a client of this release needs composed against it. Each entry is a manifest `Requirement` object (`key`, `service`, `optional`, `description`). */
+  requirements: Array<Scalars['JSON']['output']>;
   /** The scopes of the release. Scopes are used to limit the access of a client to a user's data. They represent app-level permissions. */
   scopes: Array<Scalars['String']['output']>;
   /** The version of the release. This should be a string that identifies the version of the release. We enforce semantic versioning notation. E.g. `0.1.0`. The version is unique per app. */
@@ -1315,12 +1467,17 @@ export type Release = {
 /** A Release is a version of an app. Releases might change over time. E.g. a release might be updated to fix a bug, and the release might be updated to add a new feature. This is why they are the home for `scopes` and `requirements`, which might change over the release cycle. */
 export type ReleaseClientsArgs = {
   filters?: InputMaybe<ClientFilter>;
+  ordering?: Array<ClientOrdering>;
   pagination?: InputMaybe<OffsetPaginationInput>;
 };
 
+export type ReleaseOrdering =
+  { id: Ordering; name?: never; }
+  |  { id?: never; name: Ordering; };
+
 export type RenderInput = {
   client: Scalars['ID']['input'];
-  composition?: InputMaybe<Scalars['ID']['input']>;
+  hub?: InputMaybe<Scalars['ID']['input']>;
   manifest?: InputMaybe<ManifestInput>;
   request?: InputMaybe<LinkingRequestInput>;
 };
@@ -1363,10 +1520,13 @@ export type RoleFilter = {
   DISTINCT?: InputMaybe<Scalars['Boolean']['input']>;
   NOT?: InputMaybe<RoleFilter>;
   OR?: InputMaybe<RoleFilter>;
+  identifier?: InputMaybe<StrFilterLookup>;
   ids?: InputMaybe<Array<Scalars['ID']['input']>>;
-  name?: InputMaybe<StrFilterLookup>;
   search?: InputMaybe<Scalars['String']['input']>;
 };
+
+export type RoleOrdering =
+  { id: Ordering; };
 
 /** A scope that can be assigned to a client. Scopes are used to limit the access of a client to a user's data. They represent app-level permissions. */
 export type Scope = {
@@ -1387,7 +1547,7 @@ export type Service = {
   id: Scalars['ID']['output'];
   /** The identifier of the service. This should be a globally unique string that identifies the service. We encourage you to use the reverse domain name notation. E.g. `com.example.myservice` */
   identifier: Scalars['ServiceIdentifier']['output'];
-  /** The logo of the app. This should be a url to a logo that can be used to represent the app. */
+  /** The logo of the service. This should be a url to a logo that can be used to represent the service. */
   logo?: Maybe<MediaStore>;
   /** The name of the service */
   name: Scalars['String']['output'];
@@ -1399,10 +1559,11 @@ export type Service = {
 /** A Service is a Webservice that a Client might want to access. It is not the configured instance of the service, but the service itself. */
 export type ServiceReleasesArgs = {
   filters?: InputMaybe<ServiceReleaseFilter>;
+  ordering?: Array<ServiceReleaseOrdering>;
   pagination?: InputMaybe<OffsetPaginationInput>;
 };
 
-/** Service(id, name, identifier, logo, description) */
+/** Service(id, name, identifier, organization, logo, description) */
 export type ServiceFilter = {
   AND?: InputMaybe<ServiceFilter>;
   DISTINCT?: InputMaybe<Scalars['Boolean']['input']>;
@@ -1430,9 +1591,9 @@ export type ServiceInstance = {
   instanceId: Scalars['ID']['output'];
   /** The logo of the app. This should be a url to a logo that can be used to represent the app. */
   logo?: Maybe<MediaStore>;
-  /** The mappings of the composition. A mapping is a mapping of a service to a service instance. This is used to configure the composition. */
+  /** The mappings of the hub. A mapping is a mapping of a service to a service instance. This is used to configure the hub. */
   mappings: Array<ServiceInstanceMapping>;
-  /** The name of the instance. This is a human readable name of the instance. */
+  /** A human readable name of the instance, derived from its service identifier and instance id. */
   name: Scalars['String']['output'];
   /** The service release that this instance belongs to. */
   release: ServiceRelease;
@@ -1440,8 +1601,15 @@ export type ServiceInstance = {
 
 
 /** A ServiceInstance is a configured instance of a Service. It will be configured by a configuration backend and will be used to send to the client as a configuration. It should never contain sensitive information. */
+export type ServiceInstanceAliasesArgs = {
+  ordering?: Array<InstanceAliasOrdering>;
+};
+
+
+/** A ServiceInstance is a configured instance of a Service. It will be configured by a configuration backend and will be used to send to the client as a configuration. It should never contain sensitive information. */
 export type ServiceInstanceAllowedGroupsArgs = {
   filters?: InputMaybe<GroupFilter>;
+  ordering?: Array<GroupOrdering>;
   pagination?: InputMaybe<OffsetPaginationInput>;
 };
 
@@ -1449,6 +1617,7 @@ export type ServiceInstanceAllowedGroupsArgs = {
 /** A ServiceInstance is a configured instance of a Service. It will be configured by a configuration backend and will be used to send to the client as a configuration. It should never contain sensitive information. */
 export type ServiceInstanceAllowedUsersArgs = {
   filters?: InputMaybe<UserFilter>;
+  ordering?: Array<UserOrdering>;
   pagination?: InputMaybe<OffsetPaginationInput>;
 };
 
@@ -1456,6 +1625,7 @@ export type ServiceInstanceAllowedUsersArgs = {
 /** A ServiceInstance is a configured instance of a Service. It will be configured by a configuration backend and will be used to send to the client as a configuration. It should never contain sensitive information. */
 export type ServiceInstanceDeniedGroupsArgs = {
   filters?: InputMaybe<GroupFilter>;
+  ordering?: Array<GroupOrdering>;
   pagination?: InputMaybe<OffsetPaginationInput>;
 };
 
@@ -1463,10 +1633,17 @@ export type ServiceInstanceDeniedGroupsArgs = {
 /** A ServiceInstance is a configured instance of a Service. It will be configured by a configuration backend and will be used to send to the client as a configuration. It should never contain sensitive information. */
 export type ServiceInstanceDeniedUsersArgs = {
   filters?: InputMaybe<UserFilter>;
+  ordering?: Array<UserOrdering>;
   pagination?: InputMaybe<OffsetPaginationInput>;
 };
 
-/** ServiceInstance(id, composition, release, logo, instance_id, private_key, steward, organization, device, template, public_key, token) */
+
+/** A ServiceInstance is a configured instance of a Service. It will be configured by a configuration backend and will be used to send to the client as a configuration. It should never contain sensitive information. */
+export type ServiceInstanceMappingsArgs = {
+  ordering?: Array<ServiceInstanceMappingOrdering>;
+};
+
+/** ServiceInstance(id, hub, release, logo, instance_id, private_key, steward, organization, device, template, public_key, token) */
 export type ServiceInstanceFilter = {
   AND?: InputMaybe<ServiceInstanceFilter>;
   DISTINCT?: InputMaybe<Scalars['Boolean']['input']>;
@@ -1476,25 +1653,33 @@ export type ServiceInstanceFilter = {
   search?: InputMaybe<Scalars['String']['input']>;
 };
 
-/** A ServiceInstance is a configured instance of a Service. It will be configured by a configuration backend and will be used to send to the client as a configuration. It should never contain sensitive information. */
+/** A ServiceInstanceMapping binds one of a client's requirements (by key) to the ServiceInstance that fulfils it. The set of mappings of a client is its composed configuration. */
 export type ServiceInstanceMapping = {
   __typename?: 'ServiceInstanceMapping';
-  /** The client that this instance belongs to. */
+  /** The client whose requirement this mapping fulfils. */
   client: Client;
   id: Scalars['ID']['output'];
-  /** The service that this instance belongs to. */
+  /** The service instance this requirement is mapped to. */
   instance: ServiceInstance;
-  /** The key of the instance. This is a unique string that identifies the instance. It is used to identify the instance in the code and in the database. */
+  /** The requirement key of the client that this mapping fulfils. Unique per client. */
   key: Scalars['String']['output'];
   /** Is this mapping optional? If a mapping is optional, you can configure the client without this mapping. */
   optional: Scalars['Boolean']['output'];
 };
 
+export type ServiceInstanceMappingOrdering =
+  { id: Ordering; };
+
+export type ServiceInstanceOrdering =
+  { id: Ordering; };
+
+export type ServiceOrdering =
+  { id: Ordering; name?: never; }
+  |  { id?: never; name: Ordering; };
+
 /** A ServiceRelease is a specific release of a Service. It contains the configuration for a particular version of the service. */
 export type ServiceRelease = {
   __typename?: 'ServiceRelease';
-  /** The description of the service. This should be a human readable description of the service. */
-  description?: Maybe<Scalars['String']['output']>;
   id: Scalars['ID']['output'];
   /** The instances of the service. A service instance is a configured instance of a service. It will be configured by a configuration backend and will be used to send to the client as a configuration. It should never contain sensitive information. */
   instances: Array<ServiceInstance>;
@@ -1508,6 +1693,7 @@ export type ServiceRelease = {
 /** A ServiceRelease is a specific release of a Service. It contains the configuration for a particular version of the service. */
 export type ServiceReleaseInstancesArgs = {
   filters?: InputMaybe<ServiceInstanceFilter>;
+  ordering?: Array<ServiceInstanceOrdering>;
   pagination?: InputMaybe<OffsetPaginationInput>;
 };
 
@@ -1520,6 +1706,9 @@ export type ServiceReleaseFilter = {
   ids?: InputMaybe<Array<Scalars['ID']['input']>>;
   search?: InputMaybe<Scalars['String']['input']>;
 };
+
+export type ServiceReleaseOrdering =
+  { id: Ordering; };
 
 /**
  *
@@ -1534,7 +1723,7 @@ export type Stash = {
   isActive: Scalars['Boolean']['output'];
   items: Array<StashItem>;
   name: Scalars['String']['output'];
-  /** The number of items in the stash */
+  /** The owner of the stash */
   owner: User;
   updatedAt: Scalars['DateTime']['output'];
 };
@@ -1547,6 +1736,7 @@ export type Stash = {
  */
 export type StashItemsArgs = {
   filters?: InputMaybe<StashItemFilter>;
+  ordering?: Array<StashItemOrdering>;
   pagination?: InputMaybe<OffsetPaginationInput>;
 };
 
@@ -1568,7 +1758,6 @@ export type StashFilter = {
 export type StashItem = {
   __typename?: 'StashItem';
   addedAt: Scalars['DateTime']['output'];
-  description?: Maybe<Scalars['String']['output']>;
   id: Scalars['ID']['output'];
   identifier: Scalars['String']['output'];
   object: Scalars['String']['output'];
@@ -1581,10 +1770,10 @@ export type StashItemFilter = {
   DISTINCT?: InputMaybe<Scalars['Boolean']['input']>;
   NOT?: InputMaybe<StashItemFilter>;
   OR?: InputMaybe<StashItemFilter>;
+  identifier?: InputMaybe<StrFilterLookup>;
   ids?: InputMaybe<Array<Scalars['ID']['input']>>;
   search?: InputMaybe<Scalars['String']['input']>;
   stashes?: InputMaybe<Array<Scalars['ID']['input']>>;
-  username?: InputMaybe<StrFilterLookup>;
 };
 
 export type StashItemInput = {
@@ -1592,6 +1781,16 @@ export type StashItemInput = {
   identifier: Scalars['String']['input'];
   object: Scalars['String']['input'];
 };
+
+export type StashItemOrdering =
+  { id: Ordering; updatedAt?: never; }
+  |  { id?: never; updatedAt: Ordering; };
+
+export type StashOrdering =
+  { createdAt: Ordering; id?: never; name?: never; updatedAt?: never; }
+  |  { createdAt?: never; id: Ordering; name?: never; updatedAt?: never; }
+  |  { createdAt?: never; id?: never; name: Ordering; updatedAt?: never; }
+  |  { createdAt?: never; id?: never; name?: never; updatedAt: Ordering; };
 
 export type StrFilterLookup = {
   contains?: InputMaybe<Scalars['String']['input']>;
@@ -1638,8 +1837,8 @@ export type SystemMessage = {
   /** The action to take (e.g. the node) */
   action: Scalars['String']['output'];
   id: Scalars['ID']['output'];
-  message: Scalars['String']['output'];
-  title: Scalars['String']['output'];
+  message?: Maybe<Scalars['String']['output']>;
+  title?: Maybe<Scalars['String']['output']>;
   user: User;
 };
 
@@ -1654,7 +1853,7 @@ export type TimeBucket = {
   ts: Scalars['DateTime']['output'];
 };
 
-export type UpdateComputeNodeInput = {
+export type UpdateDeviceInput = {
   id: Scalars['ID']['input'];
   name?: InputMaybe<Scalars['String']['input']>;
 };
@@ -1663,6 +1862,11 @@ export type UpdateGroupProfileInput = {
   avatar: Scalars['ID']['input'];
   id: Scalars['ID']['input'];
   name: Scalars['String']['input'];
+};
+
+export type UpdateMembershipColorsInput = {
+  brandChroma?: InputMaybe<Scalars['Float']['input']>;
+  brandHue?: InputMaybe<Scalars['Float']['input']>;
 };
 
 export type UpdateOrganizationInput = {
@@ -1717,7 +1921,6 @@ export type User = {
   groups: Array<Group>;
   id: Scalars['ID']['output'];
   lastName?: Maybe<Scalars['String']['output']>;
-  managedClients: Array<DjangoModelType>;
   /** The memberships of the user in organizations */
   memberships: Array<Membership>;
   profile: Profile;
@@ -1740,7 +1943,8 @@ export type User = {
  *
  */
 export type UserComChannelsArgs = {
-  filters?: InputMaybe<OrganizationFilter>;
+  filters?: InputMaybe<ComChannelFilter>;
+  ordering?: Array<ComChannelOrdering>;
   pagination?: InputMaybe<OffsetPaginationInput>;
 };
 
@@ -1760,6 +1964,7 @@ export type UserComChannelsArgs = {
  */
 export type UserGroupsArgs = {
   filters?: InputMaybe<GroupFilter>;
+  ordering?: Array<GroupOrdering>;
   pagination?: InputMaybe<OffsetPaginationInput>;
 };
 
@@ -1779,6 +1984,7 @@ export type UserGroupsArgs = {
  */
 export type UserMembershipsArgs = {
   filters?: InputMaybe<MembershipFilter>;
+  ordering?: Array<MembershipOrdering>;
   pagination?: InputMaybe<OffsetPaginationInput>;
 };
 
@@ -1803,6 +2009,9 @@ export type UserFilter = {
   /** Required. 150 characters or fewer. Letters, digits and @/./+/-/_ only. */
   username?: InputMaybe<StrFilterLookup>;
 };
+
+export type UserOrdering =
+  { id: Ordering; };
 
 export type UserStats = {
   __typename?: 'UserStats';
@@ -1872,9 +2081,9 @@ export type DetailAppFragment = { __typename?: 'App', id: string, identifier: an
 
 export type ListAppFragment = { __typename?: 'App', id: string, identifier: any, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null };
 
-export type DetailClientFragment = { __typename?: 'Client', id: string, token: string, name: string, kind: ClientKind, user?: { __typename?: 'User', id: string, username: string } | null, release: { __typename?: 'Release', id: string, version: any, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null, app: { __typename?: 'App', id: string, identifier: any, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null } }, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null, oauth2Client: { __typename?: 'Oauth2Client', clientId: string }, mappings: Array<{ __typename?: 'ServiceInstanceMapping', id: string, key: string, optional: boolean, instance: { __typename?: 'ServiceInstance', id: string }, client: { __typename?: 'Client', id: string, name: string, kind: ClientKind, user?: { __typename?: 'User', id: string, username: string } | null, release: { __typename?: 'Release', version: any, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null, app: { __typename?: 'App', id: string, identifier: any, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null } } } }> };
+export type DetailClientFragment = { __typename?: 'Client', id: string, name: string, kind: ClientKind, clientId: string, user?: { __typename?: 'User', id: string, username: string } | null, release?: { __typename?: 'Release', id: string, version: any, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null, app: { __typename?: 'App', id: string, identifier: any, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null } } | null, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null, mappings: Array<{ __typename?: 'ServiceInstanceMapping', id: string, key: string, optional: boolean, instance: { __typename?: 'ServiceInstance', id: string }, client: { __typename?: 'Client', id: string, name: string, kind: ClientKind, user?: { __typename?: 'User', id: string, username: string } | null, release?: { __typename?: 'Release', version: any, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null, app: { __typename?: 'App', id: string, identifier: any, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null } } | null } }> };
 
-export type ListClientFragment = { __typename?: 'Client', id: string, name: string, kind: ClientKind, user?: { __typename?: 'User', id: string, username: string } | null, release: { __typename?: 'Release', version: any, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null, app: { __typename?: 'App', id: string, identifier: any, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null } } };
+export type ListClientFragment = { __typename?: 'Client', id: string, name: string, kind: ClientKind, user?: { __typename?: 'User', id: string, username: string } | null, release?: { __typename?: 'Release', version: any, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null, app: { __typename?: 'App', id: string, identifier: any, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null } } | null };
 
 export type LeafFragment = { __typename?: 'LeafDescendant', bold?: boolean | null, italic?: boolean | null, code?: boolean | null, text?: string | null };
 
@@ -1910,17 +2119,19 @@ export type ListGroupFragment = { __typename?: 'Group', id: string, name: string
 
 export type GroupProfileFragment = { __typename?: 'GroupProfile', id: string, name?: string | null, avatar?: { __typename?: 'MediaStore', presignedUrl: string } | null };
 
-export type LayerFragment = { __typename?: 'Layer', id: string, name: string, description?: string | null, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null, instances: Array<{ __typename?: 'ServiceInstance', id: string }> };
+export type LayerFragment = { __typename?: 'Layer', id: string, name: string, description?: string | null, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null };
 
 export type ListLayerFragment = { __typename?: 'Layer', id: string, name: string, description?: string | null, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null };
 
-export type OrganizationFragment = { __typename?: 'Organization', id: string, name: string, slug: string };
+export type BrandMembershipFragment = { __typename?: 'Membership', id: string, brandHue?: number | null, brandChroma?: number | null, organization: { __typename?: 'Organization', id: string } };
+
+export type BrandOrganizationFragment = { __typename?: 'Organization', id: string, brandHue?: number | null, brandChroma?: number | null };
 
 export type ProfileFragment = { __typename?: 'Profile', id: string, name?: string | null, avatar?: { __typename?: 'MediaStore', presignedUrl: string } | null };
 
-export type ListRedeemTokenFragment = { __typename?: 'RedeemToken', id: string, token: string, user: { __typename?: 'User', id: string, email?: string | null }, client?: { __typename?: 'Client', id: string, release: { __typename?: 'Release', version: any, app: { __typename?: 'App', identifier: any } } } | null };
+export type ListRedeemTokenFragment = { __typename?: 'RedeemToken', id: string, token: string, user: { __typename?: 'User', id: string, email?: string | null }, client?: { __typename?: 'Client', id: string, release?: { __typename?: 'Release', version: any, app: { __typename?: 'App', identifier: any } } | null } | null };
 
-export type DetailReleaseFragment = { __typename?: 'Release', id: string, version: any, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null, app: { __typename?: 'App', id: string, identifier: any, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null }, clients: Array<{ __typename?: 'Client', id: string, name: string, kind: ClientKind, user?: { __typename?: 'User', id: string, username: string } | null, release: { __typename?: 'Release', version: any, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null, app: { __typename?: 'App', id: string, identifier: any, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null } } }> };
+export type DetailReleaseFragment = { __typename?: 'Release', id: string, version: any, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null, app: { __typename?: 'App', id: string, identifier: any, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null }, clients: Array<{ __typename?: 'Client', id: string, name: string, kind: ClientKind, user?: { __typename?: 'User', id: string, username: string } | null, release?: { __typename?: 'Release', version: any, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null, app: { __typename?: 'App', id: string, identifier: any, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null } } | null }> };
 
 export type ListReleaseFragment = { __typename?: 'Release', id: string, version: any, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null, app: { __typename?: 'App', id: string, identifier: any, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null } };
 
@@ -1928,7 +2139,7 @@ export type ListServiceFragment = { __typename?: 'Service', identifier: any, id:
 
 export type ServiceFragment = { __typename?: 'Service', identifier: any, id: string, name: string, releases: Array<{ __typename?: 'ServiceRelease', id: string, version: string, service: { __typename?: 'Service', identifier: any, id: string, name: string } }> };
 
-export type ServiceInstanceFragment = { __typename?: 'ServiceInstance', id: string, release: { __typename?: 'ServiceRelease', id: string, version: string, service: { __typename?: 'Service', identifier: any, id: string, name: string } }, allowedUsers: Array<{ __typename?: 'User', username: string, firstName?: string | null, lastName?: string | null, email?: string | null, avatar?: string | null, id: string }>, deniedUsers: Array<{ __typename?: 'User', username: string, firstName?: string | null, lastName?: string | null, email?: string | null, avatar?: string | null, id: string }>, allowedGroups: Array<{ __typename?: 'Group', id: string, name: string, profile?: { __typename?: 'GroupProfile', id: string, bio?: string | null, avatar?: { __typename?: 'MediaStore', presignedUrl: string } | null } | null }>, deniedGroups: Array<{ __typename?: 'Group', id: string, name: string, profile?: { __typename?: 'GroupProfile', id: string, bio?: string | null, avatar?: { __typename?: 'MediaStore', presignedUrl: string } | null } | null }>, mappings: Array<{ __typename?: 'ServiceInstanceMapping', id: string, key: string, optional: boolean, instance: { __typename?: 'ServiceInstance', id: string }, client: { __typename?: 'Client', id: string, name: string, kind: ClientKind, user?: { __typename?: 'User', id: string, username: string } | null, release: { __typename?: 'Release', version: any, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null, app: { __typename?: 'App', id: string, identifier: any, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null } } } }>, aliases: Array<{ __typename?: 'InstanceAlias', host?: string | null, port?: number | null, ssl: boolean, challenge: string, kind: string }>, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null };
+export type ServiceInstanceFragment = { __typename?: 'ServiceInstance', id: string, release: { __typename?: 'ServiceRelease', id: string, version: string, service: { __typename?: 'Service', identifier: any, id: string, name: string } }, allowedUsers: Array<{ __typename?: 'User', username: string, firstName?: string | null, lastName?: string | null, email?: string | null, avatar?: string | null, id: string }>, deniedUsers: Array<{ __typename?: 'User', username: string, firstName?: string | null, lastName?: string | null, email?: string | null, avatar?: string | null, id: string }>, allowedGroups: Array<{ __typename?: 'Group', id: string, name: string, profile?: { __typename?: 'GroupProfile', id: string, bio?: string | null, avatar?: { __typename?: 'MediaStore', presignedUrl: string } | null } | null }>, deniedGroups: Array<{ __typename?: 'Group', id: string, name: string, profile?: { __typename?: 'GroupProfile', id: string, bio?: string | null, avatar?: { __typename?: 'MediaStore', presignedUrl: string } | null } | null }>, mappings: Array<{ __typename?: 'ServiceInstanceMapping', id: string, key: string, optional: boolean, instance: { __typename?: 'ServiceInstance', id: string }, client: { __typename?: 'Client', id: string, name: string, kind: ClientKind, user?: { __typename?: 'User', id: string, username: string } | null, release?: { __typename?: 'Release', version: any, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null, app: { __typename?: 'App', id: string, identifier: any, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null } } | null } }>, aliases: Array<{ __typename?: 'InstanceAlias', host?: string | null, port?: number | null, ssl: boolean, challenge: string, kind: string }>, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null };
 
 export type ListServiceInstanceFragment = { __typename?: 'ServiceInstance', id: string };
 
@@ -1936,7 +2147,7 @@ export type ListServiceReleaseFragment = { __typename?: 'ServiceRelease', id: st
 
 export type ServiceReleaseFragment = { __typename?: 'ServiceRelease', id: string, version: string, service: { __typename?: 'Service', identifier: any }, instances: Array<{ __typename?: 'ServiceInstance', id: string }> };
 
-export type ListServiceInstanceMappingFragment = { __typename?: 'ServiceInstanceMapping', id: string, key: string, optional: boolean, instance: { __typename?: 'ServiceInstance', id: string }, client: { __typename?: 'Client', id: string, name: string, kind: ClientKind, user?: { __typename?: 'User', id: string, username: string } | null, release: { __typename?: 'Release', version: any, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null, app: { __typename?: 'App', id: string, identifier: any, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null } } } };
+export type ListServiceInstanceMappingFragment = { __typename?: 'ServiceInstanceMapping', id: string, key: string, optional: boolean, instance: { __typename?: 'ServiceInstance', id: string }, client: { __typename?: 'Client', id: string, name: string, kind: ClientKind, user?: { __typename?: 'User', id: string, username: string } | null, release?: { __typename?: 'Release', version: any, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null, app: { __typename?: 'App', id: string, identifier: any, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null } } | null } };
 
 export type StashFragment = { __typename?: 'Stash', id: string, name: string, description?: string | null, createdAt: any, updatedAt: any, owner: { __typename?: 'User', id: string, username: string } };
 
@@ -1955,7 +2166,7 @@ export type CreateClientMutationVariables = Exact<{
 }>;
 
 
-export type CreateClientMutation = { __typename?: 'Mutation', createDevelopmentalClient: { __typename?: 'Client', id: string, token: string } };
+export type CreateClientMutation = { __typename?: 'Mutation', createDevelopmentalClient: { __typename?: 'Client', id: string, clientId: string } };
 
 export type RegisterComChannelMutationVariables = Exact<{
   input: RegisterComChannelInput;
@@ -2008,14 +2219,14 @@ export type UpdateServiceInstanceMutationVariables = Exact<{
 }>;
 
 
-export type UpdateServiceInstanceMutation = { __typename?: 'Mutation', updateServiceInstance: { __typename?: 'ServiceInstance', id: string, release: { __typename?: 'ServiceRelease', id: string, version: string, service: { __typename?: 'Service', identifier: any, id: string, name: string } }, allowedUsers: Array<{ __typename?: 'User', username: string, firstName?: string | null, lastName?: string | null, email?: string | null, avatar?: string | null, id: string }>, deniedUsers: Array<{ __typename?: 'User', username: string, firstName?: string | null, lastName?: string | null, email?: string | null, avatar?: string | null, id: string }>, allowedGroups: Array<{ __typename?: 'Group', id: string, name: string, profile?: { __typename?: 'GroupProfile', id: string, bio?: string | null, avatar?: { __typename?: 'MediaStore', presignedUrl: string } | null } | null }>, deniedGroups: Array<{ __typename?: 'Group', id: string, name: string, profile?: { __typename?: 'GroupProfile', id: string, bio?: string | null, avatar?: { __typename?: 'MediaStore', presignedUrl: string } | null } | null }>, mappings: Array<{ __typename?: 'ServiceInstanceMapping', id: string, key: string, optional: boolean, instance: { __typename?: 'ServiceInstance', id: string }, client: { __typename?: 'Client', id: string, name: string, kind: ClientKind, user?: { __typename?: 'User', id: string, username: string } | null, release: { __typename?: 'Release', version: any, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null, app: { __typename?: 'App', id: string, identifier: any, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null } } } }>, aliases: Array<{ __typename?: 'InstanceAlias', host?: string | null, port?: number | null, ssl: boolean, challenge: string, kind: string }>, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null } };
+export type UpdateServiceInstanceMutation = { __typename?: 'Mutation', updateServiceInstance: { __typename?: 'ServiceInstance', id: string, release: { __typename?: 'ServiceRelease', id: string, version: string, service: { __typename?: 'Service', identifier: any, id: string, name: string } }, allowedUsers: Array<{ __typename?: 'User', username: string, firstName?: string | null, lastName?: string | null, email?: string | null, avatar?: string | null, id: string }>, deniedUsers: Array<{ __typename?: 'User', username: string, firstName?: string | null, lastName?: string | null, email?: string | null, avatar?: string | null, id: string }>, allowedGroups: Array<{ __typename?: 'Group', id: string, name: string, profile?: { __typename?: 'GroupProfile', id: string, bio?: string | null, avatar?: { __typename?: 'MediaStore', presignedUrl: string } | null } | null }>, deniedGroups: Array<{ __typename?: 'Group', id: string, name: string, profile?: { __typename?: 'GroupProfile', id: string, bio?: string | null, avatar?: { __typename?: 'MediaStore', presignedUrl: string } | null } | null }>, mappings: Array<{ __typename?: 'ServiceInstanceMapping', id: string, key: string, optional: boolean, instance: { __typename?: 'ServiceInstance', id: string }, client: { __typename?: 'Client', id: string, name: string, kind: ClientKind, user?: { __typename?: 'User', id: string, username: string } | null, release?: { __typename?: 'Release', version: any, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null, app: { __typename?: 'App', id: string, identifier: any, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null } } | null } }>, aliases: Array<{ __typename?: 'InstanceAlias', host?: string | null, port?: number | null, ssl: boolean, challenge: string, kind: string }>, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null } };
 
 export type CreateServiceInstanceMutationVariables = Exact<{
   input: CreateServiceInstanceInput;
 }>;
 
 
-export type CreateServiceInstanceMutation = { __typename?: 'Mutation', createServiceInstance: { __typename?: 'ServiceInstance', id: string, release: { __typename?: 'ServiceRelease', id: string, version: string, service: { __typename?: 'Service', identifier: any, id: string, name: string } }, allowedUsers: Array<{ __typename?: 'User', username: string, firstName?: string | null, lastName?: string | null, email?: string | null, avatar?: string | null, id: string }>, deniedUsers: Array<{ __typename?: 'User', username: string, firstName?: string | null, lastName?: string | null, email?: string | null, avatar?: string | null, id: string }>, allowedGroups: Array<{ __typename?: 'Group', id: string, name: string, profile?: { __typename?: 'GroupProfile', id: string, bio?: string | null, avatar?: { __typename?: 'MediaStore', presignedUrl: string } | null } | null }>, deniedGroups: Array<{ __typename?: 'Group', id: string, name: string, profile?: { __typename?: 'GroupProfile', id: string, bio?: string | null, avatar?: { __typename?: 'MediaStore', presignedUrl: string } | null } | null }>, mappings: Array<{ __typename?: 'ServiceInstanceMapping', id: string, key: string, optional: boolean, instance: { __typename?: 'ServiceInstance', id: string }, client: { __typename?: 'Client', id: string, name: string, kind: ClientKind, user?: { __typename?: 'User', id: string, username: string } | null, release: { __typename?: 'Release', version: any, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null, app: { __typename?: 'App', id: string, identifier: any, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null } } } }>, aliases: Array<{ __typename?: 'InstanceAlias', host?: string | null, port?: number | null, ssl: boolean, challenge: string, kind: string }>, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null } };
+export type CreateServiceInstanceMutation = { __typename?: 'Mutation', createServiceInstance: { __typename?: 'ServiceInstance', id: string, release: { __typename?: 'ServiceRelease', id: string, version: string, service: { __typename?: 'Service', identifier: any, id: string, name: string } }, allowedUsers: Array<{ __typename?: 'User', username: string, firstName?: string | null, lastName?: string | null, email?: string | null, avatar?: string | null, id: string }>, deniedUsers: Array<{ __typename?: 'User', username: string, firstName?: string | null, lastName?: string | null, email?: string | null, avatar?: string | null, id: string }>, allowedGroups: Array<{ __typename?: 'Group', id: string, name: string, profile?: { __typename?: 'GroupProfile', id: string, bio?: string | null, avatar?: { __typename?: 'MediaStore', presignedUrl: string } | null } | null }>, deniedGroups: Array<{ __typename?: 'Group', id: string, name: string, profile?: { __typename?: 'GroupProfile', id: string, bio?: string | null, avatar?: { __typename?: 'MediaStore', presignedUrl: string } | null } | null }>, mappings: Array<{ __typename?: 'ServiceInstanceMapping', id: string, key: string, optional: boolean, instance: { __typename?: 'ServiceInstance', id: string }, client: { __typename?: 'Client', id: string, name: string, kind: ClientKind, user?: { __typename?: 'User', id: string, username: string } | null, release?: { __typename?: 'Release', version: any, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null, app: { __typename?: 'App', id: string, identifier: any, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null } } | null } }>, aliases: Array<{ __typename?: 'InstanceAlias', host?: string | null, port?: number | null, ssl: boolean, challenge: string, kind: string }>, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null } };
 
 export type CreateUserProfileMutationVariables = Exact<{
   input: CreateProfileInput;
@@ -2100,34 +2311,39 @@ export type DetailAppQueryVariables = Exact<{
 
 export type DetailAppQuery = { __typename?: 'Query', app: { __typename?: 'App', id: string, identifier: any, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null, releases: Array<{ __typename?: 'Release', id: string, version: any, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null, app: { __typename?: 'App', id: string, identifier: any, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null } }> } };
 
+export type MyBrandQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type MyBrandQuery = { __typename?: 'Query', mycontext: { __typename?: 'Context', organization: { __typename?: 'Organization', id: string, brandHue?: number | null, brandChroma?: number | null } }, me: { __typename?: 'User', id: string, memberships: Array<{ __typename?: 'Membership', id: string, brandHue?: number | null, brandChroma?: number | null, organization: { __typename?: 'Organization', id: string } }> } };
+
 export type ClientsQueryVariables = Exact<{
   filters?: InputMaybe<ClientFilter>;
   pagination?: InputMaybe<OffsetPaginationInput>;
 }>;
 
 
-export type ClientsQuery = { __typename?: 'Query', clients: Array<{ __typename?: 'Client', id: string, name: string, kind: ClientKind, user?: { __typename?: 'User', id: string, username: string } | null, release: { __typename?: 'Release', version: any, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null, app: { __typename?: 'App', id: string, identifier: any, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null } } }> };
+export type ClientsQuery = { __typename?: 'Query', clients: Array<{ __typename?: 'Client', id: string, name: string, kind: ClientKind, user?: { __typename?: 'User', id: string, username: string } | null, release?: { __typename?: 'Release', version: any, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null, app: { __typename?: 'App', id: string, identifier: any, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null } } | null }> };
 
 export type DetailClientQueryVariables = Exact<{
   id: Scalars['ID']['input'];
 }>;
 
 
-export type DetailClientQuery = { __typename?: 'Query', client: { __typename?: 'Client', id: string, token: string, name: string, kind: ClientKind, user?: { __typename?: 'User', id: string, username: string } | null, release: { __typename?: 'Release', id: string, version: any, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null, app: { __typename?: 'App', id: string, identifier: any, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null } }, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null, oauth2Client: { __typename?: 'Oauth2Client', clientId: string }, mappings: Array<{ __typename?: 'ServiceInstanceMapping', id: string, key: string, optional: boolean, instance: { __typename?: 'ServiceInstance', id: string }, client: { __typename?: 'Client', id: string, name: string, kind: ClientKind, user?: { __typename?: 'User', id: string, username: string } | null, release: { __typename?: 'Release', version: any, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null, app: { __typename?: 'App', id: string, identifier: any, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null } } } }> } };
+export type DetailClientQuery = { __typename?: 'Query', client: { __typename?: 'Client', id: string, name: string, kind: ClientKind, clientId: string, user?: { __typename?: 'User', id: string, username: string } | null, release?: { __typename?: 'Release', id: string, version: any, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null, app: { __typename?: 'App', id: string, identifier: any, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null } } | null, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null, mappings: Array<{ __typename?: 'ServiceInstanceMapping', id: string, key: string, optional: boolean, instance: { __typename?: 'ServiceInstance', id: string }, client: { __typename?: 'Client', id: string, name: string, kind: ClientKind, user?: { __typename?: 'User', id: string, username: string } | null, release?: { __typename?: 'Release', version: any, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null, app: { __typename?: 'App', id: string, identifier: any, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null } } | null } }> } };
 
 export type MyManagedClientsQueryVariables = Exact<{
   kind: ClientKind;
 }>;
 
 
-export type MyManagedClientsQuery = { __typename?: 'Query', myManagedClients: { __typename?: 'Client', id: string, name: string, kind: ClientKind, user?: { __typename?: 'User', id: string, username: string } | null, release: { __typename?: 'Release', version: any, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null, app: { __typename?: 'App', id: string, identifier: any, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null } } } };
+export type MyManagedClientsQuery = { __typename?: 'Query', myManagedClients: Array<{ __typename?: 'Client', id: string, name: string, kind: ClientKind, user?: { __typename?: 'User', id: string, username: string } | null, release?: { __typename?: 'Release', version: any, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null, app: { __typename?: 'App', id: string, identifier: any, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null } } | null }> };
 
 export type ClientQueryVariables = Exact<{
   clientId: Scalars['ID']['input'];
 }>;
 
 
-export type ClientQuery = { __typename?: 'Query', client: { __typename?: 'Client', id: string, token: string, name: string, kind: ClientKind, user?: { __typename?: 'User', id: string, username: string } | null, release: { __typename?: 'Release', id: string, version: any, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null, app: { __typename?: 'App', id: string, identifier: any, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null } }, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null, oauth2Client: { __typename?: 'Oauth2Client', clientId: string }, mappings: Array<{ __typename?: 'ServiceInstanceMapping', id: string, key: string, optional: boolean, instance: { __typename?: 'ServiceInstance', id: string }, client: { __typename?: 'Client', id: string, name: string, kind: ClientKind, user?: { __typename?: 'User', id: string, username: string } | null, release: { __typename?: 'Release', version: any, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null, app: { __typename?: 'App', id: string, identifier: any, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null } } } }> } };
+export type ClientQuery = { __typename?: 'Query', client: { __typename?: 'Client', id: string, name: string, kind: ClientKind, clientId: string, user?: { __typename?: 'User', id: string, username: string } | null, release?: { __typename?: 'Release', id: string, version: any, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null, app: { __typename?: 'App', id: string, identifier: any, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null } } | null, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null, mappings: Array<{ __typename?: 'ServiceInstanceMapping', id: string, key: string, optional: boolean, instance: { __typename?: 'ServiceInstance', id: string }, client: { __typename?: 'Client', id: string, name: string, kind: ClientKind, user?: { __typename?: 'User', id: string, username: string } | null, release?: { __typename?: 'Release', version: any, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null, app: { __typename?: 'App', id: string, identifier: any, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null } } | null } }> } };
 
 export type CommentsForQueryVariables = Exact<{
   object: Scalars['ID']['input'];
@@ -2190,12 +2406,12 @@ export type DetailLayerQueryVariables = Exact<{
 }>;
 
 
-export type DetailLayerQuery = { __typename?: 'Query', layer: { __typename?: 'Layer', id: string, name: string, description?: string | null, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null, instances: Array<{ __typename?: 'ServiceInstance', id: string }> } };
+export type DetailLayerQuery = { __typename?: 'Query', layer: { __typename?: 'Layer', id: string, name: string, description?: string | null, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null } };
 
 export type MyActiveMessagesQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type MyActiveMessagesQuery = { __typename?: 'Query', myActiveMessages: Array<{ __typename?: 'SystemMessage', id: string, title: string, message: string, action: string }> };
+export type MyActiveMessagesQuery = { __typename?: 'Query', myActiveMessages: Array<{ __typename?: 'SystemMessage', id: string, title?: string | null, message?: string | null, action: string }> };
 
 export type RedeemTokensQueryVariables = Exact<{
   filters?: InputMaybe<RedeemTokenFilter>;
@@ -2203,7 +2419,7 @@ export type RedeemTokensQueryVariables = Exact<{
 }>;
 
 
-export type RedeemTokensQuery = { __typename?: 'Query', redeemTokens: Array<{ __typename?: 'RedeemToken', id: string, token: string, user: { __typename?: 'User', id: string, email?: string | null }, client?: { __typename?: 'Client', id: string, release: { __typename?: 'Release', version: any, app: { __typename?: 'App', identifier: any } } } | null }> };
+export type RedeemTokensQuery = { __typename?: 'Query', redeemTokens: Array<{ __typename?: 'RedeemToken', id: string, token: string, user: { __typename?: 'User', id: string, email?: string | null }, client?: { __typename?: 'Client', id: string, release?: { __typename?: 'Release', version: any, app: { __typename?: 'App', identifier: any } } | null } | null }> };
 
 export type ReleasesQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -2218,14 +2434,14 @@ export type ReleaseQueryVariables = Exact<{
 }>;
 
 
-export type ReleaseQuery = { __typename?: 'Query', release: { __typename?: 'Release', id: string, version: any, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null, app: { __typename?: 'App', id: string, identifier: any, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null }, clients: Array<{ __typename?: 'Client', id: string, name: string, kind: ClientKind, user?: { __typename?: 'User', id: string, username: string } | null, release: { __typename?: 'Release', version: any, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null, app: { __typename?: 'App', id: string, identifier: any, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null } } }> } };
+export type ReleaseQuery = { __typename?: 'Query', release: { __typename?: 'Release', id: string, version: any, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null, app: { __typename?: 'App', id: string, identifier: any, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null }, clients: Array<{ __typename?: 'Client', id: string, name: string, kind: ClientKind, user?: { __typename?: 'User', id: string, username: string } | null, release?: { __typename?: 'Release', version: any, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null, app: { __typename?: 'App', id: string, identifier: any, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null } } | null }> } };
 
 export type DetailReleaseQueryVariables = Exact<{
   id: Scalars['ID']['input'];
 }>;
 
 
-export type DetailReleaseQuery = { __typename?: 'Query', release: { __typename?: 'Release', id: string, version: any, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null, app: { __typename?: 'App', id: string, identifier: any, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null }, clients: Array<{ __typename?: 'Client', id: string, name: string, kind: ClientKind, user?: { __typename?: 'User', id: string, username: string } | null, release: { __typename?: 'Release', version: any, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null, app: { __typename?: 'App', id: string, identifier: any, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null } } }> } };
+export type DetailReleaseQuery = { __typename?: 'Query', release: { __typename?: 'Release', id: string, version: any, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null, app: { __typename?: 'App', id: string, identifier: any, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null }, clients: Array<{ __typename?: 'Client', id: string, name: string, kind: ClientKind, user?: { __typename?: 'User', id: string, username: string } | null, release?: { __typename?: 'Release', version: any, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null, app: { __typename?: 'App', id: string, identifier: any, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null } } | null }> } };
 
 export type ScopesQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -2260,7 +2476,7 @@ export type GetServiceInstanceQueryVariables = Exact<{
 }>;
 
 
-export type GetServiceInstanceQuery = { __typename?: 'Query', serviceInstance: { __typename?: 'ServiceInstance', id: string, release: { __typename?: 'ServiceRelease', id: string, version: string, service: { __typename?: 'Service', identifier: any, id: string, name: string } }, allowedUsers: Array<{ __typename?: 'User', username: string, firstName?: string | null, lastName?: string | null, email?: string | null, avatar?: string | null, id: string }>, deniedUsers: Array<{ __typename?: 'User', username: string, firstName?: string | null, lastName?: string | null, email?: string | null, avatar?: string | null, id: string }>, allowedGroups: Array<{ __typename?: 'Group', id: string, name: string, profile?: { __typename?: 'GroupProfile', id: string, bio?: string | null, avatar?: { __typename?: 'MediaStore', presignedUrl: string } | null } | null }>, deniedGroups: Array<{ __typename?: 'Group', id: string, name: string, profile?: { __typename?: 'GroupProfile', id: string, bio?: string | null, avatar?: { __typename?: 'MediaStore', presignedUrl: string } | null } | null }>, mappings: Array<{ __typename?: 'ServiceInstanceMapping', id: string, key: string, optional: boolean, instance: { __typename?: 'ServiceInstance', id: string }, client: { __typename?: 'Client', id: string, name: string, kind: ClientKind, user?: { __typename?: 'User', id: string, username: string } | null, release: { __typename?: 'Release', version: any, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null, app: { __typename?: 'App', id: string, identifier: any, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null } } } }>, aliases: Array<{ __typename?: 'InstanceAlias', host?: string | null, port?: number | null, ssl: boolean, challenge: string, kind: string }>, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null } };
+export type GetServiceInstanceQuery = { __typename?: 'Query', serviceInstance: { __typename?: 'ServiceInstance', id: string, release: { __typename?: 'ServiceRelease', id: string, version: string, service: { __typename?: 'Service', identifier: any, id: string, name: string } }, allowedUsers: Array<{ __typename?: 'User', username: string, firstName?: string | null, lastName?: string | null, email?: string | null, avatar?: string | null, id: string }>, deniedUsers: Array<{ __typename?: 'User', username: string, firstName?: string | null, lastName?: string | null, email?: string | null, avatar?: string | null, id: string }>, allowedGroups: Array<{ __typename?: 'Group', id: string, name: string, profile?: { __typename?: 'GroupProfile', id: string, bio?: string | null, avatar?: { __typename?: 'MediaStore', presignedUrl: string } | null } | null }>, deniedGroups: Array<{ __typename?: 'Group', id: string, name: string, profile?: { __typename?: 'GroupProfile', id: string, bio?: string | null, avatar?: { __typename?: 'MediaStore', presignedUrl: string } | null } | null }>, mappings: Array<{ __typename?: 'ServiceInstanceMapping', id: string, key: string, optional: boolean, instance: { __typename?: 'ServiceInstance', id: string }, client: { __typename?: 'Client', id: string, name: string, kind: ClientKind, user?: { __typename?: 'User', id: string, username: string } | null, release?: { __typename?: 'Release', version: any, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null, app: { __typename?: 'App', id: string, identifier: any, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null } } | null } }>, aliases: Array<{ __typename?: 'InstanceAlias', host?: string | null, port?: number | null, ssl: boolean, challenge: string, kind: string }>, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null } };
 
 export type ListServiceReleaseQueryVariables = Exact<{
   pagination?: InputMaybe<OffsetPaginationInput>;
@@ -2432,7 +2648,6 @@ ${ListClientFragmentDoc}`;
 export const DetailClientFragmentDoc = gql`
     fragment DetailClient on Client {
   id
-  token
   name
   user {
     id
@@ -2445,9 +2660,7 @@ export const DetailClientFragmentDoc = gql`
   logo {
     presignedUrl
   }
-  oauth2Client {
-    clientId
-  }
+  clientId
   mappings {
     ...ListServiceInstanceMapping
   }
@@ -2674,11 +2887,8 @@ export const LayerFragmentDoc = gql`
   logo {
     presignedUrl
   }
-  instances {
-    ...ListServiceInstance
-  }
 }
-    ${ListServiceInstanceFragmentDoc}`;
+    `;
 export const ListLayerFragmentDoc = gql`
     fragment ListLayer on Layer {
   id
@@ -2689,11 +2899,21 @@ export const ListLayerFragmentDoc = gql`
   }
 }
     `;
-export const OrganizationFragmentDoc = gql`
-    fragment Organization on Organization {
+export const BrandMembershipFragmentDoc = gql`
+    fragment BrandMembership on Membership {
   id
-  name
-  slug
+  brandHue
+  brandChroma
+  organization {
+    id
+  }
+}
+    `;
+export const BrandOrganizationFragmentDoc = gql`
+    fragment BrandOrganization on Organization {
+  id
+  brandHue
+  brandChroma
 }
     `;
 export const ListRedeemTokenFragmentDoc = gql`
@@ -2900,7 +3120,7 @@ export const CreateClientDocument = gql`
     mutation CreateClient($input: DevelopmentClientInput!) {
   createDevelopmentalClient(input: $input) {
     id
-    token
+    clientId
   }
 }
     `;
@@ -3575,6 +3795,49 @@ export function useDetailAppLazyQuery(baseOptions?: ApolloReactHooks.LazyQueryHo
 export type DetailAppQueryHookResult = ReturnType<typeof useDetailAppQuery>;
 export type DetailAppLazyQueryHookResult = ReturnType<typeof useDetailAppLazyQuery>;
 export type DetailAppQueryResult = Apollo.QueryResult<DetailAppQuery, DetailAppQueryVariables>;
+export const MyBrandDocument = gql`
+    query MyBrand {
+  mycontext {
+    organization {
+      ...BrandOrganization
+    }
+  }
+  me {
+    id
+    memberships {
+      ...BrandMembership
+    }
+  }
+}
+    ${BrandOrganizationFragmentDoc}
+${BrandMembershipFragmentDoc}`;
+
+/**
+ * __useMyBrandQuery__
+ *
+ * To run a query within a React component, call `useMyBrandQuery` and pass it any options that fit your needs.
+ * When your component renders, `useMyBrandQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useMyBrandQuery({
+ *   variables: {
+ *   },
+ * });
+ */
+export function useMyBrandQuery(baseOptions?: ApolloReactHooks.QueryHookOptions<MyBrandQuery, MyBrandQueryVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return ApolloReactHooks.useQuery<MyBrandQuery, MyBrandQueryVariables>(MyBrandDocument, options);
+      }
+export function useMyBrandLazyQuery(baseOptions?: ApolloReactHooks.LazyQueryHookOptions<MyBrandQuery, MyBrandQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return ApolloReactHooks.useLazyQuery<MyBrandQuery, MyBrandQueryVariables>(MyBrandDocument, options);
+        }
+export type MyBrandQueryHookResult = ReturnType<typeof useMyBrandQuery>;
+export type MyBrandLazyQueryHookResult = ReturnType<typeof useMyBrandLazyQuery>;
+export type MyBrandQueryResult = Apollo.QueryResult<MyBrandQuery, MyBrandQueryVariables>;
 export const ClientsDocument = gql`
     query Clients($filters: ClientFilter, $pagination: OffsetPaginationInput) {
   clients(filters: $filters, pagination: $pagination) {

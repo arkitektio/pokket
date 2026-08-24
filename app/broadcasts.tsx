@@ -10,6 +10,7 @@ import {
 import { Link, Stack } from 'expo-router';
 import * as React from 'react';
 import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
+import { useThemeColors } from '@/lib/theme/BrandProvider';
 
 function EmptyState({
   title,
@@ -18,6 +19,7 @@ function EmptyState({
   title: string;
   description: string;
 }) {
+  const colors = useThemeColors();
   return (
     <Card className="border-border bg-card">
       <CardContent className="items-center py-8">
@@ -25,7 +27,7 @@ function EmptyState({
           <IconSymbol
             name="antenna.radiowaves.left.and.right"
             size={24}
-            color="hsl(170, 36%, 43%)"
+            color={colors.primary}
           />
         </View>
         <Text className="text-center text-lg font-semibold text-card-foreground">{title}</Text>
@@ -36,15 +38,17 @@ function EmptyState({
 }
 
 function LoadingState({ message }: { message: string }) {
+  const colors = useThemeColors();
   return (
     <View className="items-center justify-center py-16">
-      <ActivityIndicator size="large" color="hsl(170, 36%, 43%)" />
+      <ActivityIndicator size="large" color={colors.primary} />
       <Text className="mt-4 text-sm text-muted-foreground">{message}</Text>
     </View>
   );
 }
 
 function BroadcastsContent() {
+  const colors = useThemeColors();
   const {
     data: soloData,
     loading: soloLoading,
@@ -104,7 +108,7 @@ function BroadcastsContent() {
                 void handleRefresh();
               }}
             >
-              <IconSymbol name="arrow.clockwise" size={16} color="hsl(170, 36%, 43%)" />
+              <IconSymbol name="arrow.clockwise" size={16} color={colors.primary} />
               <Text className="text-sm font-medium text-foreground">Refresh</Text>
             </Button>
           </View>

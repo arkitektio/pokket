@@ -3,17 +3,24 @@ import '~/global.css';
 import { AlertDialogProvider } from '@/components/ui/alert-dialog';
 import { App } from '@/lib/app/App';
 import { useArkitekt } from '@/lib/arkitekt/provider';
+import { ErrorOverlay } from '@/lib/debug/ErrorOverlay';
+import { installGlobalErrorHandlers } from '@/lib/debug/globalHandlers';
+import { BrandProvider } from '@/lib/theme/BrandProvider';
 import { useColorScheme } from '@/lib/useColorScheme';
 import { registerGlobals } from '@livekit/react-native';
 import * as Notifications from 'expo-notifications';
 import { Stack } from 'expo-router';
-import { DarkTheme, DefaultTheme, Theme, ThemeProvider } from 'expo-router/react-navigation';
 import { StatusBar } from 'expo-status-bar';
+import { Toaster } from 'sonner-native';
 import * as React from 'react';
 import { Platform } from 'react-native';
-import { NAV_THEME } from '~/lib/constants';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 registerGlobals();
+
+// Before anything else can fail: this is what makes async failures — rejected
+// promises, throws in callbacks, library `console.error`s — reach the screen.
+installGlobalErrorHandlers();
 
 
 export {
@@ -30,18 +37,6 @@ Notifications.setNotificationHandler({
     shouldShowList: true,
   }),
 });
-
-const LIGHT_THEME: Theme = {
-  ...DefaultTheme,
-  colors: NAV_THEME.light,
-};
-const DARK_THEME: Theme = {
-  ...DarkTheme,
-  colors: NAV_THEME.dark,
-};
-
-
-
 
 export const AppLayout = () => {
   const { connection } = useArkitekt()
@@ -93,14 +88,25 @@ export default function RootLayout() {
   }
 
   return (
-    <App.Provider>
-      <ThemeProvider value={DARK_THEME}>
-        <AlertDialogProvider>
-          <StatusBar style={'light'} />
-          <AppLayout />
-        </AlertDialogProvider>
-      </ThemeProvider>
-    </App.Provider>
+    /* sonner-native's Toaster renders a GestureDetector, which throws unless a
+       GestureHandlerRootView is above it. Nothing in the app provided one. */
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <App.Provider>
+        <BrandProvider>
+          <AlertDialogProvider>
+            <StatusBar style={'light'} />
+            <AppLayout />
+            {/* lib/lok/funcs.tsx has always reported mutation failures with
+                `toast.error`, but nothing ever mounted the renderer, so every one
+                of those was discarded. */}
+            <Toaster />
+            {/* Last child so it draws over the navigator; renders nothing until
+                something has actually gone wrong. */}
+            <ErrorOverlay />
+          </AlertDialogProvider>
+        </BrandProvider>
+      </App.Provider>
+    </GestureHandlerRootView>
   );
 }
 

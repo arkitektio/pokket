@@ -1,5 +1,5 @@
-fragment Organization on Organization {
+fragment BrandOrganization on Organization {
   id
-  name
-  slug
+  brandHue
+  brandChroma
 }

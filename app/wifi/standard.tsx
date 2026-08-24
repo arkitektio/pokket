@@ -4,8 +4,10 @@ import { useWifiProfiles } from '@/hooks/useWifiProfiles';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { ScrollView, Text, TextInput, View } from 'react-native';
+import { useThemeColors } from '@/lib/theme/BrandProvider';
 
 export default function StandardWifiScreen() {
+  const colors = useThemeColors();
     const [ssid, setSsid] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
@@ -54,7 +56,7 @@ export default function StandardWifiScreen() {
                             value={ssid}
                             onChangeText={setSsid}
                             placeholder="Enter Wi-Fi SSID"
-                            placeholderTextColor="hsl(165, 8%, 35%)"
+                            placeholderTextColor={colors.mutedForeground}
                             autoCapitalize="none"
                             autoCorrect={false}
                             className="border border-border rounded-xl px-4 py-3 bg-card text-card-foreground"
@@ -68,7 +70,7 @@ export default function StandardWifiScreen() {
                                 value={password}
                                 onChangeText={setPassword}
                                 placeholder="Enter Wi-Fi password"
-                                placeholderTextColor="hsl(165, 8%, 35%)"
+                                placeholderTextColor={colors.mutedForeground}
                                 secureTextEntry={!showPassword}
                                 autoCapitalize="none"
                                 autoCorrect={false}

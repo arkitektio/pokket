@@ -1,6 +1,5 @@
 fragment DetailClient on Client {
   id
-  token
   name
   user {
     id
@@ -13,9 +12,7 @@ fragment DetailClient on Client {
   logo {
     presignedUrl
   }
-  oauth2Client {
-    clientId
-  }
+  clientId
   mappings {
     ...ListServiceInstanceMapping
   }

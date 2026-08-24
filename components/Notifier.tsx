@@ -1,3 +1,4 @@
+import { reportError } from '@/lib/debug/errorLog';
 import { useRegisterComChannelMutation } from '@/lib/lok/api/graphql';
 import Constants from 'expo-constants';
 import * as Device from 'expo-device';
@@ -91,19 +92,33 @@ export const Notifier = () => {
   const [register] = useRegisterComChannelMutation()
   const [success, setSuccess] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  /* Which step it reached. Without this, a promise that simply never settles —
+     a permission prompt that was never answered, a request with no timeout —
+     is indistinguishable from one that was never started. */
+  const [stage, setStage] = useState<string>('requesting permission and token');
   const [notification, setNotification] = useState<Notifications.Notification | undefined>(
     undefined
   );
 
   useEffect(() => {
+    const fail = (stage: string) => (thrown: any) => {
+      const message = `${stage}: ${thrown?.message ?? String(thrown)}`;
+      setError(message);
+      // Also into the error log: the inline <Text> below is easy to scroll past
+      // and disappears the moment this screen unmounts.
+      reportError('js', `push registration — ${message}`, thrown?.stack);
+    };
+
     registerForPushNotificationsAsync()
       .then(token => {
+        setStage(token ? `registering token ${token.slice(0, 24)}…` : 'no token returned');
         register({ variables: { input: { token: token ?? '' } } }).then(response => {
             console.log(response);
+            setStage('registered');
             setSuccess(true);
-        }).catch((error: any) => setError(error.message));
+        }).catch(fail('registerComChannel mutation'));
       })
-      .catch((error: any) => setError(error.message));
+      .catch(fail('getExpoPushTokenAsync'));
 
     const notificationListener = Notifications.addNotificationReceivedListener(notification => {
       setNotification(notification);
@@ -120,9 +135,13 @@ export const Notifier = () => {
   }, []);
 
   return (
-    <View >
-      {error && <Text>{error}</Text>}
-      {success && <Text>Successfully registered for push notifications! 🎉</Text>}
+    <View>
+      {error ? <Text className="text-destructive text-sm">Push: {error}</Text> : null}
+      {success ? (
+        <Text className="text-sm">Successfully registered for push notifications! 🎉</Text>
+      ) : (
+        <Text className="text-muted-foreground text-xs">Push: {stage}</Text>
+      )}
     </View>
   );
 }

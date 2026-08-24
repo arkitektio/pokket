@@ -1,0 +1,13 @@
+query MyBrand {
+  mycontext {
+    organization {
+      ...BrandOrganization
+    }
+  }
+  me {
+    id
+    memberships {
+      ...BrandMembership
+    }
+  }
+}

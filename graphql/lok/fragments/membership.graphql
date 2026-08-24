@@ -1,0 +1,8 @@
+fragment BrandMembership on Membership {
+  id
+  brandHue
+  brandChroma
+  organization {
+    id
+  }
+}

@@ -19,6 +19,7 @@ import { Link, Stack } from 'expo-router';
 import { Track } from 'livekit-client';
 import * as React from 'react';
 import { ActivityIndicator, ScrollView, TextInput, View } from 'react-native';
+import { useThemeColors } from '@/lib/theme/BrandProvider';
 
 function EmptyState({
   title,
@@ -27,6 +28,7 @@ function EmptyState({
   title: string;
   description: string;
 }) {
+  const colors = useThemeColors();
   return (
     <Card className="border-border bg-card">
       <CardContent className="items-center py-8">
@@ -34,7 +36,7 @@ function EmptyState({
           <IconSymbol
             name="antenna.radiowaves.left.and.right"
             size={24}
-            color="hsl(170, 36%, 43%)"
+            color={colors.primary}
           />
         </View>
         <Text className="text-center text-lg font-semibold text-card-foreground">{title}</Text>
@@ -45,9 +47,10 @@ function EmptyState({
 }
 
 function LoadingState({ message }: { message: string }) {
+  const colors = useThemeColors();
   return (
     <View className="items-center justify-center py-16">
-      <ActivityIndicator size="large" color="hsl(170, 36%, 43%)" />
+      <ActivityIndicator size="large" color={colors.primary} />
       <Text className="mt-4 text-sm text-muted-foreground">{message}</Text>
     </View>
   );
@@ -193,6 +196,7 @@ function BroadcasterRoom({
 }
 
 function StartSoloBroadcastContent() {
+  const colors = useThemeColors();
   const [ensureSoloBroadcast] = useEnsureSoloBroadcastMutation();
   const [ensureStream] = useEnsureStreamMutation();
   const [title, setTitle] = React.useState('My solo broadcast');
@@ -293,7 +297,7 @@ function StartSoloBroadcastContent() {
               value={title}
               onChangeText={setTitle}
               placeholder="Name your broadcast"
-              placeholderTextColor="hsl(165, 8%, 35%)"
+              placeholderTextColor={colors.mutedForeground}
               autoCapitalize="sentences"
               autoCorrect={false}
               className="rounded-xl border border-border bg-card px-4 py-3 text-card-foreground"
