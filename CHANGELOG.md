@@ -1,3 +1,10 @@
+# [1.4.0](https://github.com/arkitektio/pokket/compare/v1.3.0...v1.4.0) (2026-08-24)
+
+
+### Features
+
+* a bit of a color update ([9e6b97b](https://github.com/arkitektio/pokket/commit/9e6b97b3b853d2ceb3bb42314710346b0244b687))
+
 # [1.3.0](https://github.com/arkitektio/pokket/compare/v1.2.3...v1.3.0) (2026-08-21)
 
 
