@@ -29,6 +29,14 @@ export const InstanceSchema = z.object({
 export const SelfFaktSchema = z.object({
   deployment_name: z.string(),
   alias: AliasSchema,
+  /**
+   * Who this grant is for, as lok's ids: the user (`sub`), the organization
+   * and the hub it was approved into. Absent from deployments that predate
+   * it, and from fakts stored before it existed.
+   */
+  sub: z.string().nullish(),
+  organization: z.string().nullish(),
+  hub: z.string().nullish(),
 });
 
 /**

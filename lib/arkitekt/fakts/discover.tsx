@@ -33,6 +33,15 @@ export const discover = async ({
       }
 
       const json = await response.json();
+      // An explicit other version is refused by name. A missing one is left
+      // to the schema: a protocol-1 server lacks the OAuth endpoints and
+      // fails there, a protocol-2 server that omits the field still works.
+      const version = json?.protocol_version;
+      if (version != null && String(version) !== "2") {
+        throw new Error(
+          `${base} speaks fakts protocol ${version}; this app needs protocol 2`,
+        );
+      }
       return FaktsEndpointSchema.parse(json);
     }),
   );
