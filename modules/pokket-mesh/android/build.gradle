@@ -1,0 +1,36 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'live.arkitekt.pokket'
+version = '0.1.0'
+
+// The Go half of the sidecar, produced by `pnpm build:mesh:android`
+// (scripts/build-mesh-mobile.sh): gomobile's AAR, unpacked into a classes jar
+// and per-ABI jniLibs so this library can depend on it (AGP refuses a local
+// .aar dependency inside a library module). Without it the module still
+// builds, and reports itself unavailable to JS.
+def meshJar = file('libs/meshmobile.jar')
+def hasMesh = meshJar.exists()
+
+android {
+  namespace "live.arkitekt.pokket.mesh"
+  defaultConfig {
+    versionCode 1
+    versionName '0.1.0'
+  }
+  sourceSets {
+    main {
+      if (hasMesh) {
+        java.srcDirs += 'src/go/java'
+      }
+    }
+  }
+}
+
+dependencies {
+  if (hasMesh) {
+    implementation files(meshJar)
+  }
+}

@@ -14,7 +14,10 @@
     "lok": "graphql-codegen --config ./lok.yml",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "build:mesh": "scripts/build-mesh-mobile.sh all",
+    "build:mesh:android": "scripts/build-mesh-mobile.sh android",
+    "build:mesh:ios": "scripts/build-mesh-mobile.sh ios"
   },
   "dependencies": {
     "@apollo/client": "^3.13.9",

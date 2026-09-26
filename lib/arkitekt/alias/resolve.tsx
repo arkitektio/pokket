@@ -1,4 +1,5 @@
 import { Alias, Instance } from "../fakts/faktsSchema";
+import type { AliasRouter } from "../types";
 import { fetchWithTimeout } from "../utils";
 import { aliasToHttpPath } from "./helpers";
 
@@ -10,12 +11,29 @@ export const buildChallengeUrl = (alias: Alias): string => {
 };
 
 
+/**
+ * The alias a check should actually talk to: itself, or — for one only the
+ * router can reach — the router's stand-in (null when it cannot be reached).
+ */
+const reachableAlias = async (
+  alias: Alias,
+  controller: AbortController,
+  router?: AliasRouter,
+): Promise<Alias | null> =>
+  router?.isRouted(alias) ? router.prepare(alias, controller) : alias;
+
 export const checkAliasHealth = async (
   alias: Alias,
   timeout: number,
   controller: AbortController,
+  router?: AliasRouter,
 ): Promise<boolean> => {
-  const url = aliasToHttpPath(alias, alias.challenge);
+  const target = await reachableAlias(alias, controller, router);
+  if (!target) {
+    console.warn(`[ArkitektProvider] Alias ${alias.host} is routed but not reachable right now`);
+    return false;
+  }
+  const url = aliasToHttpPath(target, alias.challenge);
 
   console.log(`[ArkitektProvider] Checking alias health: ${url} (timeout: ${timeout}ms)`);
   try {
@@ -35,15 +53,30 @@ export const resolveWorkingAlias = async ({
   instance,
   timeout = 5000,
   controller,
+  router,
 }: {
   instance: Instance;
   timeout?: number;
   controller: AbortController;
+  router?: AliasRouter;
 }): Promise<Alias> => {
   console.log(`[ArkitektProvider] Resolving working alias for service: ${instance.service}, aliases: ${instance.aliases.length}, timeout: ${timeout}ms`);
-  for (const alias of instance.aliases) {
+  // Direct aliases first, in fakts order; the routed ones (on the mesh) only
+  // after them, since reaching those may mean waiting for the mesh to come up.
+  const ordered = router
+    ? [
+        ...instance.aliases.filter((alias) => !router.isRouted(alias)),
+        ...instance.aliases.filter((alias) => router.isRouted(alias)),
+      ]
+    : instance.aliases;
+  for (const alias of ordered) {
     try {
-      const url = aliasToHttpPath(alias, alias.challenge);
+      const target = await reachableAlias(alias, controller, router);
+      if (!target) {
+        console.warn(`[ArkitektProvider] Alias not reachable through the mesh: ${alias.host}`);
+        continue;
+      }
+      const url = aliasToHttpPath(target, alias.challenge);
       console.log(`[ArkitektProvider] Trying alias: ${url}`);
 
       const response = await fetchWithTimeout(url, {

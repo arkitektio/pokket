@@ -47,6 +47,7 @@ import {
   EnhancedManifest,
   FaktsStorage,
   GetToken,
+  MeshIntegration,
   ModuleRegistry,
   NodeIDProvider,
   Service,
@@ -71,9 +72,18 @@ export type ArkitektProviderProps<
   storageProvider: FaktsStorage;
   windowPopper: WindowPopper;
   nodeIDProvider: NodeIDProvider;
+  /** The organisation mesh (lib/mesh); absent means every alias is direct. */
+  mesh?: MeshIntegration;
 }
 
-
+/** Mesh hooks are best-effort: log, never fail the session over them. */
+const bestEffort = async (label: string, run: () => Promise<void>) => {
+  try {
+    await run();
+  } catch (error) {
+    console.warn(`[ArkitektProvider] mesh ${label} failed:`, error);
+  }
+};
 
 
 export const ArkitektProvider = <T extends ServiceBuilderMap, S extends ServiceBuilder>({
@@ -85,7 +95,14 @@ export const ArkitektProvider = <T extends ServiceBuilderMap, S extends ServiceB
   storageProvider,
   windowPopper,
   nodeIDProvider,
+  mesh,
 }: ArkitektProviderProps<T, S>) => {
+  // A ref, because the token rotation below is wired once for the provider's life.
+  const meshRef = useRef(mesh);
+  useEffect(() => {
+    meshRef.current = mesh;
+  }, [mesh]);
+
   const resolvedModuleRegistry = useMemo(
     () => moduleRegistry || createModuleRegistryFromServices(serviceBuilderMap),
     [moduleRegistry, serviceBuilderMap],
@@ -152,6 +169,13 @@ export const ArkitektProvider = <T extends ServiceBuilderMap, S extends ServiceB
         // No envelope on the response means the server could not re-render it,
         // not that our config went away.
         const nextFakts = refreshedFakts ?? session.fakts;
+        if (refreshedFakts && meshRef.current) {
+          // A re-render may have put an alias on the mesh (or taken the last off).
+          const integration = meshRef.current;
+          void bestEffort("restore after refresh", () =>
+            integration.onRestore({ endpoint: session.endpoint, fakts: refreshedFakts }),
+          );
+        }
 
         console.log("[ArkitektProvider] Token refresh succeeded");
         const nextSession = { ...session, token: nextToken, fakts: nextFakts };
@@ -261,7 +285,7 @@ export const ArkitektProvider = <T extends ServiceBuilderMap, S extends ServiceB
       console.log("[ArkitektProvider] hydrateConnection called, session:", session ? "present" : "null");
       const activeManifest = manifestOverride ?? store.getState().manifest;
       const connection = session
-        ? instantiateConnection(session, activeManifest, serviceBuilderMap, selfServiceBuilder, (options) => refreshTokenRef.current(options))
+        ? instantiateConnection(session, activeManifest, serviceBuilderMap, selfServiceBuilder, (options) => refreshTokenRef.current(options), meshRef.current?.router)
         : undefined;
       console.log("[ArkitektProvider] hydrateConnection result, services:", connection ? Object.keys(connection.serviceMap) : "none");
 
@@ -387,10 +411,11 @@ export const ArkitektProvider = <T extends ServiceBuilderMap, S extends ServiceB
         let alias = session.aliasMap.aliasMap[serviceKey];
         const hc = new AbortController();
         const serviceTimeout = serviceBuilderMap[serviceKey]?.timeout ?? 5000;
+        const router = meshRef.current?.router;
 
-        if (!alias || !(await checkAliasHealth(alias, serviceTimeout, hc))) {
+        if (!alias || !(await checkAliasHealth(alias, serviceTimeout, hc, router).catch(() => false))) {
           console.log("[ArkitektProvider] validateService: cached alias unhealthy, re-resolving:", serviceKey);
-          alias = await resolveWorkingAlias({ instance, timeout: serviceTimeout, controller: hc });
+          alias = await resolveWorkingAlias({ instance, timeout: serviceTimeout, controller: hc, router });
         }
 
         const validationResult: { persistedSession?: StoredArkitektSession } = {};
@@ -421,6 +446,7 @@ export const ArkitektProvider = <T extends ServiceBuilderMap, S extends ServiceB
             serviceBuilderMap,
             selfServiceBuilder,
             (options) => refreshTokenRef.current(options),
+            meshRef.current?.router,
           );
 
           validationResult.persistedSession = nextSession;
@@ -510,15 +536,32 @@ export const ArkitektProvider = <T extends ServiceBuilderMap, S extends ServiceB
         console.log("[ArkitektProvider] connect: manifest enhanced, node_id:", enhancedManifest.node_id);
         await writeStoredEndpoint(endpoint, storageProvider);
 
-        // One grant, one response: tokens and the rendered instances together.
-        const { fakts, token: grantToken } = await flow({
+        const integration = meshRef.current;
+        let requestMeshKey = false;
+        if (integration) {
+          try {
+            requestMeshKey = integration.wantsKey(endpoint);
+          } catch (error) {
+            console.warn("[ArkitektProvider] mesh wantsKey failed:", error);
+          }
+        }
+
+        // One grant, one response: tokens and the rendered instances together
+        // (and a one-shot mesh key, when we asked and lok minted one).
+        const { fakts, token: grantToken, mesh: granted } = await flow({
           endpoint,
           controller,
           manifest: enhancedManifest,
           windowPopper: windowPopper,
+          requestMeshKey,
         });
         console.log("[ArkitektProvider] connect: fakts resolved, services:", Object.keys(fakts.instances || {}));
         await writeStoredFakts(fakts, storageProvider);
+
+        // Join before resolving aliases, so the ones on the mesh can be reached.
+        if (integration) {
+          await bestEffort("grant", () => integration.onGrant({ endpoint, fakts, granted }));
+        }
 
         const token = normalizeToken(grantToken);
         const { aliasReports, aliasMap } = await buildAliases({
@@ -526,6 +569,7 @@ export const ArkitektProvider = <T extends ServiceBuilderMap, S extends ServiceB
           manifest: enhancedManifest,
           controller,
           serviceBuilderMap,
+          router: integration?.router,
         });
         console.log("[ArkitektProvider] connect: aliases built, keys:", Object.keys(aliasMap));
 
@@ -578,6 +622,10 @@ export const ArkitektProvider = <T extends ServiceBuilderMap, S extends ServiceB
   const disconnect = useCallback<AppFunctions["disconnect"]>(async () => {
     console.log("[ArkitektProvider] disconnect called");
     controllerRef.current = null;
+    const integration = meshRef.current;
+    if (integration) {
+      await bestEffort("disconnect", () => integration.onDisconnect());
+    }
     await clearStoredArkitektStorage(undefined, storageProvider);
     hydrateConnection(null, store.getState().manifest, {
       connecting: false,
@@ -683,6 +731,15 @@ export const ArkitektProvider = <T extends ServiceBuilderMap, S extends ServiceB
           throw new Error("Stored session missing after refresh");
         }
 
+        // Rejoin from the node's on-disk state (no key needed) when an alias
+        // lives on the mesh; the health checks below wait for it as needed.
+        const integration = meshRef.current;
+        if (integration) {
+          await bestEffort("restore", () =>
+            integration.onRestore({ endpoint: refreshedSession.endpoint, fakts: refreshedSession.fakts }),
+          );
+        }
+
         hydrateConnection(refreshedSession, enhancedManifest, {
           connecting: false,
           hasBootstrapped: true,
@@ -705,6 +762,20 @@ export const ArkitektProvider = <T extends ServiceBuilderMap, S extends ServiceB
     void run();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // runs once on mount
+
+  // When the mesh's routes change (the node came up, a forward was re-bound
+  // after the app came back from the background, the mesh was switched on or
+  // off), re-check the services so clients are rebuilt against the live
+  // route. All of them: once the mesh is off nothing reads as routed any
+  // more, yet clients built against its forwards still need rebuilding.
+  // These notices are rare, and a check is one request per service.
+  useEffect(() => {
+    if (!mesh) return;
+    return mesh.subscribe(() => {
+      if (!store.getState().storedSession) return;
+      void Promise.all(Object.keys(serviceBuilderMap).map((key) => validateService(key)));
+    });
+  }, [mesh, store, serviceBuilderMap, validateService]);
 
 
   const contextValue = useMemo(() => ({ store, actions }), [store, actions]);
@@ -746,6 +817,7 @@ export type ArkitektBuilderOptions<T extends ServiceBuilderMap, S extends Servic
   storageProvider: FaktsStorage;
   windowPopper: WindowPopper;
   nodeIDProvider: NodeIDProvider;
+  mesh?: MeshIntegration;
 };
 
 export const buildArkitektProvider =
@@ -759,6 +831,7 @@ export const buildArkitektProvider =
       storageProvider={options.storageProvider}
       windowPopper={options.windowPopper}
       nodeIDProvider={options.nodeIDProvider}
+      mesh={options.mesh}
     >
       {children}
     </ArkitektProvider>
@@ -782,6 +855,7 @@ export {
 export type {
   AppContext,
   ArkitektContextType, EnhancedManifest, FaktsStorage, ModuleDefinition,
+  MeshIntegration,
   ModuleRegistry,
   ModuleRuntimeState,
   Service,

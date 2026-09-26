@@ -4,6 +4,7 @@ import { ActiveFakts, Alias, Instance } from "./fakts/faktsSchema";
 import { Manifest } from "./fakts/manifestSchema";
 import { StoredArkitektSession } from "./fakts/sessionStorageSchema";
 import { TokenResponse } from "./fakts/tokenSchema";
+import type { GrantedMesh } from "./fakts/meshGrant";
 
 
 export type FaktsStorage = {
@@ -18,6 +19,47 @@ export type WindowPopper = {
 };
 
 export type NodeIDProvider = () => Promise<string>;
+
+/**
+ * Reaching aliases that are not reachable directly — in pokket, the ones on
+ * the organisation mesh (lib/mesh). The arkitekt runtime only asks these
+ * questions; how an alias is made reachable is the router's business.
+ *
+ * Stored alias maps always hold the fakts' own aliases. The router's answer
+ * (e.g. `127.0.0.1:<port>` for a loopback forward) is applied when clients
+ * are built and when an alias is checked, never persisted: it is only valid
+ * while this process runs.
+ */
+export type AliasRouter = {
+  /** Does this alias only work through the router? Such aliases are tried after the direct ones. */
+  isRouted: (alias: Alias) => boolean;
+  /**
+   * Make a routed alias reachable and return the alias to actually talk to,
+   * or null when it cannot be reached this way (no mesh, not signed in, timed out).
+   */
+  prepare: (alias: Alias, controller: AbortController) => Promise<Alias | null>;
+  /** The prepared stand-in for an alias, or the alias itself. Synchronous, for client builders. */
+  resolve: (alias: Alias) => Alias;
+};
+
+/**
+ * The optional mesh hooks the provider calls around a session's life. Every
+ * hook is best-effort: a mesh failure must never turn a working login into
+ * an error, so the provider catches and logs whatever they throw.
+ */
+export type MeshIntegration = {
+  router: AliasRouter;
+  /** Ask lok for a one-shot mesh key with this grant? */
+  wantsKey: (endpoint: FaktsEndpoint) => boolean;
+  /** A grant came back (with a key when lok minted one): record and join the mesh. */
+  onGrant: (args: { endpoint: FaktsEndpoint; fakts: ActiveFakts; granted?: GrantedMesh }) => Promise<void>;
+  /** A stored or refreshed session is live: rejoin from on-disk state if its aliases need the mesh. */
+  onRestore: (args: { endpoint: FaktsEndpoint; fakts: ActiveFakts }) => Promise<void>;
+  /** The session is gone: leave the mesh and forget this device's node. */
+  onDisconnect: () => Promise<void>;
+  /** Routes changed under us (the node came back, an app resume re-bound a forward). */
+  subscribe: (listener: () => void) => () => void;
+};
 
 
 export type AvailableService = {

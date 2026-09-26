@@ -5,6 +5,7 @@ import { buildArkitekt } from "../arkitekt";
 import { livekitServiceDefinition } from "../livekit/service";
 import { lokServiceBuilder } from "../lok/service";
 import { lovekitServiceDefinition } from "../lovekit/service";
+import { mesh } from "../mesh/integration";
 import { mikroServiceDefinition } from "../mikro/service";
 import { rekuestServiceDefinition } from "../rekuest/service";
 
@@ -16,7 +17,8 @@ let asyncStorageProvider = {
     return await AsyncStorage.getItem(key);
   },
   set: async (key: string, value: string) => {
-    console.log("set", key, value);
+    // Key only: the values are tokens and refresh tokens.
+    console.log("set", key);
     return await AsyncStorage.setItem(key, value);
   },
   remove: async (key: string) => {
@@ -79,6 +81,7 @@ export const App = buildArkitekt({
   storageProvider: asyncStorageProvider,
   windowPopper: windowPopper,
   nodeIDProvider: nodeIDProvider,
+  mesh,
 });
 
 

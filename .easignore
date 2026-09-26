@@ -1,3 +1,8 @@
+# EAS reads this file INSTEAD of .gitignore when it packs the project for a
+# build. It is .gitignore minus the mesh sidecar's build outputs, which are
+# gitignored (they are built, not committed) but must reach the native build.
+# Keep the two in sync.
+
 # Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
 
 # dependencies
@@ -39,9 +44,3 @@ yarn-error.*
 
 
 app-example
-
-# Mesh sidecar build outputs (scripts/build-mesh-mobile.sh). Keep in sync with .easignore,
-# which must NOT list them, or EAS builds would ship without the mesh.
-modules/pokket-mesh/android/libs/
-modules/pokket-mesh/android/src/main/jniLibs/
-modules/pokket-mesh/ios/Meshmobile.xcframework/

@@ -53,6 +53,7 @@ export const AppLayout = () => {
         <Stack.Screen name="debug" options={{ title: 'Debug' }} />
         <Stack.Screen name="provision" options={{ title: 'Provision' }} />
         <Stack.Screen name="tasks" options={{ title: 'Tasks' }} />
+        <Stack.Screen name="mesh" options={{ title: 'Mesh' }} />
       </Stack.Protected>
       <Stack.Protected guard={!isLoggedIn} >
         <Stack.Screen name="login" options={{ headerShown: false }} />

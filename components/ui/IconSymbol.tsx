@@ -43,6 +43,7 @@ const MAPPING = {
   'bell.fill': 'notifications',
   'bell.slash': 'notifications-off',
   'exclamationmark.triangle': 'warning',
+  'network': 'hub',
 } as IconMapping;
 
 /**

@@ -75,6 +75,14 @@ export default function HomeScreen() {
             borderClassName="border-t-2 border-t-chart-2/40"
           />
           <HomeCard
+            href="/mesh"
+            title="Mesh"
+            icon="network"
+            color={colors.primary}
+            iconBgClassName="bg-chart-3/10"
+            borderClassName="border-t-2 border-t-chart-3/40"
+          />
+          <HomeCard
             href="/debug"
             title="Debug"
             icon="ant.fill"
