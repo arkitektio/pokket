@@ -40,8 +40,10 @@ build_android() {
   trap 'rm -rf "$work"' RETURN
 
   echo "mesh: building android library"
+  # 16 KB pages: Google Play requires 16 KB-aligned native libraries for apps
+  # targeting Android 15+, and older NDKs link with 4 KB alignment.
   gomobile bind -target=android/arm64,android/arm,android/amd64 -androidapi 24 \
-    -trimpath -ldflags "-s -w" -o "$work/meshmobile.aar" .
+    -trimpath -ldflags "-s -w -extldflags=-Wl,-z,max-page-size=16384" -o "$work/meshmobile.aar" .
 
   # A library module may not depend on a local .aar (AGP refuses to package
   # one into another), so unpack it: the Java classes as a jar, the Go
@@ -52,6 +54,26 @@ build_android() {
   rm -rf "$module/android/src/main/jniLibs"
   mkdir -p "$module/android/src/main/jniLibs"
   cp -R "$work/aar/jni/." "$module/android/src/main/jniLibs/"
+
+  # Check the 16 KB alignment of every 64-bit library (32-bit arm is exempt).
+  local readelf
+  readelf="$(ls "${ANDROID_NDK_HOME:-/nonexistent}"/toolchains/llvm/prebuilt/*/bin/llvm-readelf 2>/dev/null | head -n1 || true)"
+  [ -n "$readelf" ] || readelf="$(command -v llvm-readelf || command -v readelf || true)"
+  if [ -n "$readelf" ]; then
+    for so in "$module"/android/src/main/jniLibs/{arm64-v8a,x86_64}/*.so; do
+      [ -f "$so" ] || continue
+      local align
+      for align in $("$readelf" -lW "$so" | awk '$1 == "LOAD" { print $NF }'); do
+        if [ $((align)) -lt 16384 ]; then
+          echo "mesh: $so has a LOAD segment aligned to $align, not 16 KB" >&2
+          exit 1
+        fi
+      done
+      echo "mesh: $(basename "$(dirname "$so")")/$(basename "$so") is 16 KB aligned"
+    done
+  else
+    echo "mesh: no readelf found; skipping the 16 KB alignment check" >&2
+  fi
   echo "mesh: android library ready"
 }
 

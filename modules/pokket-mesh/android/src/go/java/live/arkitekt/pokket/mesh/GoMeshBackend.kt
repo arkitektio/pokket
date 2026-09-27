@@ -15,6 +15,8 @@ class GoMeshBackend : MeshBackend {
 
   override fun setInterfaces(text: String) = Meshmobile.setInterfaces(text)
 
+  override fun setDefaultRoute(ifName: String, gateway: String) = Meshmobile.setDefaultRoute(ifName, gateway)
+
   override fun version(): String = Meshmobile.version()
 
   override fun start(id: String, stateDir: String, controlUrl: String, hostname: String, authKey: String) =

@@ -1,12 +1,15 @@
 package live.arkitekt.pokket.mesh
 
 import android.content.Context
+import android.net.ConnectivityManager
+import android.net.LinkProperties
+import android.net.Network
+import java.net.Inet4Address
 import expo.modules.kotlin.exception.CodedException
 import expo.modules.kotlin.exception.Exceptions
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 import java.io.File
-import java.net.Inet6Address
 import java.net.NetworkInterface
 
 private const val STATUS_EVENT = "onStatus"
@@ -33,6 +36,29 @@ class PokketMeshModule : Module() {
   }
 
   private fun requireBackend(): MeshBackend = backend ?: throw MeshUnavailableException()
+
+  /**
+   * Keeps tsnet told which interface and gateway carry the default route —
+   * on Android it cannot read the route table itself — and re-hands it the
+   * interface list whenever the network changes (Wi-Fi <-> cellular).
+   */
+  private val networkCallback = object : ConnectivityManager.NetworkCallback() {
+    override fun onLinkPropertiesChanged(network: Network, lp: LinkProperties) {
+      val b = backend ?: return
+      val gateway = lp.routes
+        .firstOrNull { it.isDefaultRoute && it.gateway is Inet4Address }
+        ?.gateway?.hostAddress ?: ""
+      b.setDefaultRoute(lp.interfaceName ?: "", gateway)
+      pushInterfaces(b)
+    }
+
+    override fun onLost(network: Network) {
+      val b = backend ?: return
+      b.setDefaultRoute("", "")
+      pushInterfaces(b)
+    }
+  }
+  private var callbackRegistered = false
 
   private fun stateDir(id: String): File {
     require(MESH_ID.matches(id)) { "invalid mesh id" }
@@ -75,13 +101,30 @@ class PokketMeshModule : Module() {
     Events(STATUS_EVENT, LOG_EVENT)
 
     OnCreate {
-      backend?.setListener(
+      val b = backend ?: return@OnCreate
+      b.setListener(
         onStatus = { json -> sendEvent(STATUS_EVENT, mapOf("status" to json)) },
         onLog = { id, message -> sendEvent(LOG_EVENT, mapOf("id" to id, "message" to message)) },
       )
+      pushInterfaces(b)
+      try {
+        val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        cm.registerDefaultNetworkCallback(networkCallback)
+        callbackRegistered = true
+      } catch (_: Exception) {
+        // Without it tsnet still runs; it just learns less about the network.
+      }
     }
 
     OnDestroy {
+      if (callbackRegistered) {
+        try {
+          val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+          cm.unregisterNetworkCallback(networkCallback)
+        } catch (_: Exception) {
+        }
+        callbackRegistered = false
+      }
       backend?.stopAll()
     }
 

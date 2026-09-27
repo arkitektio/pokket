@@ -1,0 +1,187 @@
+name: Mesh sidecar
+
+# Verifies the organisation-mesh sidecar end to end:
+#  - go:      unit + tailnet end-to-end tests of the Go library
+#  - js:      jest tests of the fakts client and lib/mesh
+#  - android: gomobile build (16 KB pages), release APK, and an emulator run
+#             in which the app joins a test tailnet and talks through it
+#  - ios:     gomobile build, Release simulator app, and the same run on a simulator
+
+on:
+  push:
+    branches: [main, "claude/**"]
+    paths:
+      - "modules/pokket-mesh/**"
+      - "lib/mesh/**"
+      - "lib/arkitekt/**"
+      - "lib/testing/**"
+      - "app/mesh*.tsx"
+      - "app/_layout.tsx"
+      - "app.json"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "scripts/build-mesh-mobile.sh"
+      - "scripts/ci/**"
+      - ".github/workflows/mesh.yaml"
+  pull_request:
+    paths:
+      - "modules/pokket-mesh/**"
+      - "lib/mesh/**"
+      - "lib/arkitekt/**"
+      - "lib/testing/**"
+      - "app/mesh*.tsx"
+      - "app/_layout.tsx"
+      - "app.json"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "scripts/build-mesh-mobile.sh"
+      - "scripts/ci/**"
+      - ".github/workflows/mesh.yaml"
+  workflow_dispatch:
+
+concurrency:
+  group: mesh-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  go:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: modules/pokket-mesh/go
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: modules/pokket-mesh/go/go.mod
+          cache-dependency-path: modules/pokket-mesh/go/go.sum
+      - run: go vet ./...
+      - run: go test -race -count=1 ./...
+      - name: Cross-compile for the phones
+        run: |
+          GOOS=android GOARCH=arm64 go build ./...
+          GOOS=ios GOARCH=arm64 CGO_ENABLED=1 go vet ./...
+
+  js:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test --ci
+      - run: >
+          pnpm exec eslint app/mesh.tsx app/mesh-selftest.tsx lib/mesh lib/testing
+          modules/pokket-mesh/index.ts modules/pokket-mesh/app.plugin.js
+
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    env:
+      # Bundled into the JS at build time: turns on app/mesh-selftest.tsx.
+      EXPO_PUBLIC_MESH_SELFTEST: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: actions/setup-java@v4
+        with:
+          java-version: "17"
+          distribution: temurin
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: modules/pokket-mesh/go/go.mod
+          cache-dependency-path: modules/pokket-mesh/go/go.sum
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build the Go library (checks 16 KB alignment)
+        run: pnpm build:mesh:android
+
+      - name: Prebuild
+        run: npx expo prebuild --platform android --no-install --clean
+
+      - name: Build the release APK
+        working-directory: android
+        # x86_64 for the emulator, arm64 to prove the phone ABI links too.
+        run: ./gradlew :app:assembleRelease -PreactNativeArchitectures=x86_64,arm64-v8a --no-daemon
+
+      - name: Check the APK
+        run: |
+          apk=android/app/build/outputs/apk/release/app-release.apk
+          aapt2="$(ls "$ANDROID_HOME"/build-tools/*/aapt2 | sort -V | tail -n1)"
+          manifest="$("$aapt2" dump xmltree --file AndroidManifest.xml "$apk")"
+          echo "$manifest" | grep -q 'android:usesCleartextTraffic.*=true' || { echo "release APK does not allow cleartext"; exit 1; }
+          echo "$manifest" | grep -q 'android.permission.ACCESS_NETWORK_STATE' || { echo "ACCESS_NETWORK_STATE missing"; exit 1; }
+          unzip -l "$apk" | grep -E 'lib/(x86_64|arm64-v8a)/libgojni.so' || { echo "libgojni.so missing"; exit 1; }
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Self-test on an emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          script: scripts/ci/mesh-device-e2e-android.sh android/app/build/outputs/apk/release/app-release.apk
+
+  ios:
+    runs-on: macos-latest
+    timeout-minutes: 90
+    env:
+      EXPO_PUBLIC_MESH_SELFTEST: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: modules/pokket-mesh/go/go.mod
+          cache-dependency-path: modules/pokket-mesh/go/go.sum
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build the Go framework
+        run: pnpm build:mesh:ios
+
+      - name: Prebuild
+        run: npx expo prebuild --platform ios --no-install --clean
+
+      - name: Check Info.plist
+        run: |
+          plist=ios/pokket/Info.plist
+          /usr/libexec/PlistBuddy -c 'Print :NSLocalNetworkUsageDescription' "$plist" | grep -qi mesh
+          /usr/libexec/PlistBuddy -c 'Print :NSAppTransportSecurity:NSAllowsLocalNetworking' "$plist" | grep -q true
+
+      - name: Install pods
+        working-directory: ios
+        run: pod install
+
+      - name: Build the Release simulator app
+        working-directory: ios
+        run: |
+          set -o pipefail
+          xcodebuild -workspace pokket.xcworkspace -scheme pokket -configuration Release \
+            -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build CODE_SIGNING_ALLOWED=NO build | tail -n 60
+
+      - name: Self-test on a simulator
+        run: scripts/ci/mesh-device-e2e-ios.sh ios/build/Build/Products/Release-iphonesimulator/pokket.app

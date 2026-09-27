@@ -75,6 +75,25 @@ Currently available for Android devices with BLE support. Just download the APK 
    The node keeps its identity in the app's files, so it rejoins by itself after the one-shot
    key from the login has been used.
 
+   **Permissions.** The mesh needs no VPN permission and no runtime prompt on Android: it uses
+   `INTERNET` and `ACCESS_NETWORK_STATE` (install-time), and cleartext HTTP is allowed app-wide in
+   release builds (the loopback proxies and plain-HTTP LAN aliases need it; see
+   `modules/pokket-mesh/app.plugin.js`). On iOS the node's search for direct paths to peers on the
+   LAN can show the Local Network prompt, with the text set in the same plugin. The node never
+   sends logs to Tailscale.
+
+4. **Tests**
+
+   ```bash
+   pnpm test                                   # jest: fakts client, lib/mesh
+   (cd modules/pokket-mesh/go && go test ./...) # Go, incl. a real in-process tailnet
+   ```
+
+   The `Mesh sidecar` workflow additionally builds the release APK and a Release iOS simulator app,
+   and runs them on an emulator/simulator against a test tailnet (`TestDeviceEnv`): the app opens
+   `pokket://mesh-selftest?...` (only active in builds made with `EXPO_PUBLIC_MESH_SELFTEST=1`),
+   joins, and must fetch and hold a WebSocket through the mesh, reporting back through it.
+
 ## Tech Stack
 
 - **Framework**: React Native (Expo)

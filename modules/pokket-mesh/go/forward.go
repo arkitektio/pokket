@@ -3,6 +3,7 @@ package meshmobile
 import (
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"errors"
 	"fmt"
 	"net"
@@ -12,6 +13,10 @@ import (
 	"sync"
 	"time"
 )
+
+// testRootCAs lets tests trust their own TLS upstreams; nil (the system
+// roots) everywhere else.
+var testRootCAs *x509.CertPool
 
 // dialFunc is how a forward reaches its upstream: the node's tailnet dialer
 // in the app, a plain dialer in tests.
@@ -80,7 +85,7 @@ func newForward(host string, port int, useTLS bool, preferPort int, dial dialFun
 		DialContext: func(ctx context.Context, network, _ string) (net.Conn, error) {
 			return dial(ctx, network, upstream)
 		},
-		TLSClientConfig:       &tls.Config{ServerName: host},
+		TLSClientConfig:       &tls.Config{ServerName: host, RootCAs: testRootCAs},
 		ForceAttemptHTTP2:     false,
 		MaxIdleConns:          16,
 		IdleConnTimeout:       60 * time.Second,

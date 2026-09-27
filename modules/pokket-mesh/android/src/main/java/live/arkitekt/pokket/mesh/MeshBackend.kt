@@ -7,6 +7,7 @@ package live.arkitekt.pokket.mesh
 interface MeshBackend {
   fun setListener(onStatus: (String) -> Unit, onLog: (String, String) -> Unit)
   fun setInterfaces(text: String)
+  fun setDefaultRoute(ifName: String, gateway: String)
   fun version(): String
   fun start(id: String, stateDir: String, controlUrl: String, hostname: String, authKey: String)
   fun forward(id: String, host: String, port: Long, tls: Boolean): Long

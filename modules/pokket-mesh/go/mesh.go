@@ -93,6 +93,9 @@ type node struct {
 	forwards map[string]*forward
 }
 
+// debugLogf receives tsnet's internal log; silent except in tests.
+var debugLogf = func(string, ...any) {}
+
 var (
 	listenerMu sync.Mutex
 	listener   Listener
@@ -171,7 +174,7 @@ func Start(id, stateDir, controlURL, hostname, authKey string) error {
 		AuthKey:    authKey,
 		Ephemeral:  false,
 		// tsnet is chatty; only the user-facing lines are relayed.
-		Logf: func(string, ...any) {},
+		Logf: debugLogf,
 		UserLogf: func(format string, args ...any) {
 			emitLog(id, fmt.Sprintf(format, args...))
 		},

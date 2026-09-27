@@ -58,6 +58,8 @@ export const AppLayout = () => {
       <Stack.Protected guard={!isLoggedIn} >
         <Stack.Screen name="login" options={{ headerShown: false }} />
       </Stack.Protected>
+      {/* CI's on-device mesh check; inert unless built with EXPO_PUBLIC_MESH_SELFTEST=1. */}
+      <Stack.Screen name="mesh-selftest" options={{ title: 'Mesh self-test' }} />
     </Stack>
   );
 }

@@ -15,6 +15,7 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "lint": "expo lint",
+    "test": "jest",
     "build:mesh": "scripts/build-mesh-mobile.sh all",
     "build:mesh:android": "scripts/build-mesh-mobile.sh android",
     "build:mesh:ios": "scripts/build-mesh-mobile.sh ios"
@@ -81,15 +82,39 @@
     "@graphql-codegen/fragment-matcher": "^5.0.0",
     "@graphql-codegen/introspection": "^4.0.0",
     "@graphql-codegen/typescript-react-apollo": "^3.3.7",
+    "@react-native/jest-preset": "^0.86.3",
     "@semantic-release/changelog": "^6.0.3",
     "@semantic-release/git": "^10.0.1",
+    "@types/jest": "^29.5.14",
     "@types/react": "~19.2.14",
     "eslint": "^9.25.0",
     "eslint-config-expo": "~57.0.1",
+    "jest": "^29.7.0",
+    "jest-expo": "~57.0.5",
     "prettier-plugin-tailwindcss": "^0.5.11",
     "semantic-release": "^25.0.3",
     "tailwindcss": "^3.4.17",
     "typescript": "~6.0.3"
   },
-  "private": true
+  "private": true,
+  "jest": {
+    "preset": "jest-expo",
+    "moduleNameMapper": {
+      "^@/(.*)$": "<rootDir>/$1",
+      "^~/(.*)$": "<rootDir>/$1",
+      "^any-signal$": "<rootDir>/node_modules/any-signal/dist/src/index.js"
+    },
+    "setupFiles": [
+      "<rootDir>/jest.setup.js"
+    ],
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "<rootDir>/modules/pokket-mesh/go/"
+    ],
+    "transformIgnorePatterns": [
+      "/node_modules/(?!(.pnpm|react-native|@react-native|@react-native-community|expo|@expo|@expo-google-fonts|react-navigation|@react-navigation|@sentry/react-native|native-base|standard-navigation|any-signal))",
+      "/node_modules/react-native-reanimated/plugin/",
+      "/node_modules/@react-native/babel-preset/"
+    ]
+  }
 }

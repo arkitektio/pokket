@@ -1,4 +1,5 @@
 import ExpoModulesCore
+import Network
 #if canImport(Meshmobile)
 import Meshmobile
 #endif
@@ -35,6 +36,8 @@ public final class PokketMeshModule: Module {
   #if canImport(Meshmobile)
   private let listener = MeshListener()
   private let available = true
+  /// Tells tsnet which interface carries the default route (Wi-Fi <-> cellular).
+  private let pathMonitor = NWPathMonitor()
   #else
   private let available = false
   #endif
@@ -64,11 +67,17 @@ public final class PokketMeshModule: Module {
       #if canImport(Meshmobile)
       self.listener.module = self
       MeshmobileSetListener(self.listener)
+      self.pathMonitor.pathUpdateHandler = { path in
+        let name = path.status == .satisfied ? (path.availableInterfaces.first?.name ?? "") : ""
+        MeshmobileSetDefaultRoute(name, "")
+      }
+      self.pathMonitor.start(queue: DispatchQueue(label: "live.arkitekt.pokket.mesh.path"))
       #endif
     }
 
     OnDestroy {
       #if canImport(Meshmobile)
+      self.pathMonitor.cancel()
       MeshmobileStopAll()
       #endif
     }
