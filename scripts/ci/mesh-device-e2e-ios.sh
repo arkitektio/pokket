@@ -35,11 +35,19 @@ xcrun simctl boot "$udid" || true
 xcrun simctl bootstatus "$udid" -b
 
 # idb (installed by the workflow) drives the simulator's UI; see tap_text.
+# The companion can take a while to come up on a busy runner (Metro building
+# next to it), so keep trying for a minute.
+idb_connect() {
+  for _ in $(seq 1 30); do
+    idb connect localhost 10882 > /dev/null 2>&1 && idb describe > /dev/null 2>&1 && return 0
+    sleep 2
+  done
+  return 1
+}
 if command -v idb_companion > /dev/null && command -v idb > /dev/null; then
   mkdir -p "$work"
   idb_companion --udid "$udid" > "$work/idb-companion.log" 2>&1 &
-  sleep 5
-  idb connect localhost 10882 || echo "idb connect failed"
+  idb_connect || { echo "idb connect failed; companion log:"; tail -n 20 "$work/idb-companion.log"; }
 else
   echo "idb is not installed; link prompts cannot be answered"
 fi
@@ -80,6 +88,7 @@ tap_text() {
   command -v idb > /dev/null || { echo "no idb to tap \"$label\"; pressing Return instead"; press_return; return; }
   xcrun simctl io "$udid" screenshot "$work/tap.png" > /dev/null 2>&1 || return 1
   pos="$("$work/ocr" "$work/tap.png" "$label" 2>/dev/null)" || { echo "\"$label\" is not on screen"; return 1; }
+  idb describe > /dev/null 2>&1 || idb_connect || { echo "idb is not connected"; return 1; }
   size="$(idb describe --json 2>/dev/null | python3 -c '
 import json, sys
 d = json.load(sys.stdin)["screen_dimensions"]
