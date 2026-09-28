@@ -114,7 +114,20 @@ jobs:
       - name: Build the release APK
         working-directory: android
         # x86_64 for the emulator, arm64 to prove the phone ABI links too.
-        run: ./gradlew :app:assembleRelease -PreactNativeArchitectures=x86_64,arm64-v8a --no-daemon
+        # Packaging two ~40 MB Go libraries next to WebRTC outgrows the template's
+        # 2 GB Gradle heap.
+        run: |
+          df -h .
+          ./gradlew :app:assembleRelease -PreactNativeArchitectures=x86_64,arm64-v8a --no-daemon --stacktrace \
+            "-Dorg.gradle.jvmargs=-Xmx6g -XX:MaxMetaspaceSize=1g -XX:+HeapDumpOnOutOfMemoryError"
+
+      - name: Upload the Gradle problems report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gradle-problems
+          path: android/build/reports/problems/
+          if-no-files-found: ignore
 
       - name: Check the APK
         run: |

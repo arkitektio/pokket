@@ -1,3 +1,8 @@
+//go:build !ios && !android
+
+// The tailnet harness (tailscale.com/tstest/integration) only builds for the
+// dev/CI host, never for the phones this library targets.
+
 package meshmobile
 
 // End-to-end tests against a real (in-process) tailnet: Tailscale's test

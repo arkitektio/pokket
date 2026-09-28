@@ -16,7 +16,10 @@ Pod::Spec.new do |s|
 
   s.dependency 'ExpoModulesCore'
 
-  s.source_files = "**/*.{h,m,swift}"
+  # Only the module's own sources: a recursive glob would also pick up the
+  # headers inside Meshmobile.xcframework, and CocoaPods would put them in this
+  # pod's umbrella header, where they cannot be found.
+  s.source_files = "*.swift"
   # The Go half, produced by `pnpm build:mesh:ios` (scripts/build-mesh-mobile.sh).
   # Without it the module still builds (`canImport(Meshmobile)` is false) and
   # reports itself unavailable to JS.
