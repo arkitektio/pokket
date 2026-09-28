@@ -476,6 +476,13 @@ func TestDeviceEnv(t *testing.T) {
 			wait = d
 		}
 	}
+	// Keep hearing the device for a while after its report: a driver checks
+	// for lines (links reaching the app) that can land just after it.
+	defer func() {
+		if d, err := time.ParseDuration(os.Getenv("MESH_E2E_LINGER")); err == nil {
+			time.Sleep(d)
+		}
+	}()
 	select {
 	case body := <-tn.reportC:
 		t.Logf("device report: %s", body)

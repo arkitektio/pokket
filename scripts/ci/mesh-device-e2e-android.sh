@@ -21,6 +21,8 @@ work="${RUNNER_TEMP:-/tmp}/mesh-e2e"
 ip="$(hostname -I | awk '{print $1}')"
 
 [ "$variant" = dev ] && export MESH_E2E_WAIT=25m
+# The warm link can land after the report; keep listening a little longer.
+export MESH_E2E_LINGER=30s
 "$root/scripts/ci/mesh-device-env.sh" "$ip" "$work"
 url="$(cat "$work/url")"
 
