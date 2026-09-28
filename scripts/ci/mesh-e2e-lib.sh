@@ -54,3 +54,18 @@ expect_line() {
     link_failures=1
   fi
 }
+
+# Background helpers (Metro, log streams, delayed screenshots) must not
+# outlive the driver: they hold its output open, and a runner that waits for
+# the output to close (android-emulator-runner does) waits until the job
+# times out.
+kill_tree() {
+  local child
+  for child in $(pgrep -P "$1" 2> /dev/null); do kill_tree "$child"; done
+  kill "$1" 2> /dev/null || true
+}
+stop_background() {
+  local pid
+  for pid in $(jobs -p); do kill_tree "$pid"; done
+}
+trap stop_background EXIT

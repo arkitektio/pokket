@@ -98,6 +98,7 @@ jobs:
       - name: Publish to the dev-client pre-release
         env:
           GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: scripts/ci/publish-dev-client.sh "$RUNNER_TEMP"/out/*.apk pokket-dev.apk
 
   ios-simulator:
@@ -147,4 +148,5 @@ jobs:
       - name: Publish to the dev-client pre-release
         env:
           GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: scripts/ci/publish-dev-client.sh "$RUNNER_TEMP"/out/*.zip pokket-dev-simulator.zip
