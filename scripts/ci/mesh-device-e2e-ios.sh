@@ -41,9 +41,28 @@ export MESH_E2E_LINGER=30s
 "$root/scripts/ci/mesh-device-env.sh" 127.0.0.1 "$work"
 url="$(cat "$work/url")"
 
+# What is on the simulator's screen, as text (and in the log via `mark`).
+swiftc -O "$root/scripts/ci/ocr.swift" -o "$work/ocr" 2>/dev/null || echo "no OCR"
+screen_text() {
+  xcrun simctl io "$udid" screenshot "$work/screen-$1.png" > /dev/null 2>&1 || return 0
+  local text
+  text="$("$work/ocr" "$work/screen-$1.png" 2>/dev/null | head -c 600 || true)"
+  echo "screen ($1): $text"
+  mark "screen ($1): $text"
+}
+
+# openurl can block (it waits on the system to open the URL); never let it
+# hold up the run, and look at the screen once it has had time to act.
+link_count=0
 open_link() {
+  link_count=$((link_count + 1))
   mark "opening $1"
-  xcrun simctl openurl "$udid" "$1" || echo "openurl failed"
+  local started=$SECONDS
+  perl -e 'alarm shift; exec @ARGV' 60 xcrun simctl openurl "$udid" "$1" || echo "openurl failed or timed out"
+  echo "openurl returned after $((SECONDS - started)) s"
+  mark "openurl returned after $((SECONDS - started)) s"
+  sleep 5
+  screen_text "link$link_count"
 }
 
 [ "$variant" = dev ] && start_metro ios
@@ -58,7 +77,7 @@ xcrun simctl install "$udid" "$app"
 if [ "$variant" = dev ]; then
   xcrun simctl launch "$udid" live.arkitekt.pokket || echo "launch failed"
   open_link "$DEV_CLIENT_URL"
-  wait_for_line "app booted" 300 || echo "the app did not boot from Metro in 300 s"
+  wait_for_line "app booted" 300 || { echo "the app did not boot from Metro in 300 s"; screen_text no-boot; }
   open_link "$url"
 else
   # Cold start by the link, as when a user taps it with the app closed.

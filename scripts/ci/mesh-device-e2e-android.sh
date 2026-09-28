@@ -33,9 +33,22 @@ echo "::group::emulator -> control server"
 adb shell "printf 'GET /key?v=1 HTTP/1.0\r\n\r\n' | toybox nc -w 5 $control_hostport | head -n 1" || echo "control server NOT reachable from the emulator"
 echo "::endgroup::"
 
+# What is on the emulator's screen, as the text of its UI hierarchy.
+screen_text() {
+  local text
+  text="$(timeout 30 adb shell 'uiautomator dump /sdcard/ui.xml > /dev/null && cat /sdcard/ui.xml' 2>/dev/null \
+    | grep -o 'text="[^"]*"' | sed 's/^text="//; s/"$//' | grep -v '^$' | tr '\n' '|' | head -c 600 || true)"
+  echo "screen ($1): $text"
+  mark "screen ($1): $text"
+}
+
+link_count=0
 open_link() {
+  link_count=$((link_count + 1))
   mark "opening $1"
-  adb shell "am start -W -a android.intent.action.VIEW -d '$1' live.arkitekt.pokket" || echo "am start failed"
+  timeout 60 adb shell "am start -a android.intent.action.VIEW -d '$1' live.arkitekt.pokket" || echo "am start failed or timed out"
+  sleep 5
+  screen_text "link$link_count"
 }
 
 if [ "$variant" = dev ]; then
@@ -49,7 +62,7 @@ adb logcat -c
 
 if [ "$variant" = dev ]; then
   open_link "$DEV_CLIENT_URL"
-  wait_for_line "app booted" 300 || echo "the app did not boot from Metro in 300 s"
+  wait_for_line "app booted" 300 || { echo "the app did not boot from Metro in 300 s"; screen_text no-boot; }
   open_link "$url"
 else
   # Cold start by the link, as when a user taps it with the app closed.
