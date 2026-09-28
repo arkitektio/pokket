@@ -49,7 +49,7 @@ open_link() {
 [ "$variant" = dev ] && start_metro ios
 
 xcrun simctl spawn "$udid" log stream --style compact --level debug \
-  --predicate 'process CONTAINS[c] "pokket" OR eventMessage CONTAINS "mesh-selftest"' > "$work/device.log" 2>&1 &
+  --predicate 'process CONTAINS[c] "pokket" OR eventMessage CONTAINS[c] "pokket"' > "$work/device.log" 2>&1 &
 logger=$!
 
 xcrun simctl install "$udid" "$app"
@@ -63,7 +63,7 @@ if [ "$variant" = dev ]; then
 else
   # Cold start by the link, as when a user taps it with the app closed.
   open_link "$url"
-  if ! wait_for_line "app booted" 120; then
+  if ! wait_for_line "app booted" 150; then
     echo "no boot after the cold link; launching the app directly"
     xcrun simctl launch "$udid" live.arkitekt.pokket || echo "launch failed"
   fi
@@ -80,8 +80,13 @@ kill "$logger" 2>/dev/null || true
 echo "::group::test tailnet log"
 cat "$work/env.log"
 echo "::endgroup::"
+echo "::group::device log: links"
+# Every line about a pokket:// URL, from any process (SpringBoard's handling
+# of openurl included), and what the app's JS made of it.
+grep -E "pokket://|url event|native url|initial url|app booted|openURL|OpenURL" "$work/device.log" | grep -v "node: tsnet" | head -n 300 || true
+echo "::endgroup::"
 echo "::group::device log"
-grep -E "mesh-selftest|pokket-mesh|Meshmobile|Opening URL|ATS|App Transport|error|fault|crash" "$work/device.log" | tail -n 600 || true
+grep -E "mesh-selftest|pokket-mesh|Meshmobile|ATS|App Transport|error|fault|crash" "$work/device.log" | grep -v "node: tsnet" | tail -n 400 || true
 echo "::endgroup::"
 echo "::group::crash reports"
 ls -la ~/Library/Logs/DiagnosticReports 2>/dev/null | grep -i pokket || echo "no pokket crash reports"

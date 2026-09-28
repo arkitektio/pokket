@@ -11,8 +11,10 @@ name: Mesh sidecar
 # run also checks that deep links reach the app's JS.
 
 on:
+  # Branches run through their pull request; a push trigger on them as well
+  # would run every device job twice.
   push:
-    branches: [main, "claude/**"]
+    branches: [main]
     paths:
       - "modules/pokket-mesh/**"
       - "lib/mesh/**"
