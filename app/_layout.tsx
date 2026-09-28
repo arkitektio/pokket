@@ -4,6 +4,8 @@ import { AlertDialogProvider } from '@/components/ui/alert-dialog';
 import { App } from '@/lib/app/App';
 import { useArkitekt } from '@/lib/arkitekt/provider';
 import { ErrorOverlay } from '@/lib/debug/ErrorOverlay';
+import { SELFTEST_ENABLED } from '@/lib/mesh/selftest';
+import { MeshSelfTestBoot } from '@/lib/mesh/selftestBoot';
 import { installGlobalErrorHandlers } from '@/lib/debug/globalHandlers';
 import { BrandProvider } from '@/lib/theme/BrandProvider';
 import { useColorScheme } from '@/lib/useColorScheme';
@@ -99,6 +101,7 @@ export default function RootLayout() {
           <AlertDialogProvider>
             <StatusBar style={'light'} />
             <AppLayout />
+            {SELFTEST_ENABLED && <MeshSelfTestBoot />}
             {/* lib/lok/funcs.tsx has always reported mutation failures with
                 `toast.error`, but nothing ever mounted the renderer, so every one
                 of those was discarded. */}

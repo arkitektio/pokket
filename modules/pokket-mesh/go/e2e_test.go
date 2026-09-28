@@ -143,7 +143,7 @@ func startTailnet(t *testing.T, ip string) *testTailnet {
 		AllOnline:        true,
 		Logf:             logger.Discard,
 	}
-	ln, err := net.Listen("tcp", net.JoinHostPort(ip, "0"))
+	ln, err := net.Listen("tcp", net.JoinHostPort(ip, envPort("MESH_E2E_CONTROL_PORT")))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -397,6 +397,16 @@ func TestForwardTLSUpstream(t *testing.T) {
 	}
 }
 
+// envPort is a fixed listen port from the environment, or "0" for any: a
+// build that carries its self-test parameters (EXPO_PUBLIC_MESH_SELFTEST_AUTORUN)
+// needs to know the addresses before this runs.
+func envPort(name string) string {
+	if p := os.Getenv(name); p != "" {
+		return p
+	}
+	return "0"
+}
+
 // TestDeviceEnv is not a test of this package: it is the tailnet a device
 // self-test (app/mesh-selftest.tsx) joins in CI. It serves until the device
 // reports back through the mesh, and passes only on a successful report.
@@ -416,7 +426,7 @@ func TestDeviceEnv(t *testing.T) {
 	// A plain HTTP side channel, NOT through the mesh: the self-test streams
 	// every step and log line here, so a device that never gets onto the
 	// mesh still says what happened (Release RN logs reach no device log).
-	progressLn, err := net.Listen("tcp", net.JoinHostPort(ip, "0"))
+	progressLn, err := net.Listen("tcp", net.JoinHostPort(ip, envPort("MESH_E2E_PROGRESS_PORT")))
 	if err != nil {
 		t.Fatal(err)
 	}

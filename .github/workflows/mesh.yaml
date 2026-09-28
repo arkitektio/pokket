@@ -172,6 +172,12 @@ jobs:
     timeout-minutes: 90
     env:
       EXPO_PUBLIC_MESH_SELFTEST: "1"
+      # The simulator shares the Mac's loopback, so the test tailnet's addresses
+      # are known before the build: bake them in, and the self-test starts on
+      # launch rather than hinging on the deep link reaching the app.
+      MESH_E2E_CONTROL_PORT: "47001"
+      MESH_E2E_PROGRESS_PORT: "47002"
+      EXPO_PUBLIC_MESH_SELFTEST_AUTORUN: "control=http%3A%2F%2F127.0.0.1%3A47001&key=tskey-auth-pokket-test&host=svc&port=8080&progress=http%3A%2F%2F127.0.0.1%3A47002%2Fprogress"
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
