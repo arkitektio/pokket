@@ -28,21 +28,31 @@ xcrun simctl bootstatus "$udid" -b
 url="$(cat "$work/url")"
 
 xcrun simctl spawn "$udid" log stream --style compact --level debug \
-  --predicate 'process == "pokket"' > "$work/device.log" 2>&1 &
+  --predicate 'process CONTAINS[c] "pokket" OR eventMessage CONTAINS "mesh-selftest"' > "$work/device.log" 2>&1 &
 logger=$!
 
 xcrun simctl install "$udid" "$app"
-xcrun simctl openurl "$udid" "$url"
+# Start the app first, then hand it the link: a cold openurl of a custom
+# scheme can stop at an "Open in …?" confirmation.
+xcrun simctl launch "$udid" live.arkitekt.pokket || echo "launch failed"
+sleep 8
+xcrun simctl openurl "$udid" "$url" || echo "openurl failed"
+( sleep 30; xcrun simctl io "$udid" screenshot "$work/screen-30s.png" ) &
 
 status=0
 while [ ! -f "$work/env.exit" ]; do sleep 2; done
 status="$(cat "$work/env.exit")"
+xcrun simctl io "$udid" screenshot "$work/screen-end.png" || true
 kill "$logger" 2>/dev/null || true
 
 echo "::group::test tailnet log"
 cat "$work/env.log"
 echo "::endgroup::"
 echo "::group::device log"
-grep -E "mesh-selftest|pokket-mesh|Meshmobile|ATS|App Transport|error" "$work/device.log" | tail -n 400 || true
+grep -E "mesh-selftest|pokket-mesh|Meshmobile|ATS|App Transport|error|fault|crash" "$work/device.log" | tail -n 600 || true
+echo "::endgroup::"
+echo "::group::crash reports"
+ls -la ~/Library/Logs/DiagnosticReports 2>/dev/null | grep -i pokket || echo "no pokket crash reports"
+for f in ~/Library/Logs/DiagnosticReports/*pokket*; do [ -f "$f" ] && head -n 80 "$f"; done
 echo "::endgroup::"
 exit "$status"

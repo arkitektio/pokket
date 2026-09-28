@@ -26,10 +26,12 @@ echo "::endgroup::"
 adb install -r "$apk"
 adb logcat -c
 adb shell "am start -W -a android.intent.action.VIEW -d '$url' live.arkitekt.pokket"
+( sleep 30; adb exec-out screencap -p > "$work/screen-30s.png" ) &
 
 status=0
 while [ ! -f "$work/env.exit" ]; do sleep 2; done
 status="$(cat "$work/env.exit")"
+adb exec-out screencap -p > "$work/screen-end.png" || true
 
 echo "::group::test tailnet log"
 cat "$work/env.log"

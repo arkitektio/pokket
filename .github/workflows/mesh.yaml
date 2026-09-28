@@ -156,6 +156,17 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
           script: scripts/ci/mesh-device-e2e-android.sh android/app/build/outputs/apk/release/app-release.apk
 
+      - name: Upload self-test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-selftest
+          path: |
+            ${{ runner.temp }}/mesh-e2e/*.png
+            ${{ runner.temp }}/mesh-e2e/*.log
+            ${{ runner.temp }}/mesh-e2e/*.json
+          if-no-files-found: ignore
+
   ios:
     runs-on: macos-latest
     timeout-minutes: 90
@@ -200,3 +211,14 @@ jobs:
 
       - name: Self-test on a simulator
         run: scripts/ci/mesh-device-e2e-ios.sh ios/build/Build/Products/Release-iphonesimulator/pokket.app
+
+      - name: Upload self-test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-selftest
+          path: |
+            ${{ runner.temp }}/mesh-e2e/*.png
+            ${{ runner.temp }}/mesh-e2e/*.log
+            ${{ runner.temp }}/mesh-e2e/*.json
+          if-no-files-found: ignore
