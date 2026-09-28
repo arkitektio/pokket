@@ -1,0 +1,130 @@
+name: Dev client
+
+# Builds the development client (expo-dev-client, JS from Metro) on GitHub's
+# runners instead of the EAS queue, mesh sidecar included, and uploads it:
+#  - android: a debug APK (arm64 phones, x86_64 emulators, armv7), signed with
+#             the template's shared debug key, so it installs over earlier builds
+#  - ios:     a simulator .app (unsigned; a physical iPhone needs a signed build)
+# Run it from the Actions tab ("Run workflow", once this file is on main). It
+# also runs on pushes to main (both), and on pull requests (Android only).
+# Then: install the artifact and `pnpm expo start --dev-client`.
+
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: Which dev client to build
+        type: choice
+        options: [android, ios, both]
+        default: android
+  push:
+    branches: [main]
+    paths:
+      - "modules/**"
+      - "app.json"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "scripts/build-mesh-mobile.sh"
+      - ".github/workflows/dev-client.yaml"
+  pull_request:
+    paths:
+      - "modules/**"
+      - "app.json"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "scripts/build-mesh-mobile.sh"
+      - ".github/workflows/dev-client.yaml"
+
+concurrency:
+  group: dev-client-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  android:
+    if: github.event_name != 'workflow_dispatch' || inputs.platform != 'ios'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: actions/setup-java@v4
+        with:
+          java-version: "17"
+          distribution: temurin
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: modules/pokket-mesh/go/go.mod
+          cache-dependency-path: modules/pokket-mesh/go/go.sum
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build the mesh library
+        run: pnpm build:mesh:android
+
+      - name: Prebuild
+        run: npx expo prebuild --platform android --no-install --clean
+
+      - name: Build the debug APK
+        working-directory: android
+        # The Go library is built for arm64, armv7 and x86_64 only.
+        run: |
+          ./gradlew :app:assembleDebug -PreactNativeArchitectures=arm64-v8a,armeabi-v7a,x86_64 --no-daemon \
+            "-Dorg.gradle.jvmargs=-Xmx6g -XX:MaxMetaspaceSize=1g"
+          mkdir -p "$RUNNER_TEMP/out"
+          cp app/build/outputs/apk/debug/app-debug.apk "$RUNNER_TEMP/out/pokket-dev-${GITHUB_SHA::7}.apk"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pokket-dev-android
+          path: ${{ runner.temp }}/out/*.apk
+          retention-days: 14
+
+  ios-simulator:
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.platform != 'android')
+    runs-on: macos-latest
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: modules/pokket-mesh/go/go.mod
+          cache-dependency-path: modules/pokket-mesh/go/go.sum
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build the mesh framework
+        run: pnpm build:mesh:ios
+
+      - name: Prebuild
+        run: npx expo prebuild --platform ios --no-install --clean
+
+      - name: Install pods
+        working-directory: ios
+        run: pod install
+
+      - name: Build the Debug simulator app
+        working-directory: ios
+        run: |
+          set -o pipefail
+          xcodebuild -workspace pokket.xcworkspace -scheme pokket -configuration Debug \
+            -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build CODE_SIGNING_ALLOWED=NO build | tail -n 40
+          mkdir -p "$RUNNER_TEMP/out"
+          ditto -c -k --keepParent build/Build/Products/Debug-iphonesimulator/pokket.app \
+            "$RUNNER_TEMP/out/pokket-dev-simulator-${GITHUB_SHA::7}.zip"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pokket-dev-ios-simulator
+          path: ${{ runner.temp }}/out/*.zip
+          retention-days: 14
