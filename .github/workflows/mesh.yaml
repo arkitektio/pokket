@@ -41,7 +41,9 @@ on:
 
 concurrency:
   group: mesh-${{ github.ref }}
-  cancel-in-progress: true
+  # Queue rather than cancel: the device jobs take ~30 min, and a push while
+  # one runs should not throw away its result.
+  cancel-in-progress: false
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
