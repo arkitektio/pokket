@@ -1,0 +1,46 @@
+# EAS reads this file INSTEAD of .gitignore when it packs the project for a
+# build. It is .gitignore minus the mesh sidecar's build outputs, which are
+# gitignored (they are built, not committed) but must reach the native build.
+# Keep the two in sync.
+
+# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
+
+# dependencies
+node_modules/
+
+# Expo
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+
+# Native
+.kotlin/
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Metro
+.metro-health-check*
+
+# debug
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# macOS
+.DS_Store
+*.pem
+
+# local env files
+.env*.local
+
+# typescript
+*.tsbuildinfo
+
+
+app-example

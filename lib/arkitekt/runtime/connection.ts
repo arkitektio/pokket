@@ -1,6 +1,7 @@
 import { ActiveFakts, Alias } from "../fakts/faktsSchema";
 import { StoredArkitektSession } from "../fakts/sessionStorageSchema";
 import {
+  AliasRouter,
   ConnectedContext,
   EnhancedManifest,
   GetToken,
@@ -20,12 +21,14 @@ export const buildServiceMap = ({
   aliasMap,
   fakts,
   getToken,
+  router,
 }: {
   map: ServiceBuilderMap;
   manifest: EnhancedManifest;
   aliasMap: AliasMap;
   fakts: ActiveFakts;
   getToken: GetToken;
+  router?: AliasRouter;
 }): ServiceMap => {
   const services: ServiceMap = {};
 
@@ -39,7 +42,8 @@ export const buildServiceMap = ({
 
     services[key] = definition.builder({
       manifest,
-      alias,
+      // What the client talks to; the stored map keeps the fakts' own alias.
+      alias: router ? router.resolve(alias) : alias,
       fakts,
       getToken,
     });
@@ -57,6 +61,7 @@ export const instantiateConnection = <
   serviceBuilderMap: T,
   selfServiceBuilder: S,
   getToken: GetToken,
+  router?: AliasRouter,
 ): ConnectedContext<T, S> => {
   const token = normalizeToken(storedSession.token);
   const serviceMap = buildServiceMap({
@@ -65,11 +70,13 @@ export const instantiateConnection = <
     aliasMap: storedSession.aliasMap.aliasMap,
     fakts: storedSession.fakts,
     getToken,
+    router,
   }) as ConnectedContext<T, S>["serviceMap"];
 
+  const selfAlias = storedSession.fakts.self.alias;
   const selfService = selfServiceBuilder({
     manifest,
-    alias: storedSession.fakts.self.alias,
+    alias: router ? router.resolve(selfAlias) : selfAlias,
     fakts: storedSession.fakts,
     getToken,
   });

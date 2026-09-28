@@ -1,6 +1,6 @@
 import { resolveWorkingAlias } from './alias/resolve'
 import { ActiveFakts, Alias } from './fakts/faktsSchema'
-import { AliasReport, EnhancedManifest, ServiceBuilderMap } from './types'
+import { AliasReport, AliasRouter, EnhancedManifest, ServiceBuilderMap } from './types'
 
 const DEFAULT_ALIAS_TIMEOUT = 5000;
 
@@ -9,11 +9,13 @@ export const buildAliases = async ({
   manifest,
   controller,
   serviceBuilderMap,
+  router,
 }: {
   fakts: ActiveFakts
   manifest: EnhancedManifest
   controller: AbortController
   serviceBuilderMap: ServiceBuilderMap
+  router?: AliasRouter
 }) => {
   const aliasMap: { [key: string]: Alias } = {}
   const aliasReports: { [key: string]: AliasReport } = {}
@@ -38,7 +40,8 @@ export const buildAliases = async ({
       const alias = await resolveWorkingAlias({
         instance: serviceInstance,
         timeout: serviceTimeout,
-        controller
+        controller,
+        router,
       })
 
       console.log(`[ArkitektProvider] buildAliases: resolved "${req.key}" -> ${alias.host}:${alias.port || ''}`);

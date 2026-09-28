@@ -17,7 +17,7 @@ import {
 } from "@/lib/arkitekt/provider";
 import { Manifest, Requirement } from "./fakts/manifestSchema";
 import { useSelfService } from "./hooks";
-import { NodeIDProvider, WindowPopper } from "./types";
+import { MeshIntegration, NodeIDProvider, WindowPopper } from "./types";
 // When using the Tauri API npm package:
 
 export const buildGuard =
@@ -59,7 +59,8 @@ export const buildArkitekt = <T extends ServiceBuilderMap, S extends ServiceBuil
   moduleRegistry,
   storageProvider,
   windowPopper,
-  nodeIDProvider
+  nodeIDProvider,
+  mesh,
 }: {
   manifest: Manifest;
   serviceBuilderMap: T;
@@ -68,7 +69,7 @@ export const buildArkitekt = <T extends ServiceBuilderMap, S extends ServiceBuil
   storageProvider: FaktsStorage;
   windowPopper: WindowPopper;
   nodeIDProvider: NodeIDProvider;
-
+  mesh?: MeshIntegration;
 }) => {
 
   const requirements: Requirement[] = serviceBuilderMap
@@ -93,6 +94,7 @@ export const buildArkitekt = <T extends ServiceBuilderMap, S extends ServiceBuil
       storageProvider,
       windowPopper,
       nodeIDProvider,
+      mesh,
     }),
     buildServiceGuard: <K extends keyof T>(serviceKey: K) => buildGuard(serviceKey as string),
     Guard: ConnectedGuard,

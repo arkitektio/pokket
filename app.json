@@ -58,7 +58,8 @@
       "expo-image",
       "expo-status-bar",
       "@livekit/react-native-expo-plugin",
-      "@config-plugins/react-native-webrtc"
+      "@config-plugins/react-native-webrtc",
+      "./modules/pokket-mesh/app.plugin.js"
     ],
     "experiments": {
       "typedRoutes": true

@@ -14,15 +14,27 @@ export const FaktsEndpointSchema = z.object({
   protocol_version: z.string().optional().nullable(),
   description: z.string().optional().nullable(),
   base_url: z.string().url(),
-  /** Deprecated server-side in favour of `configure`, but still sent. */
-  frontend_url: z.string().url(),
-
-  /** Configure-page template; the literal `{code}` is substituted by us. */
-  configure: z.string().url(),
+  /**
+   * Still sent by servers, read by nothing here: the device grant opens
+   * `verification_uri_complete`. Optional so a deployment that drops them
+   * keeps working.
+   */
+  frontend_url: z.string().url().optional().nullable(),
+  configure: z.string().url().optional().nullable(),
   /** RFC 8628 device authorization + dynamic client registration. */
   device_authorization_endpoint: z.string().url(),
   /** The OAuth2 token endpoint: device-code poll, then refresh. */
   token_endpoint: z.string().url(),
+
+  /**
+   * The organisation mesh: the ionscale control server this deployment's
+   * tailnets live on. pokket's in-app mesh node (modules/pokket-mesh) joins
+   * it with the key the approver grants at login (`lib/mesh/profileMesh.ts`).
+   * Absent on a deployment without a mesh. (The document may also list a
+   * separate mesh device-code flow — `mesh_device_code_start` and friends —
+   * which is obsolete and ignored.)
+   */
+  mesh_coord_url: z.string().url().optional().nullable(),
 
   issuer: z.string().optional().nullable(),
   jwks_uri: z.string().url().optional().nullable(),

@@ -4,6 +4,8 @@ import { AlertDialogProvider } from '@/components/ui/alert-dialog';
 import { App } from '@/lib/app/App';
 import { useArkitekt } from '@/lib/arkitekt/provider';
 import { ErrorOverlay } from '@/lib/debug/ErrorOverlay';
+import { SELFTEST_ENABLED } from '@/lib/mesh/selftest';
+import { MeshSelfTestBoot } from '@/lib/mesh/selftestBoot';
 import { installGlobalErrorHandlers } from '@/lib/debug/globalHandlers';
 import { BrandProvider } from '@/lib/theme/BrandProvider';
 import { useColorScheme } from '@/lib/useColorScheme';
@@ -53,10 +55,13 @@ export const AppLayout = () => {
         <Stack.Screen name="debug" options={{ title: 'Debug' }} />
         <Stack.Screen name="provision" options={{ title: 'Provision' }} />
         <Stack.Screen name="tasks" options={{ title: 'Tasks' }} />
+        <Stack.Screen name="mesh" options={{ title: 'Mesh' }} />
       </Stack.Protected>
       <Stack.Protected guard={!isLoggedIn} >
         <Stack.Screen name="login" options={{ headerShown: false }} />
       </Stack.Protected>
+      {/* The on-device mesh check (CI, `pnpm mesh:tailnet`); inert in release builds without EXPO_PUBLIC_MESH_SELFTEST=1. */}
+      <Stack.Screen name="mesh-selftest" options={{ title: 'Mesh self-test' }} />
     </Stack>
   );
 }
@@ -96,6 +101,7 @@ export default function RootLayout() {
           <AlertDialogProvider>
             <StatusBar style={'light'} />
             <AppLayout />
+            {SELFTEST_ENABLED && <MeshSelfTestBoot />}
             {/* lib/lok/funcs.tsx has always reported mutation failures with
                 `toast.error`, but nothing ever mounted the renderer, so every one
                 of those was discarded. */}

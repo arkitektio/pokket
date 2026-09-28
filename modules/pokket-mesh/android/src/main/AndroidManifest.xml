@@ -1,0 +1,8 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <!-- The node talks to the control server, DERP relays and peers. -->
+  <uses-permission android:name="android.permission.INTERNET" />
+  <!-- Default network callbacks: which interface/gateway carries the default
+       route (tsnet cannot read the route table from an app). A normal
+       permission, granted at install without a prompt. -->
+  <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+</manifest>

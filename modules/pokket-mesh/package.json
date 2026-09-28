@@ -1,0 +1,10 @@
+{
+  "name": "pokket-mesh",
+  "version": "0.1.0",
+  "private": true,
+  "description": "pokket's mesh sidecar: an in-app Tailscale (tsnet) node exposed to JS",
+  "main": "index.ts",
+  "license": "MIT",
+  "author": "arkitektio",
+  "homepage": "https://github.com/arkitektio/pokket"
+}

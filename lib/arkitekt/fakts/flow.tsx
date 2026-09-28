@@ -16,19 +16,28 @@ export const flow = async ({
   manifest,
   windowPopper,
   expirationTime,
+  requestMeshKey = false,
 }: {
   endpoint: FaktsEndpoint;
   controller: AbortController;
   manifest: EnhancedManifest;
   windowPopper: WindowPopper;
   expirationTime?: number;
+  /**
+   * Whether this app can join a mesh and wants a key for it (the provider's
+   * `mesh` integration decides: sidecar present, mesh not switched off).
+   */
+  requestMeshKey?: boolean;
 }): Promise<GrantResult> => {
-  // 1. Device authorization (also dynamically registers our public client)
+  // 1. Device authorization (also dynamically registers our public client).
+  //    A deployment with a mesh is asked for a one-shot key when the app
+  //    wants one. Whether one comes back is the approver's call.
   const authorization = await deviceAuthorization({
     endpoint,
     controller,
     manifest,
     expirationTime,
+    requestAuthKey: !!endpoint.mesh_coord_url && requestMeshKey,
   });
 
   // 2. Open the configure page for the human
@@ -37,7 +46,8 @@ export const flow = async ({
     windowPopper,
   });
 
-  // 3. Poll the token endpoint until approved → tokens + instances
+  // 3. Poll the token endpoint until approved → tokens + instances (+ the
+  //    mesh key, if lok minted one)
   try {
     return await pollToken({
       tokenEndpoint: authorization.token_endpoint,
