@@ -69,7 +69,7 @@ function Registration({ profileId }: { profileId: string }) {
 
 export function PushRegistration() {
   const profileId = App.useActiveProfileId();
-  const connected = !!App.useConnection()?.selfService;
+  const connected = App.useIsConnected();
   if (!profileId || !connected) return null;
   return <Registration key={profileId} profileId={profileId} />;
 }

@@ -7,6 +7,41 @@ import * as React from 'react';
 
 type ParamList = Record<string, object | undefined>;
 
+/** Keeps the active tab on the page on show. Its own component, so that the
+ * page Stack does not re-render (and recompute every screen's options) on
+ * each navigation — only this does. */
+function TabRouteSync() {
+  const pathname = usePathname();
+  const params = useGlobalSearchParams();
+  const route = React.useMemo(() => routeOf(pathname, params), [pathname, params]);
+  useSyncActiveTabRoute(route);
+  return null;
+}
+
+type Nav = { getParent: () => unknown; canGoBack: () => boolean };
+const drawerOf = (navigation: Nav) => navigation.getParent() as DrawerNavigationProp<ParamList> | undefined;
+
+// Stable across renders, so the Stack never sees new listener or option factories.
+const screenListeners = ({ navigation }: { navigation: Nav }) => ({
+  focus: () => {
+    drawerOf(navigation)?.setOptions({ swipeEnabled: !navigation.canGoBack() });
+  },
+});
+
+const screenOptions = ({ navigation }: { navigation: Nav }) => ({
+  headerLeft: navigation.canGoBack()
+    ? undefined
+    : () => <MenuButton onPress={() => drawerOf(navigation)?.openDrawer()} />,
+  headerRight: () => <SearchButton />,
+});
+
+/**
+ * Pages the sidebar, the tabs and search switch between. As in orkestrator,
+ * switching is instant: no slide-in, which on a replace only made a tap in
+ * the sidebar feel slow. Details pushed over a page keep their animation.
+ */
+const page = (title: string) => ({ title, animation: 'none' as const });
+
 /**
  * The one page view: every page and the details pushed over it. A page at
  * the root of the stack opens the sidebar from its header; a pushed one has
@@ -14,46 +49,28 @@ type ParamList = Record<string, object | undefined>;
  * than opening the sidebar. Every navigation updates the active tab.
  */
 export default function PagesLayout() {
-  const pathname = usePathname();
-  const params = useGlobalSearchParams();
-  const route = React.useMemo(() => routeOf(pathname, params), [pathname, params]);
-  useSyncActiveTabRoute(route);
-
   return (
-    <Stack
-      screenListeners={({ navigation }) => ({
-        focus: () => {
-          const drawer = navigation.getParent() as DrawerNavigationProp<ParamList> | undefined;
-          drawer?.setOptions({ swipeEnabled: !navigation.canGoBack() });
-        },
-      })}
-      screenOptions={({ navigation }) => {
-        const drawer = navigation.getParent() as DrawerNavigationProp<ParamList> | undefined;
-        return {
-          headerLeft: navigation.canGoBack()
-            ? undefined
-            : () => <MenuButton onPress={() => drawer?.openDrawer()} />,
-          headerRight: () => <SearchButton />,
-        };
-      }}
-    >
-      <Stack.Screen name="index" options={{ title: 'Home' }} />
-      <Stack.Screen name="notifications" options={{ title: 'Notifications' }} />
-      <Stack.Screen name="mail/index" options={{ title: 'Mail' }} />
-      <Stack.Screen name="mail/thread/[id]" options={{ title: '' }} />
-      <Stack.Screen name="bank/index" options={{ title: 'Bank' }} />
-      <Stack.Screen name="bank/transaction/[id]" options={{ title: 'Transaction' }} />
-      <Stack.Screen name="tasks" options={{ title: 'Tasks' }} />
-      <Stack.Screen name="broadcasts" options={{ title: 'Broadcasts' }} />
-      <Stack.Screen name="solo-broadcast/start" options={{ title: 'Start Solo Broadcast' }} />
-      <Stack.Screen name="solo-broadcast/[id]" options={{ title: 'Solo Broadcast' }} />
-      <Stack.Screen name="wifi/index" options={{ title: 'Wi-Fi' }} />
-      <Stack.Screen name="wifi/eduroam" options={{ title: 'Eduroam' }} />
-      <Stack.Screen name="wifi/standard" options={{ title: 'Standard Wi-Fi' }} />
-      <Stack.Screen name="provision" options={{ title: 'Provision' }} />
-      <Stack.Screen name="mesh" options={{ title: 'Mesh' }} />
-      <Stack.Screen name="settings" options={{ title: 'Settings' }} />
-      <Stack.Screen name="debug" options={{ title: 'Debug' }} />
-    </Stack>
+    <>
+      <TabRouteSync />
+      <Stack screenListeners={screenListeners} screenOptions={screenOptions}>
+        <Stack.Screen name="index" options={page('Home')} />
+        <Stack.Screen name="notifications" options={page('Notifications')} />
+        <Stack.Screen name="mail/index" options={page('Mail')} />
+        <Stack.Screen name="mail/thread/[id]" options={{ title: '' }} />
+        <Stack.Screen name="bank/index" options={page('Bank')} />
+        <Stack.Screen name="bank/transaction/[id]" options={{ title: 'Transaction' }} />
+        <Stack.Screen name="tasks" options={page('Tasks')} />
+        <Stack.Screen name="broadcasts" options={page('Broadcasts')} />
+        <Stack.Screen name="solo-broadcast/start" options={{ title: 'Start Solo Broadcast' }} />
+        <Stack.Screen name="solo-broadcast/[id]" options={{ title: 'Solo Broadcast' }} />
+        <Stack.Screen name="wifi/index" options={page('Wi-Fi')} />
+        <Stack.Screen name="wifi/eduroam" options={{ title: 'Eduroam' }} />
+        <Stack.Screen name="wifi/standard" options={{ title: 'Standard Wi-Fi' }} />
+        <Stack.Screen name="provision" options={page('Provision')} />
+        <Stack.Screen name="mesh" options={page('Mesh')} />
+        <Stack.Screen name="settings" options={page('Settings')} />
+        <Stack.Screen name="debug" options={page('Debug')} />
+      </Stack>
+    </>
   );
 }

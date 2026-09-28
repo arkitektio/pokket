@@ -6,7 +6,7 @@ import { profileDetail, profileTitle, StoredProfile } from '@/lib/arkitekt/fakts
 import { MODULE_CATALOG, moduleForPath, pathOf } from '@/lib/modules/catalog';
 import { iconFor } from '@/lib/modules/registry';
 import { useAvailableModules } from '@/lib/modules/useAvailableModules';
-import { showDetail, showPage } from '@/lib/navigation';
+import { afterReturningToApp, showDetail, showPage } from '@/lib/navigation';
 import { rankByFilter } from '@/lib/search/filter';
 import { loadRecents, RecentEntry, recordRecent } from '@/lib/search/recents';
 import { useTabActions, useTabs } from '@/lib/tabs/TabsProvider';
@@ -66,11 +66,8 @@ export default function SearchScreen() {
     void loadRecents(profileId).then(setRecents);
   }, [profileId]);
 
-  /** Leave search, then show a page (replacing the tab's) or a detail (over it). */
-  const leaveTo = React.useCallback((show: () => void) => {
-    router.back();
-    setTimeout(show, 0);
-  }, []);
+  /** Leave search, then — back in the app frame — show a page or a detail. */
+  const leaveTo = React.useCallback((show: () => void) => afterReturningToApp(show), []);
 
   const openRoute = React.useCallback(
     (route: string, label: string) => {

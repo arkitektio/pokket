@@ -4,7 +4,7 @@ import * as React from 'react';
 import { View } from 'react-native';
 import { vars } from 'nativewind';
 
-import { useArkitekt } from '../arkitekt/hooks';
+import { useArkitektStore } from '../arkitekt/hooks';
 import { MyBrandQuery, useMyBrandQuery } from '../lok/api/graphql';
 import { buildNavTheme } from '../constants';
 import {
@@ -99,8 +99,10 @@ const BrandQuery = ({
 };
 
 export const BrandProvider = ({ children }: { children: React.ReactNode }) => {
-  const { connection } = useArkitekt();
-  const client = connection?.selfService?.client as ApolloClient<unknown> | undefined;
+  // Only the self service's client: this provider sits above everything.
+  const client = useArkitektStore((state) => state.connection?.selfService?.client) as
+    | ApolloClient<unknown>
+    | undefined;
   const canQuery = Boolean(client);
 
   const [resolved, setResolved] = React.useState<{

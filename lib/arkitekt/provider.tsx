@@ -34,8 +34,10 @@ import {
   upsertProfile,
   writeStoredProfileBook,
 } from "./fakts/profileStorageSchema";
+import { useShallow } from "zustand/react/shallow";
 import {
   useArkitekt,
+  useArkitektStore,
   useAvailableModules,
   useAvailableServices,
   useConfigurationIssues,
@@ -92,6 +94,14 @@ export type ArkitektProviderProps<
   /** The organisation mesh (lib/mesh); absent means every alias is direct. */
   mesh?: MeshIntegration;
 }
+
+/**
+ * The provider's step-by-step trace. Off by default: several of these run on
+ * every GraphQL request (every `getToken`), and in a dev build each line is
+ * a trip to Metro. Set EXPO_PUBLIC_ARKITEKT_DEBUG=1 to see them again.
+ */
+const VERBOSE = process.env.EXPO_PUBLIC_ARKITEKT_DEBUG === "1";
+const dlog: (...args: unknown[]) => void = VERBOSE ? (...args) => console.log(...args) : () => undefined;
 
 /**
  * Did the token endpoint itself turn the refresh down? Only that says the
@@ -194,7 +204,7 @@ export const ArkitektProvider = <T extends ServiceBuilderMap, S extends ServiceB
   // Wire up the locked refreshToken now that store exists
   if (!refreshInitialized.current) {
     refreshInitialized.current = true;
-    console.log("[ArkitektProvider] Initializing refreshToken function");
+    dlog("[ArkitektProvider] Initializing refreshToken function");
 
     // The coalescing + forced-vs-raced rule lives in TokenRotation
     // (runtime/tokenRotation.ts); this callback is just the round-trip.
@@ -233,7 +243,7 @@ export const ArkitektProvider = <T extends ServiceBuilderMap, S extends ServiceB
           );
         }
 
-        console.log("[ArkitektProvider] Token refresh succeeded");
+        dlog("[ArkitektProvider] Token refresh succeeded");
         const nextSession = { ...session, token: nextToken, fakts: nextFakts };
         // Awaited, unlike the web build where these are synchronous
         // localStorage writes. The refresh token rotates on every use, so a
@@ -288,11 +298,11 @@ export const ArkitektProvider = <T extends ServiceBuilderMap, S extends ServiceB
       // out. Every service client shares this token; they fail together.
       const currentToken = normalizeToken(session.token);
       if (!forceRefresh && !rotation.isForcedInFlight() && !shouldRefreshToken(currentToken)) {
-        console.log("[ArkitektProvider] Token still valid, returning current token");
+        dlog("[ArkitektProvider] Token still valid, returning current token");
         return currentToken;
       }
 
-      console.log("[ArkitektProvider] Refreshing token (forced:", forceRefresh, ")");
+      dlog("[ArkitektProvider] Refreshing token (forced:", forceRefresh, ")");
       return rotation.rotate({ forceRefresh });
     };
   }
@@ -344,12 +354,12 @@ export const ArkitektProvider = <T extends ServiceBuilderMap, S extends ServiceB
       manifestOverride?: EnhancedManifest,
       extras: Partial<AppContext<T, S>> = {},
     ) => {
-      console.log("[ArkitektProvider] hydrateConnection called, session:", session ? "present" : "null");
+      dlog("[ArkitektProvider] hydrateConnection called, session:", session ? "present" : "null");
       const activeManifest = manifestOverride ?? store.getState().manifest;
       const connection = session
         ? instantiateConnection(session, activeManifest, serviceBuilderMap, selfServiceBuilder, (options) => refreshTokenRef.current(options), meshRef.current?.router)
         : undefined;
-      console.log("[ArkitektProvider] hydrateConnection result, services:", connection ? Object.keys(connection.serviceMap) : "none");
+      dlog("[ArkitektProvider] hydrateConnection result, services:", connection ? Object.keys(connection.serviceMap) : "none");
 
       store.setState({
         storedSession: session,
@@ -442,7 +452,7 @@ export const ArkitektProvider = <T extends ServiceBuilderMap, S extends ServiceB
             : undefined;
         const profile = createProfileFromSession(provisionalProfileId(session.endpoint.base_url), session, mesh);
         book = setActiveProfile(upsertProfile(book, profile), profile.id);
-        console.log("[ArkitektProvider] Migrated the stored session into a profile");
+        dlog("[ArkitektProvider] Migrated the stored session into a profile");
       } else {
         // Chiefly the fakts protocol-2 migration: sessions written by the old
         // start/challenge/claim flow carry an `auth` block and no
@@ -459,7 +469,7 @@ export const ArkitektProvider = <T extends ServiceBuilderMap, S extends ServiceB
 
   const validateService = useCallback(
     async (serviceKey: string) => {
-      console.log("[ArkitektProvider] validateService started:", serviceKey);
+      dlog("[ArkitektProvider] validateService started:", serviceKey);
       const runId = (validationRunIdsRef.current[serviceKey] || 0) + 1;
       validationRunIdsRef.current[serviceKey] = runId;
 
@@ -470,7 +480,7 @@ export const ArkitektProvider = <T extends ServiceBuilderMap, S extends ServiceB
       const instance = session?.fakts.instances[serviceKey];
 
       if (!session || !serviceState || !instance) {
-        console.log("[ArkitektProvider] validateService skipped (missing data):", serviceKey, { session: !!session, serviceState: !!serviceState, instance: !!instance });
+        dlog("[ArkitektProvider] validateService skipped (missing data):", serviceKey, { session: !!session, serviceState: !!serviceState, instance: !!instance });
         return;
       }
 
@@ -488,7 +498,7 @@ export const ArkitektProvider = <T extends ServiceBuilderMap, S extends ServiceB
         const router = meshRef.current?.router;
 
         if (!alias || !(await checkAliasHealth(alias, serviceTimeout, hc, router).catch(() => false))) {
-          console.log("[ArkitektProvider] validateService: cached alias unhealthy, re-resolving:", serviceKey);
+          dlog("[ArkitektProvider] validateService: cached alias unhealthy, re-resolving:", serviceKey);
           alias = await resolveWorkingAlias({ instance, timeout: serviceTimeout, controller: hc, router });
         }
 
@@ -553,7 +563,7 @@ export const ArkitektProvider = <T extends ServiceBuilderMap, S extends ServiceB
           await persistBook((book) => updateProfileSession(book, profileId, nextPersistedSession));
         }
 
-        console.log("[ArkitektProvider] validateService succeeded:", serviceKey, "alias:", alias);
+        dlog("[ArkitektProvider] validateService succeeded:", serviceKey, "alias:", alias);
       } catch (error) {
         const message = error instanceof Error ? error.message : "Unable to validate service";
         console.warn("[ArkitektProvider] validateService failed:", serviceKey, message, error);
@@ -606,7 +616,7 @@ export const ArkitektProvider = <T extends ServiceBuilderMap, S extends ServiceB
 
   const connect = useCallback<AppFunctions["connect"]>(
     async ({ endpoint, controller, replaceProfileId }) => {
-      console.log("[ArkitektProvider] connect called, endpoint:", endpoint);
+      dlog("[ArkitektProvider] connect called, endpoint:", endpoint);
       const prev = store.getState();
       const replacing = replaceProfileId ? prev.profileBook.profiles[replaceProfileId] : undefined;
       controllerRef.current = controller;
@@ -614,7 +624,7 @@ export const ArkitektProvider = <T extends ServiceBuilderMap, S extends ServiceB
 
       try {
         const enhancedManifest = await resolveEnhancedManifest();
-        console.log("[ArkitektProvider] connect: manifest enhanced, node_id:", enhancedManifest.node_id);
+        dlog("[ArkitektProvider] connect: manifest enhanced, node_id:", enhancedManifest.node_id);
         await writeStoredEndpoint(endpoint, storageProvider);
 
         const integration = meshRef.current;
@@ -636,7 +646,7 @@ export const ArkitektProvider = <T extends ServiceBuilderMap, S extends ServiceB
           windowPopper: windowPopper,
           requestMeshKey,
         });
-        console.log("[ArkitektProvider] connect: fakts resolved, services:", Object.keys(fakts.instances || {}));
+        dlog("[ArkitektProvider] connect: fakts resolved, services:", Object.keys(fakts.instances || {}));
 
         // Join before resolving aliases, so the ones on the mesh can be reached.
         // Only a hub that exposes a mesh (and granted this login a node) gives one.
@@ -655,7 +665,7 @@ export const ArkitektProvider = <T extends ServiceBuilderMap, S extends ServiceB
           serviceBuilderMap,
           router: integration?.router,
         });
-        console.log("[ArkitektProvider] connect: aliases built, keys:", Object.keys(aliasMap));
+        dlog("[ArkitektProvider] connect: aliases built, keys:", Object.keys(aliasMap));
 
         await report(endpoint.base_url, token.access_token, {
           alias_reports: aliasReports,
@@ -684,7 +694,7 @@ export const ArkitektProvider = <T extends ServiceBuilderMap, S extends ServiceB
           ),
         );
 
-        console.log("[ArkitektProvider] connect: session stored, hydrating connection...");
+        dlog("[ArkitektProvider] connect: session stored, hydrating connection...");
         hydrateConnection(nextSession, enhancedManifest, {
           connecting: false,
           hasBootstrapped: true,
@@ -692,7 +702,7 @@ export const ArkitektProvider = <T extends ServiceBuilderMap, S extends ServiceB
           parkedProfileId: null,
         });
 
-        console.log("[ArkitektProvider] connect: starting background health checks");
+        dlog("[ArkitektProvider] connect: starting background health checks");
         void validateAllServices();
       } catch (error) {
         console.warn("[ArkitektProvider] connect failed:", error);
@@ -746,7 +756,7 @@ export const ArkitektProvider = <T extends ServiceBuilderMap, S extends ServiceB
       const profile = state.profileBook.profiles[profileId];
       if (!profile) throw new Error(`Unknown organization ${profileId}`);
 
-      console.log("[ArkitektProvider] switchProfile:", profileId);
+      dlog("[ArkitektProvider] switchProfile:", profileId);
       store.setState({ switchingProfileId: profileId, autoLoginError: undefined });
 
       try {
@@ -805,7 +815,7 @@ export const ArkitektProvider = <T extends ServiceBuilderMap, S extends ServiceB
 
   const signOutProfile = useCallback<AppFunctions["signOutProfile"]>(
     async (profileId) => {
-      console.log("[ArkitektProvider] signOutProfile:", profileId);
+      dlog("[ArkitektProvider] signOutProfile:", profileId);
       const book = store.getState().profileBook;
       const profile = book.profiles[profileId];
       if (!profile) return;
@@ -837,7 +847,7 @@ export const ArkitektProvider = <T extends ServiceBuilderMap, S extends ServiceB
   );
 
   const disconnect = useCallback<AppFunctions["disconnect"]>(async () => {
-    console.log("[ArkitektProvider] disconnect called");
+    dlog("[ArkitektProvider] disconnect called");
     const activeId = store.getState().profileBook.activeProfileId;
     if (activeId) {
       await signOutProfile(activeId);
@@ -857,7 +867,7 @@ export const ArkitektProvider = <T extends ServiceBuilderMap, S extends ServiceB
 
   const addProfile = useCallback<AppFunctions["addProfile"]>(async () => {
     const activeId = store.getState().profileBook.activeProfileId;
-    console.log("[ArkitektProvider] addProfile, parking:", activeId);
+    dlog("[ArkitektProvider] addProfile, parking:", activeId);
     const integration = meshRef.current;
     if (integration) {
       await bestEffort("park", () => integration.onPark());
@@ -912,7 +922,7 @@ export const ArkitektProvider = <T extends ServiceBuilderMap, S extends ServiceB
   );
 
   const reconnect = useCallback<AppFunctions["reconnect"]>(async () => {
-    console.log("[ArkitektProvider] reconnect called");
+    dlog("[ArkitektProvider] reconnect called");
     const endpoint = store.getState().storedSession?.endpoint || await loadStoredEndpoint(storageProvider);
     if (!endpoint) {
       console.warn("[ArkitektProvider] reconnect failed: no endpoint found");
@@ -926,7 +936,7 @@ export const ArkitektProvider = <T extends ServiceBuilderMap, S extends ServiceB
   }, [store, connect]);
 
   const cancelConnection = useCallback<AppFunctions["cancelConnection"]>(() => {
-    console.log("[ArkitektProvider] cancelConnection called");
+    dlog("[ArkitektProvider] cancelConnection called");
     if (controllerRef.current) {
       controllerRef.current.abort();
       controllerRef.current = null;
@@ -1013,10 +1023,10 @@ export const ArkitektProvider = <T extends ServiceBuilderMap, S extends ServiceB
 
         const active = getActiveProfile(book);
         activeId = active?.id ?? null;
-        console.log("[ArkitektProvider] Bootstrapping with profile:", activeId, "of", Object.keys(book.profiles).length);
+        dlog("[ArkitektProvider] Bootstrapping with profile:", activeId, "of", Object.keys(book.profiles).length);
 
         if (!active) {
-          console.log("[ArkitektProvider] Bootstrap: no active profile, marking bootstrapped");
+          dlog("[ArkitektProvider] Bootstrap: no active profile, marking bootstrapped");
           setBootstrapped();
           return;
         }
@@ -1026,9 +1036,9 @@ export const ArkitektProvider = <T extends ServiceBuilderMap, S extends ServiceB
           autoLoginError: undefined,
         });
 
-        console.log("[ArkitektProvider] Bootstrap: refreshing token...");
+        dlog("[ArkitektProvider] Bootstrap: refreshing token...");
         await refreshTokenRef.current();
-        console.log("[ArkitektProvider] Bootstrap: token refresh complete");
+        dlog("[ArkitektProvider] Bootstrap: token refresh complete");
 
         const refreshedSession = store.getState().storedSession;
         if (!refreshedSession) {
@@ -1053,9 +1063,9 @@ export const ArkitektProvider = <T extends ServiceBuilderMap, S extends ServiceB
           hasBootstrapped: true,
           autoLoginError: undefined,
         });
-        console.log("[ArkitektProvider] Hydrated connection from stored session:", store.getState().connection);
+        dlog("[ArkitektProvider] Hydrated connection from stored session:", store.getState().connection);
 
-        console.log("[ArkitektProvider] Bootstrap: starting background health checks");
+        dlog("[ArkitektProvider] Bootstrap: starting background health checks");
         void validateAllServices();
       } catch (error) {
         const message = errorMessage(error, "Auto-login failed");
@@ -1118,12 +1128,21 @@ export const ConnectedGuard = ({
   connectingFallback = "Loading...",
   children,
 }: ConnectedGuardProps & { children: ReactNode }) => {
-  const { connection, connecting, storedSession, hasBootstrapped } = useArkitekt();
+  // Four answers, not the whole store: this guard wraps nearly every page,
+  // and a service check or token refresh must not re-render them all.
+  const { connected, connecting, hasSession, hasBootstrapped } = useArkitektStore(
+    useShallow((state) => ({
+      connected: !!state.connection?.selfService,
+      connecting: state.connecting,
+      hasSession: !!state.storedSession,
+      hasBootstrapped: state.hasBootstrapped,
+    })),
+  );
 
-  if (!storedSession) return <>{notConnectedFallback}</>;
+  if (!hasSession) return <>{notConnectedFallback}</>;
 
-  if (!connection?.selfService) {
-    if (connecting || (!hasBootstrapped && storedSession)) return <>{connectingFallback}</>;
+  if (!connected) {
+    if (connecting || !hasBootstrapped) return <>{connectingFallback}</>;
     return <>{notConnectedFallback}</>;
   }
 

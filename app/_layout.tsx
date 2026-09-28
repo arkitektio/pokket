@@ -5,7 +5,7 @@ import { ProfileIdentitySync } from '@/components/profile/ProfileIdentitySync';
 import { TabsProvider } from '@/lib/tabs/TabsProvider';
 import { PushRegistration } from '@/lib/push/PushRegistration';
 import { App } from '@/lib/app/App';
-import { useArkitekt } from '@/lib/arkitekt/provider';
+import { useArkitektStore } from '@/lib/arkitekt/hooks';
 import { ErrorOverlay } from '@/lib/debug/ErrorOverlay';
 import { SELFTEST_ENABLED } from '@/lib/mesh/selftest';
 import { MeshSelfTestBoot } from '@/lib/mesh/selftestBoot';
@@ -44,10 +44,9 @@ Notifications.setNotificationHandler({
 });
 
 export const AppLayout = () => {
-  const { connection } = useArkitekt()
-
-  const isLoggedIn = connection?.token !== undefined ? true : false;
-  console.log("isLoggedIn:", isLoggedIn);
+  // One boolean, not the store: this is the root navigator, and it must not
+  // re-render on every service check and token refresh.
+  const isLoggedIn = useArkitektStore((state) => state.connection?.token !== undefined);
   return (
     <Stack>
       <Stack.Protected guard={isLoggedIn}>

@@ -1,5 +1,5 @@
 import { Text } from '@/components/ui/text';
-import { useArkitekt, useServiceState } from '@/lib/arkitekt/hooks';
+import { useArkitektActions, useServiceState } from '@/lib/arkitekt/hooks';
 import { NamedIcon } from '@/lib/modules/registry';
 import { AvailableModule } from '@/lib/modules/useAvailableModules';
 import { useThemeColors } from '@/lib/theme/BrandProvider';
@@ -54,7 +54,7 @@ export function ModuleGrid({
   size?: number;
 }) {
   const colors = useThemeColors();
-  const { retryService } = useArkitekt();
+  const { retryService } = useArkitektActions();
   const [info, setInfo] = React.useState<AvailableModule | null>(null);
 
   return (

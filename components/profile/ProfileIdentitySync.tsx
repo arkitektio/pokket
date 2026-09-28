@@ -43,7 +43,7 @@ function Sync({ profileId }: { profileId: string }) {
 
 export function ProfileIdentitySync() {
   const profileId = App.useActiveProfileId();
-  const connected = !!App.useConnection()?.selfService;
+  const connected = App.useIsConnected();
   if (!profileId || !connected) return null;
   return <Sync key={profileId} profileId={profileId} />;
 }

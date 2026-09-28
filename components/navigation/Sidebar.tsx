@@ -43,9 +43,11 @@ export function Sidebar({ navigation }: DrawerContentComponentProps) {
 
   const selected = modules.find((m) => m.key === selectedKey && hasLinks(m));
   const close = () => navigation.closeDrawer();
+  // Navigate first: the page starts mounting while the drawer slides shut,
+  // instead of after.
   const go = (route: string) => {
-    close();
     showPage(route);
+    close();
   };
 
   return (

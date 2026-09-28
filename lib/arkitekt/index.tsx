@@ -17,6 +17,8 @@ import {
 } from "@/lib/arkitekt/provider";
 import { Manifest, Requirement } from "./fakts/manifestSchema";
 import {
+  useArkitektActions,
+  useArkitektStore,
   useActiveProfile,
   useActiveProfileId,
   useParkedProfileId,
@@ -106,30 +108,35 @@ export const buildArkitekt = <T extends ServiceBuilderMap, S extends ServiceBuil
     }),
     buildServiceGuard: <K extends keyof T>(serviceKey: K) => buildGuard(serviceKey as string),
     Guard: ConnectedGuard,
-    useConnect: () => useArkitekt().connect,
-    useDisconnect: () => useArkitekt().disconnect,
-    useReconnect: () => useArkitekt().reconnect,
-    useCancelConnection: () => useArkitekt().cancelConnection,
+    // Narrow on purpose: these are used all over the tree, and a hook that
+    // reads the whole store re-renders its component on every store change.
+    useConnect: () => useArkitektActions().connect,
+    useDisconnect: () => useArkitektActions().disconnect,
+    useReconnect: () => useArkitektActions().reconnect,
+    useCancelConnection: () => useArkitektActions().cancelConnection,
     useManifest: () => realManifest,
-    useConnectedManifest: () => useArkitekt().connection?.manifest,
-    useConnection: (): AppContext<T>["connection"] => useArkitekt().connection as AppContext<T>["connection"],
-    useFakts: () => useArkitekt().connection?.fakts,
+    useConnectedManifest: () => useArkitektStore((state) => state.connection?.manifest),
+    useConnection: (): AppContext<T>["connection"] =>
+      useArkitektStore((state) => state.connection) as AppContext<T>["connection"],
+    /** Is a connection live? Changes only when that answer does. */
+    useIsConnected: () => useArkitektStore((state) => !!state.connection?.selfService),
+    useFakts: () => useArkitektStore((state) => state.connection?.fakts),
     useAlias: <K extends keyof T>(serviceKey: K) => {
       const service = useService(serviceKey as string);
       return service?.alias;
     },
     useSelfService: () => useSelfService(),
-    useSelf: () => useArkitekt().connection?.fakts.self,
-    useAutoLoginError: (): AppContext<T>["autoLoginError"] => useArkitekt().autoLoginError,
+    useSelf: () => useArkitektStore((state) => state.connection?.fakts.self),
+    useAutoLoginError: (): AppContext<T>["autoLoginError"] => useArkitektStore((state) => state.autoLoginError),
     useAvailableServices: useAvailableServices,
     useAvailableModules: useAvailableModules,
     useConfigurationIssues: useConfigurationIssues,
     useService: <K extends keyof T,>(service: K): ReturnType<T[K]["builder"]> => useService(service as string) as ReturnType<T[K]["builder"]>,
     usePotentialService: <K extends keyof T,>(service: K): ReturnType<T[K]["builder"]> | undefined => usePotentialService(service as string) as ReturnType<T[K]["builder"]> | undefined,
-    useToken: () => {
-      const arkitekt = useArkitekt();
-      return arkitekt.connection?.token?.access_token || arkitekt.storedSession?.token?.access_token || null;
-    },
+    useToken: () =>
+      useArkitektStore(
+        (state) => state.connection?.token?.access_token || state.storedSession?.token?.access_token || null,
+      ),
     useArkitekt: useArkitekt,
     useProfiles,
     useActiveProfile,

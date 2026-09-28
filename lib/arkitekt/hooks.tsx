@@ -29,8 +29,15 @@ export const useArkitektStore = <T,>(selector: (state: AppContext) => T) => {
   return useStore(store, selector);
 };
 
-const useArkitektActions = (): AppFunctions => useArkitektContext().actions;
+/** The provider's actions alone: stable for the provider's life, so this never re-renders. */
+export const useArkitektActions = (): AppFunctions => useArkitektContext().actions;
 
+/**
+ * The whole state and every action. Re-renders on ANY store change — every
+ * service check, token refresh and profile write — so reach for a selector
+ * (`useArkitektStore`) or `useArkitektActions` wherever a component needs
+ * less than everything.
+ */
 export const useArkitekt = () => {
   const state = useArkitektStore((currentState) => currentState) as AppContext;
   const actions = useArkitektActions();

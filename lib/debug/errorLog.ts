@@ -88,10 +88,14 @@ export const reportError = (source: ErrorSource, title: string, detail?: string)
 
   entries = trim([{ id: nextId++, at: Date.now(), source, title, detail, count: 1 }, ...entries]);
 
-  /* Also to Metro. The overlay is only readable by whoever is holding the
-     phone; the terminal is what can be copied into a bug report. `log`, not
+  /* Failures also go to Metro: the overlay is only readable by whoever holds
+     the phone, the terminal is what can be copied into a bug report. Not the
+     request traffic (two lines per GraphQL operation, a real cost in dev) nor
+     warnings (their own console.warn already printed them). `log`, not
      `error` — `error` is mirrored back into here. */
-  console.log(`[log:${source}] ${title}${detail ? `\n${detail}` : ''}`);
+  if (source !== 'request' && source !== 'warning') {
+    console.log(`[log:${source}] ${title}${detail ? `\n${detail}` : ''}`);
+  }
 
   emit();
 };

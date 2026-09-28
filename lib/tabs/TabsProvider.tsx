@@ -95,7 +95,7 @@ export function TabsProvider({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = React.useState(false);
   const bootedFor = React.useRef<string | null>(null);
 
-  const connected = !!App.useConnection();
+  const connected = App.useIsConnected();
 
   // Boot per organization, once it is live: its saved tabs, and its active
   // tab's page on show.
