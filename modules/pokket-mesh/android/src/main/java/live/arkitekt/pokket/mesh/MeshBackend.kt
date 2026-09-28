@@ -9,6 +9,7 @@ interface MeshBackend {
   fun setInterfaces(text: String)
   fun setDefaultRoute(ifName: String, gateway: String)
   fun version(): String
+  fun setVerbose(on: Boolean)
   fun start(id: String, stateDir: String, controlUrl: String, hostname: String, authKey: String)
   fun forward(id: String, host: String, port: Long, tls: Boolean): Long
   fun stop(id: String)

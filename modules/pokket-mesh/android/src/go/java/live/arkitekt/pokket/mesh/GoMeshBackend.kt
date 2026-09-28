@@ -19,6 +19,8 @@ class GoMeshBackend : MeshBackend {
 
   override fun version(): String = Meshmobile.version()
 
+  override fun setVerbose(on: Boolean) = Meshmobile.setVerbose(on)
+
   override fun start(id: String, stateDir: String, controlUrl: String, hostname: String, authKey: String) =
     Meshmobile.start(id, stateDir, controlUrl, hostname, authKey)
 

@@ -132,6 +132,8 @@ class PokketMeshModule : Module() {
 
     Function("version") { backend?.version() }
 
+    Function("setVerbose") { on: Boolean -> backend?.setVerbose(on) }
+
     AsyncFunction("start") { id: String, controlUrl: String, hostname: String, authKey: String? ->
       val b = requireBackend()
       pushInterfaces(b)

@@ -94,6 +94,12 @@ public final class PokketMeshModule: Module {
       #endif
     }
 
+    Function("setVerbose") { (on: Bool) in
+      #if canImport(Meshmobile)
+      MeshmobileSetVerbose(on)
+      #endif
+    }
+
     AsyncFunction("start") { (id: String, controlUrl: String, hostname: String, authKey: String?) throws in
       #if canImport(Meshmobile)
       let dir = try self.stateDir(id)

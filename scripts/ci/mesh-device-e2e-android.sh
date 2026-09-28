@@ -16,6 +16,13 @@ ip="$(hostname -I | awk '{print $1}')"
 "$root/scripts/ci/mesh-device-env.sh" "$ip" "$work"
 url="$(cat "$work/url")"
 
+# Can the emulator reach the test tailnet's control server at all? (Answers
+# "is it the network or the node" before the app even starts.)
+control_hostport="$(python3 -c 'import json,sys,urllib.parse; u=urllib.parse.urlparse(json.load(open(sys.argv[1]))["controlUrl"]); print(u.hostname, u.port)' "$work/env.json")"
+echo "::group::emulator -> control server"
+adb shell "printf 'GET /key?v=1 HTTP/1.0\r\n\r\n' | toybox nc -w 5 $control_hostport | head -n 1" || echo "control server NOT reachable from the emulator"
+echo "::endgroup::"
+
 adb install -r "$apk"
 adb logcat -c
 adb shell "am start -W -a android.intent.action.VIEW -d '$url' live.arkitekt.pokket"
@@ -28,6 +35,6 @@ echo "::group::test tailnet log"
 cat "$work/env.log"
 echo "::endgroup::"
 echo "::group::device log"
-adb logcat -d | grep -E "mesh-selftest|ReactNativeJS|GoLog|PokketMesh|AndroidRuntime|CLEARTEXT" | tail -n 400 || true
+adb logcat -d | grep -E "mesh-selftest|ReactNativeJS|GoLog|PokketMesh|AndroidRuntime|CLEARTEXT" | tail -n 1500 || true
 echo "::endgroup::"
 exit "$status"

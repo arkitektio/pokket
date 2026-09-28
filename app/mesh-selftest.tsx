@@ -42,7 +42,11 @@ const waitForRunning = (native: NonNullable<ReturnType<typeof meshNative>>): Pro
       const parsed = parseMeshStatus(status);
       if (!parsed || parsed.id !== ID) return;
       last = parsed;
-      log(`status ${parsed.state} peers=${parsed.peers?.length ?? 0}`);
+      log(
+        `status ${parsed.state} backend=${parsed.backendState ?? '-'} peers=${parsed.peers?.length ?? 0}` +
+          (parsed.health?.length ? ` health=${JSON.stringify(parsed.health)}` : '') +
+          (parsed.error ? ` error=${parsed.error}` : ''),
+      );
       if (parsed.state === 'running' && parsed.magicDnsSuffix && parsed.peers?.some((p) => p.online)) {
         clearTimeout(timer);
         sub.remove();
@@ -88,6 +92,10 @@ async function runSelfTest(params: { control: string; key: string; host: string;
       return `version ${native.version()}`;
     });
     await step('join tailnet', async () => {
+      // The self-test's whole point is diagnosis: tsnet's log goes to logcat /
+      // the console, and the node's user-facing lines to the JS log.
+      native!.setVerbose(true);
+      native!.addListener('onLog', ({ message }) => log(`node: ${message}`));
       await native!.forget(ID);
       const running = waitForRunning(native!);
       await native!.start(ID, params.control, 'pokket-selftest', params.key);

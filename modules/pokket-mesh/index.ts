@@ -42,6 +42,9 @@ export type MeshNodeStatus = {
   selfIps?: string[];
   selfDnsName?: string;
   peers?: MeshPeer[];
+  /** The backend's own state name, and its health warnings. */
+  backendState?: string;
+  health?: string[];
   error?: string;
 };
 
@@ -53,6 +56,8 @@ type PokketMeshEvents = {
 declare class PokketMeshModule extends NativeModule<PokketMeshEvents> {
   isAvailable(): boolean;
   version(): string | null;
+  /** Send tsnet's internal log to logcat / the console (diagnostics only). */
+  setVerbose(on: boolean): void;
   /** Join (or rejoin from on-disk state when `authKey` is empty). */
   start(id: string, controlUrl: string, hostname: string, authKey?: string | null): Promise<void>;
   /** The 127.0.0.1 port that reaches host:port over the mesh. */

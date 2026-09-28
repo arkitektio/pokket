@@ -25,12 +25,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"net"
 	"os"
 	"reflect"
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"tailscale.com/client/local"
@@ -72,8 +74,12 @@ type peer struct {
 // event (minus the proxy port and Tailnet Lock), so the TypeScript types can
 // stay aligned with orkestrator's `MeshNodeStatus`.
 type nodeStatus struct {
-	ID             string   `json:"id"`
-	State          string   `json:"state"`
+	ID    string `json:"id"`
+	State string `json:"state"`
+	// The backend's own state name and health warnings (e.g. "not connected
+	// to home DERP region"): what to look at when a node never gets to running.
+	BackendState   string   `json:"backendState,omitempty"`
+	Health         []string `json:"health,omitempty"`
 	MagicDNSSuffix string   `json:"magicDnsSuffix,omitempty"`
 	TailnetName    string   `json:"tailnetName,omitempty"`
 	SelfIPs        []string `json:"selfIps,omitempty"`
@@ -95,6 +101,22 @@ type node struct {
 
 // debugLogf receives tsnet's internal log; silent except in tests.
 var debugLogf = func(string, ...any) {}
+
+var verbose atomic.Bool
+
+// SetVerbose sends tsnet's internal log to the platform log (logcat "GoLog"
+// on Android, the console on iOS) — for diagnosing a node that will not come
+// up. Off by default: it is chatty and names peers and endpoints.
+func SetVerbose(on bool) { verbose.Store(on) }
+
+func tsnetLogf(id string) func(string, ...any) {
+	return func(format string, args ...any) {
+		if verbose.Load() {
+			log.Printf("[%s] "+format, append([]any{id}, args...)...)
+		}
+		debugLogf(format, args...)
+	}
+}
 
 var (
 	listenerMu sync.Mutex
@@ -174,7 +196,7 @@ func Start(id, stateDir, controlURL, hostname, authKey string) error {
 		AuthKey:    authKey,
 		Ephemeral:  false,
 		// tsnet is chatty; only the user-facing lines are relayed.
-		Logf: debugLogf,
+		Logf: tsnetLogf(id),
 		UserLogf: func(format string, args ...any) {
 			emitLog(id, fmt.Sprintf(format, args...))
 		},
@@ -328,10 +350,20 @@ func (n *node) refresh(ctx context.Context) {
 	sctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	st, err := n.lc.Status(sctx)
 	cancel()
+	var next nodeStatus
 	if err != nil {
-		return
+		if ctx.Err() != nil {
+			return
+		}
+		// Say so rather than go quiet: a node whose status cannot be read
+		// is a node the app must not wait on silently.
+		n.mu.Lock()
+		next = n.last
+		n.mu.Unlock()
+		next.Error = "status: " + err.Error()
+	} else {
+		next = snapshot(n.id, st)
 	}
-	next := snapshot(n.id, st)
 	n.mu.Lock()
 	changed := !reflect.DeepEqual(next, n.last)
 	n.last = next
@@ -342,7 +374,7 @@ func (n *node) refresh(ctx context.Context) {
 }
 
 func snapshot(id string, st *ipnstate.Status) nodeStatus {
-	s := nodeStatus{ID: id}
+	s := nodeStatus{ID: id, BackendState: st.BackendState, Health: st.Health}
 	switch st.BackendState {
 	case ipn.Running.String():
 		s.State = "running"
