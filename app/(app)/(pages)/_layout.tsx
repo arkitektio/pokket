@@ -1,3 +1,4 @@
+import { ExitGuard } from '@/components/navigation/ExitGuard';
 import { MenuButton, SearchButton } from '@/components/navigation/HeaderButtons';
 import { routeOf } from '@/lib/modules/catalog';
 import { useSyncActiveTabRoute } from '@/lib/tabs/TabsProvider';
@@ -52,6 +53,7 @@ export default function PagesLayout() {
   return (
     <>
       <TabRouteSync />
+      <ExitGuard />
       <Stack screenListeners={screenListeners} screenOptions={screenOptions}>
         <Stack.Screen name="index" options={page('Home')} />
         <Stack.Screen name="notifications" options={page('Notifications')} />
