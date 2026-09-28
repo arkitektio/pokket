@@ -34,6 +34,16 @@ echo "simulator: $udid"
 xcrun simctl boot "$udid" || true
 xcrun simctl bootstatus "$udid" -b
 
+# idb (installed by the workflow) drives the simulator's UI; see tap_text.
+if command -v idb_companion > /dev/null && command -v idb > /dev/null; then
+  mkdir -p "$work"
+  idb_companion --udid "$udid" > "$work/idb-companion.log" 2>&1 &
+  sleep 5
+  idb connect localhost 10882 || echo "idb connect failed"
+else
+  echo "idb is not installed; link prompts cannot be answered"
+fi
+
 # The simulator shares the Mac's network, loopback included.
 [ "$variant" = dev ] && export MESH_E2E_WAIT=25m
 # The warm link can land after the report; keep listening a little longer.
@@ -47,8 +57,27 @@ screen_text() {
   xcrun simctl io "$udid" screenshot "$work/screen-$1.png" > /dev/null 2>&1 || return 0
   local text
   text="$("$work/ocr" "$work/screen-$1.png" 2>/dev/null | head -c 600 || true)"
+  last_screen="$text"
   echo "screen ($1): $text"
   mark "screen ($1): $text"
+}
+
+# Taps the on-screen text $1 (a system alert's button) through idb: the
+# simulator has no other way to press a button from a script.
+tap_text() {
+  local label="$1" pos size x y
+  command -v idb > /dev/null || { echo "no idb to tap \"$label\""; return 1; }
+  xcrun simctl io "$udid" screenshot "$work/tap.png" > /dev/null 2>&1 || return 1
+  pos="$("$work/ocr" "$work/tap.png" "$label" 2>/dev/null)" || { echo "\"$label\" is not on screen"; return 1; }
+  size="$(idb describe --json 2>/dev/null | python3 -c '
+import json, sys
+d = json.load(sys.stdin)["screen_dimensions"]
+density = d.get("density") or 1
+print(d.get("width_points") or d["width"] / density, d.get("height_points") or d["height"] / density)
+')" || { echo "idb describe failed"; return 1; }
+  read -r x y <<< "$(python3 -c 'import sys; px, py, w, h = map(float, sys.argv[1:]); print(round(px * w), round(py * h))' $pos $size)"
+  echo "tapping \"$label\" at $x,$y (screen $size points)"
+  idb ui tap "$x" "$y"
 }
 
 # openurl can block (it waits on the system to open the URL); never let it
@@ -63,6 +92,14 @@ open_link() {
   mark "openurl returned after $((SECONDS - started)) s"
   sleep 5
   screen_text "link$link_count"
+  # A fresh simulator asks before it opens a custom-scheme link from outside
+  # the app ("Open in "pokket"?"), as a phone does the first time a link is
+  # tapped. Answer it the way a user would.
+  if [[ "$last_screen" == *"Open in"* ]]; then
+    if tap_text Open; then mark "tapped Open on the link prompt"; else mark "could not tap Open on the link prompt"; fi
+    sleep 5
+    screen_text "link$link_count-after"
+  fi
 }
 
 [ "$variant" = dev ] && start_metro ios

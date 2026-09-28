@@ -236,6 +236,16 @@ jobs:
             -derivedDataPath build CODE_SIGNING_ALLOWED=NO build | tail -n 60
           echo "APP=$GITHUB_WORKSPACE/ios/build/Build/Products/$configuration-iphonesimulator/pokket.app" >> "$GITHUB_ENV"
 
+      - name: Install idb
+        # Answers the simulator's "Open in pokket?" link prompt (tap_text in
+        # scripts/ci/mesh-device-e2e-ios.sh). Without it the link checks fail.
+        continue-on-error: true
+        run: |
+          brew tap facebook/fb
+          brew install idb-companion
+          python3 -m pip install --break-system-packages fb-idb
+          python3 -c 'import sysconfig; print(sysconfig.get_path("scripts"))' >> "$GITHUB_PATH"
+
       - name: Self-test on a simulator
         run: scripts/ci/mesh-device-e2e-ios.sh "$APP" ${{ matrix.variant }}
 
