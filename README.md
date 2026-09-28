@@ -82,6 +82,22 @@ Currently available for Android devices with BLE support. Just download the APK 
    LAN can show the Local Network prompt, with the text set in the same plugin. The node never
    sends logs to Tailscale.
 
+   **Working on it in a development build.** Expo Go has no mesh (it cannot load the native
+   module); use a development build, which has it once the library is built:
+
+   ```bash
+   pnpm build:mesh:android && npx expo run:android   # or: pnpm build:mesh:ios && npx expo run:ios
+   # or, after pnpm build:mesh: eas build --profile development
+   pnpm expo start --dev-client                      # then iterate on the JS as usual
+   ```
+
+   Only the Go code needs a native rebuild; the Mesh screen, `lib/mesh` and the fakts client
+   reload like any other JS. A reload keeps the running nodes: the new JS reattaches to them, and
+   the aliases keep their loopback ports. To see the mesh work without a deployment,
+   `pnpm mesh:tailnet` serves a throwaway tailnet on your machine and prints a
+   `pokket://mesh-selftest?...` link; open it in the dev build (same network) and it joins,
+   fetches and holds a WebSocket through the mesh, and reports the result in your terminal.
+
 4. **Tests**
 
    ```bash
@@ -89,10 +105,13 @@ Currently available for Android devices with BLE support. Just download the APK 
    (cd modules/pokket-mesh/go && go test ./...) # Go, incl. a real in-process tailnet
    ```
 
-   The `Mesh sidecar` workflow additionally builds the release APK and a Release iOS simulator app,
-   and runs them on an emulator/simulator against a test tailnet (`TestDeviceEnv`): the app opens
-   `pokket://mesh-selftest?...` (only active in builds made with `EXPO_PUBLIC_MESH_SELFTEST=1`),
-   joins, and must fetch and hold a WebSocket through the mesh, reporting back through it.
+   The `Mesh sidecar` workflow additionally builds the app for Android and the iOS simulator, both
+   as release builds and as development builds loading their JS from Metro, and runs each on an
+   emulator/simulator against a test tailnet (`TestDeviceEnv`): the app is sent
+   `pokket://mesh-selftest?...` (active in development builds, and in release builds made with
+   `EXPO_PUBLIC_MESH_SELFTEST=1`), joins, and must fetch and hold a WebSocket through the mesh,
+   reporting back through it. The run also fails if the deep links it sends do not reach the
+   app's JS.
 
 ## Tech Stack
 

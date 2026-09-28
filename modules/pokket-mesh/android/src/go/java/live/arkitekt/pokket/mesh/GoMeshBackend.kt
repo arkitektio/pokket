@@ -29,7 +29,5 @@ class GoMeshBackend : MeshBackend {
 
   override fun stop(id: String) = Meshmobile.stop(id)
 
-  override fun stopAll() = Meshmobile.stopAll()
-
   override fun status(id: String): String = Meshmobile.status(id)
 }

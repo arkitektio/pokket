@@ -11,7 +11,8 @@ import {
   startSelfTest,
 } from './selftest';
 
-const AUTORUN_DELAY_MS = 5_000;
+// Long enough for CI to answer "app booted" with a deep link, which then wins.
+const AUTORUN_DELAY_MS = 15_000;
 
 /**
  * Mounted at the root of self-test builds only. Says "booted" on the self-test's

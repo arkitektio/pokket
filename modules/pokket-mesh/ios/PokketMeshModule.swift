@@ -75,10 +75,14 @@ public final class PokketMeshModule: Module {
       #endif
     }
 
+    // The nodes belong to the app process, not to this module instance: a JS
+    // reload (dev builds, OTA updates) destroys and recreates the module, and
+    // the new JS reattaches to the running nodes (Start is idempotent, Forward
+    // keeps its ports) instead of rejoining from scratch.
     OnDestroy {
       #if canImport(Meshmobile)
       self.pathMonitor.cancel()
-      MeshmobileStopAll()
+      self.listener.module = nil
       #endif
     }
 

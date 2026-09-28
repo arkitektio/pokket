@@ -10,11 +10,11 @@ import { meshNative, parseMeshStatus, type MeshNodeStatus } from '@/modules/pokk
  * loads, the node reaches "running", a forward opens, RN fetch and RN
  * WebSocket work over http://127.0.0.1 (release cleartext policy / ATS), and
  * it posts its result to the service THROUGH the mesh — so a report arriving
- * at all proves the path works. Every build without EXPO_PUBLIC_MESH_SELFTEST=1
- * does nothing.
+ * at all proves the path works. Release builds without EXPO_PUBLIC_MESH_SELFTEST=1
+ * do nothing; development builds always have it (`pnpm mesh:tailnet`).
  */
 
-export const SELFTEST_ENABLED = process.env.EXPO_PUBLIC_MESH_SELFTEST === '1';
+export const SELFTEST_ENABLED = process.env.EXPO_PUBLIC_MESH_SELFTEST === '1' || __DEV__;
 /**
  * Optional: the self-test's parameters as a query string, baked into the build
  * so it runs without a deep link (the iOS simulator run uses this).

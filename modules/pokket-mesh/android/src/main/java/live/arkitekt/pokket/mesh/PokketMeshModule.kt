@@ -60,6 +60,9 @@ class PokketMeshModule : Module() {
   }
   private var callbackRegistered = false
 
+  /** Set once this instance is gone (a JS reload makes a new one). */
+  @Volatile private var destroyed = false
+
   private fun stateDir(id: String): File {
     require(MESH_ID.matches(id)) { "invalid mesh id" }
     return File(File(context.filesDir, "mesh"), id)
@@ -103,8 +106,8 @@ class PokketMeshModule : Module() {
     OnCreate {
       val b = backend ?: return@OnCreate
       b.setListener(
-        onStatus = { json -> sendEvent(STATUS_EVENT, mapOf("status" to json)) },
-        onLog = { id, message -> sendEvent(LOG_EVENT, mapOf("id" to id, "message" to message)) },
+        onStatus = { json -> if (!destroyed) sendEvent(STATUS_EVENT, mapOf("status" to json)) },
+        onLog = { id, message -> if (!destroyed) sendEvent(LOG_EVENT, mapOf("id" to id, "message" to message)) },
       )
       pushInterfaces(b)
       try {
@@ -116,7 +119,12 @@ class PokketMeshModule : Module() {
       }
     }
 
+    // The nodes belong to the app process, not to this module instance: a JS
+    // reload (dev builds, OTA updates) destroys and recreates the module, and
+    // the new JS reattaches to the running nodes (Start is idempotent, Forward
+    // keeps its ports) instead of rejoining from scratch.
     OnDestroy {
+      destroyed = true
       if (callbackRegistered) {
         try {
           val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
@@ -125,7 +133,6 @@ class PokketMeshModule : Module() {
         }
         callbackRegistered = false
       }
-      backend?.stopAll()
     }
 
     Function("isAvailable") { backend != null }

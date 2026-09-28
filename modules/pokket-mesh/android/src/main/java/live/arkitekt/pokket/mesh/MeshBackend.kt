@@ -13,6 +13,5 @@ interface MeshBackend {
   fun start(id: String, stateDir: String, controlUrl: String, hostname: String, authKey: String)
   fun forward(id: String, host: String, port: Long, tls: Boolean): Long
   fun stop(id: String)
-  fun stopAll()
   fun status(id: String): String
 }

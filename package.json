@@ -18,7 +18,8 @@
     "test": "jest",
     "build:mesh": "scripts/build-mesh-mobile.sh all",
     "build:mesh:android": "scripts/build-mesh-mobile.sh android",
-    "build:mesh:ios": "scripts/build-mesh-mobile.sh ios"
+    "build:mesh:ios": "scripts/build-mesh-mobile.sh ios",
+    "mesh:tailnet": "scripts/mesh-dev-tailnet.sh"
   },
   "dependencies": {
     "@apollo/client": "^3.13.9",

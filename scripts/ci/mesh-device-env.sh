@@ -5,8 +5,10 @@
 #
 # Usage: source-free — run as
 #   scripts/ci/mesh-device-env.sh <advertise-ip> <workdir>
-# It writes <workdir>/env.log and <workdir>/url, and <workdir>/env.exit (the
-# exit status: 0 = the device reported success) once the tailnet is done.
+# It writes <workdir>/env.log, <workdir>/url (the deep link), <workdir>/query
+# (its parameters alone), and <workdir>/env.exit (the exit status: 0 = the
+# device reported success) once the tailnet is done. MESH_E2E_WAIT bounds the
+# wait for the device's report (default 10m).
 set -euo pipefail
 
 ip="$1"
@@ -22,7 +24,7 @@ rm -f "$work/env.json" "$work/env.exit"
 (
   status=0
   MESH_E2E_ENV=1 MESH_E2E_ADVERTISE_IP="$ip" MESH_E2E_OUT="$work/env.json" MESH_E2E_WAIT="${MESH_E2E_WAIT:-10m}" \
-    "$work/mesh.test" -test.run '^TestDeviceEnv$' -test.v -test.timeout 20m > "$work/env.log" 2>&1 || status=$?
+    "$work/mesh.test" -test.run '^TestDeviceEnv$' -test.v -test.timeout 2h > "$work/env.log" 2>&1 || status=$?
   echo "$status" > "$work/env.exit"
 ) &
 
@@ -37,13 +39,14 @@ if [ ! -s "$work/env.json" ]; then
   exit 1
 fi
 
-python3 - "$work/env.json" > "$work/url" <<'PY'
+python3 - "$work/env.json" > "$work/query" <<'PY'
 import json, sys, urllib.parse
 env = json.load(open(sys.argv[1]))
 query = urllib.parse.urlencode({
     "control": env["controlUrl"], "key": env["authKey"], "host": env["host"], "port": env["port"],
     "progress": env["progressUrl"],
 })
-print(f"pokket://mesh-selftest?{query}")
+print(query)
 PY
+echo "pokket://mesh-selftest?$(cat "$work/query")" > "$work/url"
 echo "test tailnet up: $(cat "$work/url")"

@@ -273,6 +273,19 @@ func TestE2EJoinForwardRejoin(t *testing.T) {
 	checkHTTP(t, port)
 	checkWebSocket(t, port)
 
+	// A JS reload (dev builds, OTA updates) makes a new native module and new
+	// JS, which reattach: the new listener gets the running node's status from
+	// a repeated Start (no key, no rejoin), and the forward keeps its port.
+	rec = useRecorder(t)
+	if err := Start(id, dir, tn.controlURL, testDeviceName, ""); err != nil {
+		t.Fatal(err)
+	}
+	rec.waitFor(t, id, "running after reattach", hasOnlinePeer(testSvcName))
+	if reattached, err := Forward(id, testSvcName, testSvcPort, false); err != nil || reattached != port {
+		t.Fatalf("Forward after reattach: %d, want %d (%v)", reattached, port, err)
+	}
+	checkHTTP(t, port)
+
 	// Stop and rejoin WITHOUT a key: the node's state on disk carries the login.
 	Stop(id)
 	rec.waitFor(t, id, "stopped", func(s nodeStatus) bool { return s.State == "stopped" })
@@ -430,9 +443,11 @@ func TestDeviceEnv(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	began := time.Now()
 	progress := &http.Server{Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, _ := io.ReadAll(io.LimitReader(r.Body, 64<<10))
-		t.Logf("device: %s", body)
+		// Timed, so a slow boot or a late link shows as such.
+		t.Logf("device: [+%.1fs] %s", time.Since(began).Seconds(), body)
 	})}
 	go progress.Serve(progressLn)
 	t.Cleanup(func() { progress.Close() })

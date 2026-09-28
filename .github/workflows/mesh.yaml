@@ -6,6 +6,9 @@ name: Mesh sidecar
 #  - android: gomobile build (16 KB pages), release APK, and an emulator run
 #             in which the app joins a test tailnet and talks through it
 #  - ios:     gomobile build, Release simulator app, and the same run on a simulator
+# Both device jobs run twice: the release build, and a development build
+# (expo-dev-client, JS from Metro) — the one used to work on the app. Each
+# run also checks that deep links reach the app's JS.
 
 on:
   push:
@@ -85,8 +88,13 @@ jobs:
           modules/pokket-mesh/index.ts modules/pokket-mesh/app.plugin.js
 
   android:
+    name: android (${{ matrix.variant }})
     runs-on: ubuntu-latest
-    timeout-minutes: 75
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: [release, dev]
     env:
       # Bundled into the JS at build time: turns on app/mesh-selftest.tsx.
       EXPO_PUBLIC_MESH_SELFTEST: "1"
@@ -113,30 +121,33 @@ jobs:
       - name: Prebuild
         run: npx expo prebuild --platform android --no-install --clean
 
-      - name: Build the release APK
+      - name: Build the APK
         working-directory: android
         # x86_64 for the emulator, arm64 to prove the phone ABI links too.
         # Packaging two ~40 MB Go libraries next to WebRTC outgrows the template's
         # 2 GB Gradle heap.
         run: |
           df -h .
-          ./gradlew :app:assembleRelease -PreactNativeArchitectures=x86_64,arm64-v8a --no-daemon --stacktrace \
+          task=${{ matrix.variant == 'release' && 'assembleRelease' || 'assembleDebug' }}
+          ./gradlew ":app:$task" -PreactNativeArchitectures=x86_64,arm64-v8a --no-daemon --stacktrace \
             "-Dorg.gradle.jvmargs=-Xmx6g -XX:MaxMetaspaceSize=1g -XX:+HeapDumpOnOutOfMemoryError"
+          apk="$(ls app/build/outputs/apk/*/app-*.apk | head -n1)"
+          echo "APK=$GITHUB_WORKSPACE/android/$apk" >> "$GITHUB_ENV"
 
       - name: Upload the Gradle problems report
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: gradle-problems
+          name: gradle-problems-${{ matrix.variant }}
           path: android/build/reports/problems/
           if-no-files-found: ignore
 
       - name: Check the APK
         run: |
-          apk=android/app/build/outputs/apk/release/app-release.apk
+          apk="$APK"
           aapt2="$(ls "$ANDROID_HOME"/build-tools/*/aapt2 | sort -V | tail -n1)"
           manifest="$("$aapt2" dump xmltree --file AndroidManifest.xml "$apk")"
-          echo "$manifest" | grep -q 'android:usesCleartextTraffic.*=true' || { echo "release APK does not allow cleartext"; exit 1; }
+          echo "$manifest" | grep -q 'android:usesCleartextTraffic.*=true' || { echo "the APK does not allow cleartext"; exit 1; }
           echo "$manifest" | grep -q 'android.permission.ACCESS_NETWORK_STATE' || { echo "ACCESS_NETWORK_STATE missing"; exit 1; }
           unzip -l "$apk" | grep -E 'lib/(x86_64|arm64-v8a)/libgojni.so' || { echo "libgojni.so missing"; exit 1; }
 
@@ -154,22 +165,28 @@ jobs:
           target: google_apis
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
-          script: scripts/ci/mesh-device-e2e-android.sh android/app/build/outputs/apk/release/app-release.apk
+          script: scripts/ci/mesh-device-e2e-android.sh "$APK" ${{ matrix.variant }}
 
       - name: Upload self-test evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: android-selftest
+          name: android-selftest-${{ matrix.variant }}
           path: |
             ${{ runner.temp }}/mesh-e2e/*.png
             ${{ runner.temp }}/mesh-e2e/*.log
             ${{ runner.temp }}/mesh-e2e/*.json
+            ${{ runner.temp }}/mesh-e2e/metro.log
           if-no-files-found: ignore
 
   ios:
+    name: ios (${{ matrix.variant }})
     runs-on: macos-latest
-    timeout-minutes: 90
+    timeout-minutes: 100
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: [release, dev]
     env:
       EXPO_PUBLIC_MESH_SELFTEST: "1"
       # The simulator shares the Mac's loopback, so the test tailnet's addresses
@@ -207,24 +224,27 @@ jobs:
         working-directory: ios
         run: pod install
 
-      - name: Build the Release simulator app
+      - name: Build the simulator app
         working-directory: ios
         run: |
           set -o pipefail
-          xcodebuild -workspace pokket.xcworkspace -scheme pokket -configuration Release \
+          configuration=${{ matrix.variant == 'release' && 'Release' || 'Debug' }}
+          xcodebuild -workspace pokket.xcworkspace -scheme pokket -configuration "$configuration" \
             -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
             -derivedDataPath build CODE_SIGNING_ALLOWED=NO build | tail -n 60
+          echo "APP=$GITHUB_WORKSPACE/ios/build/Build/Products/$configuration-iphonesimulator/pokket.app" >> "$GITHUB_ENV"
 
       - name: Self-test on a simulator
-        run: scripts/ci/mesh-device-e2e-ios.sh ios/build/Build/Products/Release-iphonesimulator/pokket.app
+        run: scripts/ci/mesh-device-e2e-ios.sh "$APP" ${{ matrix.variant }}
 
       - name: Upload self-test evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: ios-selftest
+          name: ios-selftest-${{ matrix.variant }}
           path: |
             ${{ runner.temp }}/mesh-e2e/*.png
             ${{ runner.temp }}/mesh-e2e/*.log
             ${{ runner.temp }}/mesh-e2e/*.json
+            ${{ runner.temp }}/mesh-e2e/metro.log
           if-no-files-found: ignore
