@@ -5,6 +5,12 @@ import { Manifest } from "./fakts/manifestSchema";
 import { StoredArkitektSession } from "./fakts/sessionStorageSchema";
 import { TokenResponse } from "./fakts/tokenSchema";
 import type { GrantedMesh } from "./fakts/meshGrant";
+import type {
+  ProfileIdentity,
+  ProfileLabel,
+  ProfileMesh,
+  StoredProfileBook,
+} from "./fakts/profileStorageSchema";
 
 
 export type FaktsStorage = {
@@ -43,20 +49,35 @@ export type AliasRouter = {
 };
 
 /**
- * The optional mesh hooks the provider calls around a session's life. Every
+ * The optional mesh hooks the provider calls around a login's life. Every
  * hook is best-effort: a mesh failure must never turn a working login into
  * an error, so the provider catches and logs whatever they throw.
+ *
+ * A mesh belongs to a login (`StoredProfile.mesh`), and only a login whose
+ * hub exposes one has it; the provider hands each hook the login's mesh and
+ * stores what comes back.
  */
 export type MeshIntegration = {
   router: AliasRouter;
-  /** Ask lok for a one-shot mesh key with this grant? */
-  wantsKey: (endpoint: FaktsEndpoint) => boolean;
-  /** A grant came back (with a key when lok minted one): record and join the mesh. */
-  onGrant: (args: { endpoint: FaktsEndpoint; fakts: ActiveFakts; granted?: GrantedMesh }) => Promise<void>;
-  /** A stored or refreshed session is live: rejoin from on-disk state if its aliases need the mesh. */
-  onRestore: (args: { endpoint: FaktsEndpoint; fakts: ActiveFakts }) => Promise<void>;
-  /** The session is gone: leave the mesh and forget this device's node. */
-  onDisconnect: () => Promise<void>;
+  /** Where the integration keeps changes to the active login's mesh (its switch, what the node learned). */
+  bind?: (persist: (mesh: ProfileMesh) => void) => void;
+  /** The single mesh record kept before there were profiles, removed as it is read. */
+  takeLegacy?: () => Promise<{ baseUrl: string; mesh: ProfileMesh } | null>;
+  /** Ask lok for a one-shot mesh key with this grant? Never when the hub exposes no mesh. */
+  wantsKey: (endpoint: FaktsEndpoint, mesh?: ProfileMesh) => boolean;
+  /** A grant came back (with a key when lok minted one): join, and return the login's mesh. */
+  onGrant: (args: {
+    endpoint: FaktsEndpoint;
+    fakts: ActiveFakts;
+    granted?: GrantedMesh;
+    previous?: ProfileMesh;
+  }) => Promise<ProfileMesh | undefined>;
+  /** This login is now the live one: rejoin its mesh if an alias needs it, run none if it has none. */
+  onRestore: (args: { endpoint: FaktsEndpoint; fakts: ActiveFakts; mesh?: ProfileMesh }) => Promise<void>;
+  /** No login is live for now (adding another): stop the node, keep its state. */
+  onPark: () => Promise<void>;
+  /** A login is gone: leave its mesh and forget its node. */
+  onDisconnect: (mesh?: ProfileMesh) => Promise<void>;
   /** Routes changed under us (the node came back, an app resume re-bound a forward). */
   subscribe: (listener: () => void) => () => void;
 };
@@ -211,6 +232,8 @@ export type ConnectedContext<
 export type ConnectFunction = (options: {
   endpoint: FaktsEndpoint;
   controller: AbortController;
+  /** Signing in again to a login that went stale: replace it (and keep its mesh node). */
+  replaceProfileId?: string;
 }) => Promise<void>;
 
 export type DisconnectFunction = () => Promise<void>;
@@ -228,6 +251,12 @@ export type AppContext<
   serviceStates: Record<string, ServiceRuntimeState>;
   moduleStates: Record<string, ModuleRuntimeState>;
   storedSession: StoredArkitektSession | null;
+  /** Every login kept on this device, and which one is live. */
+  profileBook: StoredProfileBook;
+  /** The login being switched to; the current one keeps running meanwhile. */
+  switchingProfileId: string | null;
+  /** The login that was live before "Add organization", to go back to on cancel. */
+  parkedProfileId: string | null;
 };
 
 export type AppFunctions = {
@@ -239,6 +268,19 @@ export type AppFunctions = {
   retryModule: (moduleKey: string) => Promise<void>;
   clearServiceCache: (serviceKey: string) => Promise<void>;
   clearAllServiceCaches: () => Promise<void>;
+  /** Make a kept login the live one: a token refresh and a connection swap, no sign-in. */
+  switchProfile: (profileId: string) => Promise<void>;
+  /** Forget a login (and its mesh node); signing out of the live one moves to another. */
+  signOutProfile: (profileId: string) => Promise<void>;
+  /** Park the live login and go to sign-in, to add another organization. */
+  addProfile: () => Promise<void>;
+  /** Back to the login that was live before "Add organization". */
+  cancelAddProfile: () => Promise<void>;
+  /** What lok says the live login is: its real id, and the labels its row shows. */
+  setProfileIdentity: (
+    profileId: string,
+    update: { identity?: ProfileIdentity; label?: Partial<ProfileLabel> },
+  ) => Promise<void>;
 };
 
 export type ArkitektContextType<

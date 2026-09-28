@@ -38,15 +38,33 @@ describe("mesh integration", () => {
     expect(mesh.wantsKey({ ...endpoint, mesh_coord_url: null })).toBe(false);
   });
 
-  it("joins with the one-shot key and never stores it", async () => {
+  it("asks per login: a login whose mesh is switched off asks for none", () => {
     const mesh = createMeshIntegration();
-    await mesh.onGrant({ endpoint, fakts, granted: { authKey: "SECRET-KEY" } });
+    const off = { id: "n1", label: "x", controlUrl: "https://mesh.go.test", hosts: [], enabled: false };
+    expect(mesh.wantsKey(endpoint, off)).toBe(false);
+    expect(mesh.wantsKey(endpoint, { ...off, enabled: true })).toBe(true);
+  });
+
+  it("joins with the one-shot key and hands back a mesh without it", async () => {
+    const mesh = createMeshIntegration();
+    const persisted = jest.fn();
+    mesh.bind!(persisted);
+    const granted = await mesh.onGrant({ endpoint, fakts, granted: { authKey: "SECRET-KEY" } });
     const record = mesh.record()!;
+    expect(granted).toEqual(record.mesh);
     expect(record.mesh.controlUrl).toBe("https://mesh.go.test");
     expect(fake.calls[0]).toEqual(["start", record.mesh.id, "https://mesh.go.test", "pokket-pixel-8-pro", "SECRET-KEY"]);
-    const stored = JSON.stringify(await (AsyncStorage as any).multiGet(await AsyncStorage.getAllKeys()));
-    expect(stored).toContain(record.mesh.id);
-    expect(stored).not.toContain("SECRET-KEY");
+    expect(JSON.stringify(granted)).not.toContain("SECRET-KEY");
+    expect(JSON.stringify(persisted.mock.calls)).not.toContain("SECRET-KEY");
+  });
+
+  it("gives a login on a hub without a mesh none", async () => {
+    const mesh = createMeshIntegration();
+    const granted = await mesh.onGrant({ endpoint: { ...endpoint, mesh_coord_url: null }, fakts });
+    expect(granted).toBeUndefined();
+    expect(mesh.record()).toBeNull();
+    expect(mesh.router.isRouted(meshAlias)).toBe(false);
+    expect(fake.calls).toEqual([]);
   });
 
   it("routes mesh aliases through a loopback stand-in", async () => {
@@ -61,6 +79,24 @@ describe("mesh integration", () => {
     expect(mesh.router.resolve(publicAlias)).toBe(publicAlias);
     // The node's MagicDNS suffix is remembered.
     expect(mesh.record()!.mesh.magicDnsSuffix).toBe("tail.example");
+  });
+
+  it("keeps each alias' own path when several services share a host", async () => {
+    const mesh = createMeshIntegration();
+    await mesh.onGrant({ endpoint, fakts, granted: { authKey: "k" } });
+    const rekuest = { ...meshAlias, id: "rekuest", path: "rekuest" };
+    const kuvert = { ...meshAlias, id: "kuvert", path: "kuvert" };
+    await mesh.router.prepare(rekuest, new AbortController());
+    await mesh.router.prepare(kuvert, new AbortController());
+
+    const resolvedRekuest = mesh.router.resolve(rekuest);
+    const resolvedKuvert = mesh.router.resolve(kuvert);
+    expect(resolvedKuvert.path).toBe("kuvert");
+    expect(resolvedKuvert.id).toBe("kuvert");
+    expect(resolvedRekuest.path).toBe("rekuest");
+    // Both through the one forward to that host.
+    expect(resolvedKuvert.port).toBe(resolvedRekuest.port);
+    expect(resolvedKuvert.host).toBe("127.0.0.1");
   });
 
   it("gives up on a node that cannot log in", async () => {
@@ -80,7 +116,7 @@ describe("mesh integration", () => {
     fake.calls.length = 0;
 
     const second = createMeshIntegration(); // a fresh app launch
-    await second.onRestore({ endpoint, fakts });
+    await second.onRestore({ endpoint, fakts, mesh: first.record()!.mesh });
     expect(fake.calls).toEqual([["start", first.record()!.mesh.id, "https://mesh.go.test", "pokket-pixel-8-pro", null]]);
   });
 
@@ -104,26 +140,58 @@ describe("mesh integration", () => {
     await mesh.setEnabled(false, fakts);
     expect(mesh.router.isRouted(meshAlias)).toBe(false);
     expect(mesh.router.resolve(meshAlias)).toBe(meshAlias);
-    expect(mesh.wantsKey(endpoint)).toBe(false);
+    expect(mesh.wantsKey(endpoint, mesh.record()!.mesh)).toBe(false);
     expect(routesChanged).toHaveBeenCalled();
   });
 
-  it("a grant for another deployment forgets the old node", async () => {
+  it("switching to a login without a mesh stops the node but keeps it", async () => {
     const mesh = createMeshIntegration();
     await mesh.onGrant({ endpoint, fakts, granted: { authKey: "k" } });
-    const oldId = mesh.record()!.mesh.id;
-    await mesh.onGrant({ endpoint: { ...endpoint, base_url: "https://other.test/lok/f/" }, fakts });
-    expect(fake.calls).toContainEqual(["forget", oldId]);
+    const own = mesh.record()!.mesh;
+    await mesh.router.prepare(meshAlias, new AbortController());
+    const routesChanged = jest.fn();
+    mesh.subscribe(routesChanged);
+    fake.calls.length = 0;
+
+    await mesh.onRestore({ endpoint: { ...endpoint, base_url: "https://other.test/lok/f/", mesh_coord_url: null }, fakts });
+    expect(fake.calls).toEqual([["stop", own.id]]);
     expect(mesh.record()).toBeNull();
+    expect(mesh.router.isRouted(meshAlias)).toBe(false);
+    expect(mesh.router.resolve(meshAlias)).toBe(meshAlias);
+    expect(routesChanged).toHaveBeenCalled();
+
+    // And back: the node rejoins from its state, with no key.
+    fake.calls.length = 0;
+    await mesh.onRestore({ endpoint, fakts, mesh: own });
+    expect(fake.calls).toEqual([["start", own.id, "https://mesh.go.test", "pokket-pixel-8-pro", null]]);
   });
 
-  it("logout forgets the node", async () => {
+  it("parking for another sign-in stops the node but keeps it", async () => {
     const mesh = createMeshIntegration();
     await mesh.onGrant({ endpoint, fakts, granted: { authKey: "k" } });
     const id = mesh.record()!.mesh.id;
-    await mesh.onDisconnect();
-    expect(fake.calls).toContainEqual(["forget", id]);
+    await mesh.onPark();
+    expect(fake.calls).toContainEqual(["stop", id]);
+    expect(fake.calls).not.toContainEqual(["forget", id]);
     expect(mesh.record()).toBeNull();
+  });
+
+  it("signing out of a login forgets its node", async () => {
+    const mesh = createMeshIntegration();
+    await mesh.onGrant({ endpoint, fakts, granted: { authKey: "k" } });
+    const own = mesh.record()!.mesh;
+    await mesh.onDisconnect(own);
+    expect(fake.calls).toContainEqual(["forget", own.id]);
+    expect(mesh.record()).toBeNull();
+  });
+
+  it("the switch is kept on the login's profile", async () => {
+    const mesh = createMeshIntegration();
+    const persisted = jest.fn();
+    mesh.bind!(persisted);
+    await mesh.onGrant({ endpoint, fakts, granted: { authKey: "k" } });
+    await mesh.setEnabled(false, fakts);
+    expect(persisted).toHaveBeenLastCalledWith(expect.objectContaining({ id: mesh.record()!.mesh.id, enabled: false }));
   });
 
   it("re-binds forwards when the app comes back and reports moved routes", async () => {

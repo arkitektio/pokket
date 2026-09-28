@@ -11,12 +11,29 @@ import {
   loadStoredEndpoint,
   StoredArkitektSession,
   StoredArkitektSessionSchema,
-  writeStoredAliasMap,
-  writeStoredArkitektSession,
   writeStoredEndpoint,
-  writeStoredFakts,
-  writeStoredToken
 } from "./fakts/sessionStorageSchema";
+import {
+  createProfileFromSession,
+  deriveProfileId,
+  emptyProfileBook,
+  getActiveProfile,
+  listProfiles,
+  loadStoredProfileBook,
+  markProfileOk,
+  markProfileStale,
+  normalizeBaseUrl,
+  provisionalProfileId,
+  reidentifyProfile,
+  removeProfile,
+  setActiveProfile,
+  StoredProfileBook,
+  updateProfileLabel,
+  updateProfileMesh,
+  updateProfileSession,
+  upsertProfile,
+  writeStoredProfileBook,
+} from "./fakts/profileStorageSchema";
 import {
   useArkitekt,
   useAvailableModules,
@@ -75,6 +92,18 @@ export type ArkitektProviderProps<
   /** The organisation mesh (lib/mesh); absent means every alias is direct. */
   mesh?: MeshIntegration;
 }
+
+/**
+ * Did the token endpoint itself turn the refresh down? Only that says the
+ * login is dead; a network blip says nothing about the credential, and
+ * marking on one would greet a user back from a tunnel with every
+ * organization claiming to be signed out.
+ */
+const isRejectedRefresh = (error: unknown): boolean =>
+  error instanceof Error && /Failed to refresh token: 4\d\d/.test(error.message);
+
+const errorMessage = (error: unknown, fallback: string) =>
+  error instanceof Error ? error.message : fallback;
 
 /** Mesh hooks are best-effort: log, never fail the session over them. */
 const bestEffort = async (label: string, run: () => Promise<void>) => {
@@ -135,8 +164,32 @@ export const ArkitektProvider = <T extends ServiceBuilderMap, S extends ServiceB
         buildServiceStates(serviceBuilderMap, null),
       ),
       storedSession: null,
+      profileBook: emptyProfileBook(),
+      switchingProfileId: null,
+      parkedProfileId: null,
     });
   });
+
+  /**
+   * Every change to the profile book goes through here: applied to the store
+   * at once (so back-to-back updates compose), written in order, and awaited
+   * by callers that must not go on before it has landed — refresh tokens
+   * rotate on use, and a write lost to a killed app is a dead login.
+   */
+  const persistBookRef = useRef<
+    ((update: (book: StoredProfileBook) => StoredProfileBook) => Promise<StoredProfileBook>) | null
+  >(null);
+  if (!persistBookRef.current) {
+    let writes: Promise<void> = Promise.resolve();
+    persistBookRef.current = (update) => {
+      const next = update(store.getState().profileBook);
+      store.setState({ profileBook: next });
+      const write = writes.then(() => writeStoredProfileBook(next, storageProvider));
+      writes = write.catch((error) => console.error("[ArkitektProvider] Writing profiles failed:", error));
+      return write.then(() => next);
+    };
+  }
+  const persistBook = persistBookRef.current;
 
   // Wire up the locked refreshToken now that store exists
   if (!refreshInitialized.current) {
@@ -146,15 +199,17 @@ export const ArkitektProvider = <T extends ServiceBuilderMap, S extends ServiceB
     // The coalescing + forced-vs-raced rule lives in TokenRotation
     // (runtime/tokenRotation.ts); this callback is just the round-trip.
     const rotation = new TokenRotation(async () => {
+      // The login this refresh is for; a switch may land while it is in flight.
+      const profileId = store.getState().profileBook.activeProfileId;
       const session = store.getState().storedSession;
       if (!session) {
-        console.error("[ArkitektProvider] No stored session available to refresh");
+        console.warn("[ArkitektProvider] No stored session available to refresh");
         throw new Error("No stored session available");
       }
 
       const currentToken = normalizeToken(session.token);
       if (!currentToken.refresh_token) {
-        console.error("[ArkitektProvider] Token expired but no refresh_token available");
+        console.warn("[ArkitektProvider] Token expired but no refresh_token available");
         throw new Error("No refresh token available – cannot refresh");
       }
 
@@ -169,11 +224,12 @@ export const ArkitektProvider = <T extends ServiceBuilderMap, S extends ServiceB
         // No envelope on the response means the server could not re-render it,
         // not that our config went away.
         const nextFakts = refreshedFakts ?? session.fakts;
-        if (refreshedFakts && meshRef.current) {
+        if (refreshedFakts && meshRef.current && store.getState().profileBook.activeProfileId === profileId) {
           // A re-render may have put an alias on the mesh (or taken the last off).
           const integration = meshRef.current;
+          const mesh = getActiveProfile(store.getState().profileBook)?.mesh;
           void bestEffort("restore after refresh", () =>
-            integration.onRestore({ endpoint: session.endpoint, fakts: refreshedFakts }),
+            integration.onRestore({ endpoint: session.endpoint, fakts: refreshedFakts, mesh }),
           );
         }
 
@@ -186,8 +242,14 @@ export const ArkitektProvider = <T extends ServiceBuilderMap, S extends ServiceB
         // the chain is dead and the user has to re-approve. Under the old
         // protocol this was recoverable, because `fakts.auth` could always
         // mint a fresh token via client_credentials; it no longer can.
-        await writeStoredToken(nextToken, storageProvider);
-        await writeStoredArkitektSession(nextSession, storageProvider);
+        if (profileId) {
+          await persistBook((book) => updateProfileSession(book, profileId, nextSession));
+        }
+        if (store.getState().profileBook.activeProfileId !== profileId) {
+          // Kept for when that login is switched back to; never handed to
+          // the clients of the organization that is live now.
+          throw new Error("The organization changed while its token was refreshed");
+        }
 
         const connection = store.getState().connection;
         store.setState({
@@ -204,7 +266,7 @@ export const ArkitektProvider = <T extends ServiceBuilderMap, S extends ServiceB
 
         return nextToken;
       } catch (refreshError) {
-        console.error("[ArkitektProvider] Token refresh failed:", refreshError);
+        console.warn("[ArkitektProvider] Token refresh failed:", refreshError);
         throw refreshError;
       }
     });
@@ -214,7 +276,7 @@ export const ArkitektProvider = <T extends ServiceBuilderMap, S extends ServiceB
 
       const session = store.getState().storedSession;
       if (!session) {
-        console.error("[ArkitektProvider] getToken called but no stored session available");
+        console.warn("[ArkitektProvider] getToken called but no stored session available");
         throw new Error("No stored session available");
       }
 
@@ -357,31 +419,42 @@ export const ArkitektProvider = <T extends ServiceBuilderMap, S extends ServiceB
     return enhancedManifest;
   }, [store, manifest]);
 
-  const loadValidatedStoredSession = useCallback(async (): Promise<StoredSession> => {
-    const loadedSession = await loadStoredArkitektSession(  storageProvider);
+  /**
+   * The profile book — or, on the first launch after profiles arrived, one
+   * made from the single session (and mesh record) pokket kept before: that
+   * login becomes the book's one active profile and the old keys go.
+   */
+  const loadProfileBook = useCallback(async (): Promise<StoredProfileBook> => {
+    const stored = await loadStoredProfileBook(storageProvider);
+    if (stored) return stored;
 
-    if (!loadedSession) {
-      return null;
+    const legacyMesh = await meshRef.current?.takeLegacy?.().catch(() => null);
+    const loadedSession = await loadStoredArkitektSession(storageProvider);
+    let book = emptyProfileBook();
+
+    if (loadedSession) {
+      const parsedSession = StoredArkitektSessionSchema.safeParse(loadedSession);
+      if (parsedSession.success) {
+        const session = parsedSession.data;
+        const mesh =
+          legacyMesh && normalizeBaseUrl(legacyMesh.baseUrl) === normalizeBaseUrl(session.endpoint.base_url)
+            ? legacyMesh.mesh
+            : undefined;
+        const profile = createProfileFromSession(provisionalProfileId(session.endpoint.base_url), session, mesh);
+        book = setActiveProfile(upsertProfile(book, profile), profile.id);
+        console.log("[ArkitektProvider] Migrated the stored session into a profile");
+      } else {
+        // Chiefly the fakts protocol-2 migration: sessions written by the old
+        // start/challenge/claim flow carry an `auth` block and no
+        // `client_id`, and nothing can be salvaged from them.
+        console.warn("[ArkitektProvider] Discarding unreadable stored session:", parsedSession.error.issues);
+      }
     }
 
-    const parsedSession = StoredArkitektSessionSchema.safeParse(loadedSession);
-    if (parsedSession.success) {
-      return parsedSession.data;
-    }
-
-    // A session we can no longer read is a session we no longer have. Chiefly
-    // this is the fakts protocol-2 migration: sessions written by the old
-    // start/challenge/claim flow carry an `auth` block and no `client_id`, and
-    // nothing can be salvaged from them. Throwing here would strand the user on
-    // an error screen that survives an app restart, because the unreadable
-    // entries would stay in storage — so drop them and fall back to a fresh
-    // connect.
-    console.warn(
-      "[ArkitektProvider] Discarding unreadable stored session:",
-      parsedSession.error.issues,
-    );
-    await clearStoredArkitektStorage(undefined, storageProvider);
-    return null;
+    await writeStoredProfileBook(book, storageProvider);
+    // The endpoint stays: it is what the sign-in screen offers again.
+    await clearStoredArkitektStorage(["fakts", "token", "aliasMap"], storageProvider);
+    return book;
   }, []);
 
   const validateService = useCallback(
@@ -392,6 +465,7 @@ export const ArkitektProvider = <T extends ServiceBuilderMap, S extends ServiceB
 
       const state = store.getState();
       const session = state.storedSession;
+      const profileId = state.profileBook.activeProfileId;
       const serviceState = state.serviceStates[serviceKey];
       const instance = session?.fakts.instances[serviceKey];
 
@@ -475,13 +549,14 @@ export const ArkitektProvider = <T extends ServiceBuilderMap, S extends ServiceB
           return;
         }
 
-        writeStoredAliasMap(nextPersistedSession.aliasMap, storageProvider);
-        writeStoredArkitektSession(nextPersistedSession, storageProvider);
+        if (profileId && store.getState().profileBook.activeProfileId === profileId) {
+          await persistBook((book) => updateProfileSession(book, profileId, nextPersistedSession));
+        }
 
         console.log("[ArkitektProvider] validateService succeeded:", serviceKey, "alias:", alias);
       } catch (error) {
         const message = error instanceof Error ? error.message : "Unable to validate service";
-        console.error("[ArkitektProvider] validateService failed:", serviceKey, message, error);
+        console.warn("[ArkitektProvider] validateService failed:", serviceKey, message, error);
 
         store.setState((current) => {
           if (validationRunIdsRef.current[serviceKey] !== runId) {
@@ -519,15 +594,21 @@ export const ArkitektProvider = <T extends ServiceBuilderMap, S extends ServiceB
         });
       }
     },
-    [store, serviceBuilderMap, selfServiceBuilder, deriveRuntimeState],
+    [store, serviceBuilderMap, selfServiceBuilder, deriveRuntimeState, persistBook],
+  );
+
+  const validateAllServices = useCallback(
+    () => Promise.all(Object.keys(serviceBuilderMap).map((k) => validateService(k))),
+    [serviceBuilderMap, validateService],
   );
 
   // ── actions ──
 
   const connect = useCallback<AppFunctions["connect"]>(
-    async ({ endpoint, controller }) => {
+    async ({ endpoint, controller, replaceProfileId }) => {
       console.log("[ArkitektProvider] connect called, endpoint:", endpoint);
       const prev = store.getState();
+      const replacing = replaceProfileId ? prev.profileBook.profiles[replaceProfileId] : undefined;
       controllerRef.current = controller;
       store.setState({ connecting: true, autoLoginError: undefined });
 
@@ -540,7 +621,7 @@ export const ArkitektProvider = <T extends ServiceBuilderMap, S extends ServiceB
         let requestMeshKey = false;
         if (integration) {
           try {
-            requestMeshKey = integration.wantsKey(endpoint);
+            requestMeshKey = integration.wantsKey(endpoint, replacing?.mesh);
           } catch (error) {
             console.warn("[ArkitektProvider] mesh wantsKey failed:", error);
           }
@@ -556,11 +637,14 @@ export const ArkitektProvider = <T extends ServiceBuilderMap, S extends ServiceB
           requestMeshKey,
         });
         console.log("[ArkitektProvider] connect: fakts resolved, services:", Object.keys(fakts.instances || {}));
-        await writeStoredFakts(fakts, storageProvider);
 
         // Join before resolving aliases, so the ones on the mesh can be reached.
+        // Only a hub that exposes a mesh (and granted this login a node) gives one.
+        let profileMesh = replacing?.mesh;
         if (integration) {
-          await bestEffort("grant", () => integration.onGrant({ endpoint, fakts, granted }));
+          await bestEffort("grant", async () => {
+            profileMesh = await integration.onGrant({ endpoint, fakts, granted, previous: replacing?.mesh });
+          });
         }
 
         const token = normalizeToken(grantToken);
@@ -573,30 +657,57 @@ export const ArkitektProvider = <T extends ServiceBuilderMap, S extends ServiceB
         });
         console.log("[ArkitektProvider] connect: aliases built, keys:", Object.keys(aliasMap));
 
-        await writeStoredAliasMap({ aliasMap }, storageProvider);
         await report(endpoint.base_url, token.access_token, {
           alias_reports: aliasReports,
           functional: Object.values(aliasReports).every((r) => r.valid),
         });
 
+        // A new row in the book, not an overwrite: that is what keeps the
+        // other organizations one tap away. Its id is provisional until lok
+        // says who it is (`setProfileIdentity`), which merges a repeat
+        // sign-in into the organization's existing row.
         const nextSession = { endpoint, fakts, token, aliasMap: { aliasMap } };
-        await writeStoredToken(token, storageProvider);
-        await writeStoredArkitektSession(nextSession, storageProvider);
+        const profile = createProfileFromSession(
+          replacing?.id ?? provisionalProfileId(endpoint.base_url),
+          nextSession,
+          profileMesh,
+        );
+        await persistBook((book) =>
+          setActiveProfile(
+            upsertProfile(
+              book,
+              replacing
+                ? { ...replacing, ...profile, label: replacing.label, identity: replacing.identity, staleReason: undefined }
+                : profile,
+            ),
+            profile.id,
+          ),
+        );
 
         console.log("[ArkitektProvider] connect: session stored, hydrating connection...");
         hydrateConnection(nextSession, enhancedManifest, {
           connecting: false,
           hasBootstrapped: true,
           autoLoginError: undefined,
+          parkedProfileId: null,
         });
 
         console.log("[ArkitektProvider] connect: starting background health checks");
-        // Background health checks
-        void Promise.all(Object.keys(serviceBuilderMap).map((k) => validateService(k)));
+        void validateAllServices();
       } catch (error) {
-        console.error("[ArkitektProvider] connect failed:", error);
-        if (!prev.storedSession) {
-          clearStoredArkitektStorage(undefined,   storageProvider);
+        console.warn("[ArkitektProvider] connect failed:", error);
+        // The grant may have handed the mesh to the new login already; the
+        // login still live gets its own back.
+        const integration = meshRef.current;
+        if (integration && prev.storedSession && prev.connection) {
+          const live = prev.storedSession;
+          await bestEffort("restore after failed sign-in", () =>
+            integration.onRestore({
+              endpoint: live.endpoint,
+              fakts: live.fakts,
+              mesh: getActiveProfile(prev.profileBook)?.mesh,
+            }),
+          );
         }
 
         store.setState({
@@ -607,41 +718,211 @@ export const ArkitektProvider = <T extends ServiceBuilderMap, S extends ServiceB
           hasBootstrapped: true,
           autoLoginError: isAbortLikeError(error)
             ? "Connection cancelled by user"
-            : error instanceof Error
-              ? error.message
-              : "Connection failed",
+            : errorMessage(error, "Connection failed"),
           ...recompute({ storedSession: prev.storedSession, connection: prev.connection }),
         });
+        throw error;
       } finally {
         controllerRef.current = null;
       }
     },
-    [store, serviceBuilderMap, hydrateConnection, validateService, recompute, resolveEnhancedManifest],
+    [store, serviceBuilderMap, hydrateConnection, validateAllServices, recompute, resolveEnhancedManifest, persistBook],
+  );
+
+  /**
+   * Bring a kept login live: refresh its token, hand the mesh over, swap the
+   * connection. Two rules, both from orkestrator's `switchProfile`:
+   *
+   *  1. The current login keeps running until the new token is in hand —
+   *     tearing it down first would leave a dead app if the refresh fails.
+   *  2. The rotated refresh token is persisted before the swap, so a swap
+   *     that throws cannot cost the parked login its only refresh token.
+   */
+  const switchProfile = useCallback<AppFunctions["switchProfile"]>(
+    async (profileId) => {
+      const state = store.getState();
+      if (state.switchingProfileId) return;
+      if (state.profileBook.activeProfileId === profileId && state.connection) return;
+      const profile = state.profileBook.profiles[profileId];
+      if (!profile) throw new Error(`Unknown organization ${profileId}`);
+
+      console.log("[ArkitektProvider] switchProfile:", profileId);
+      store.setState({ switchingProfileId: profileId, autoLoginError: undefined });
+
+      try {
+        const manifest = await resolveEnhancedManifest();
+        const { token: nextToken, fakts: refreshedFakts } = await refreshAccessToken(
+          profile.session.endpoint.token_endpoint,
+          normalizeToken(profile.session.token),
+        );
+        const nextSession: StoredArkitektSession = {
+          ...profile.session,
+          token: nextToken,
+          fakts: refreshedFakts ?? profile.session.fakts,
+        };
+        // (2)
+        await persistBook((book) => updateProfileSession(markProfileOk(book, profileId), profileId, nextSession));
+        if (!store.getState().profileBook.profiles[profileId]) {
+          // Signed out of while its refresh was in flight.
+          store.setState({ switchingProfileId: null });
+          return;
+        }
+
+        // Stops the previous login's node (keeping its state) and starts this
+        // one's if it has a mesh and an alias needs it; runs none otherwise.
+        const integration = meshRef.current;
+        if (integration) {
+          await bestEffort("switch", () =>
+            integration.onRestore({ endpoint: nextSession.endpoint, fakts: nextSession.fakts, mesh: profile.mesh }),
+          );
+        }
+
+        await persistBook((book) => setActiveProfile(book, profileId));
+        // New clients, new caches: nothing of one organization's data is
+        // served to another.
+        hydrateConnection(nextSession, manifest, {
+          connecting: false,
+          hasBootstrapped: true,
+          autoLoginError: undefined,
+          switchingProfileId: null,
+          parkedProfileId: null,
+        });
+        void validateAllServices();
+      } catch (error) {
+        console.warn("[ArkitektProvider] switchProfile failed:", error);
+        const message = isRejectedRefresh(error)
+          ? "Session expired — sign in again"
+          : errorMessage(error, "Could not switch organization");
+        if (isRejectedRefresh(error)) {
+          await persistBook((book) => markProfileStale(book, profileId, message));
+        }
+        store.setState({ switchingProfileId: null });
+        throw new Error(message);
+      }
+    },
+    [store, persistBook, hydrateConnection, validateAllServices, resolveEnhancedManifest],
+  );
+
+  const signOutProfile = useCallback<AppFunctions["signOutProfile"]>(
+    async (profileId) => {
+      console.log("[ArkitektProvider] signOutProfile:", profileId);
+      const book = store.getState().profileBook;
+      const profile = book.profiles[profileId];
+      if (!profile) return;
+      const wasActive = book.activeProfileId === profileId;
+
+      const integration = meshRef.current;
+      if (integration) {
+        await bestEffort("sign out", () => integration.onDisconnect(profile.mesh));
+      }
+      const next = await persistBook((current) => removeProfile(current, profileId));
+      if (!wasActive) return;
+
+      controllerRef.current = null;
+      hydrateConnection(null, store.getState().manifest, {
+        connecting: false,
+        hasBootstrapped: true,
+        autoLoginError: undefined,
+      });
+      // On to the most recently used organization still signed in, if any;
+      // otherwise the sign-in screen, which the null connection shows.
+      const fallback = listProfiles(next).find((candidate) => candidate.status === "ok");
+      if (fallback) {
+        await switchProfile(fallback.id).catch((error) =>
+          console.warn("[ArkitektProvider] no organization to fall back to:", error),
+        );
+      }
+    },
+    [store, persistBook, hydrateConnection, switchProfile],
   );
 
   const disconnect = useCallback<AppFunctions["disconnect"]>(async () => {
     console.log("[ArkitektProvider] disconnect called");
+    const activeId = store.getState().profileBook.activeProfileId;
+    if (activeId) {
+      await signOutProfile(activeId);
+      return;
+    }
     controllerRef.current = null;
     const integration = meshRef.current;
     if (integration) {
       await bestEffort("disconnect", () => integration.onDisconnect());
     }
-    await clearStoredArkitektStorage(undefined, storageProvider);
     hydrateConnection(null, store.getState().manifest, {
       connecting: false,
       hasBootstrapped: true,
       autoLoginError: undefined,
     });
-  }, [store, hydrateConnection]);
+  }, [store, hydrateConnection, signOutProfile]);
+
+  const addProfile = useCallback<AppFunctions["addProfile"]>(async () => {
+    const activeId = store.getState().profileBook.activeProfileId;
+    console.log("[ArkitektProvider] addProfile, parking:", activeId);
+    const integration = meshRef.current;
+    if (integration) {
+      await bestEffort("park", () => integration.onPark());
+    }
+    await persistBook((book) => setActiveProfile(book, null));
+    // A null connection is what routes to the sign-in screen.
+    hydrateConnection(null, store.getState().manifest, {
+      connecting: false,
+      hasBootstrapped: true,
+      autoLoginError: undefined,
+      parkedProfileId: activeId,
+    });
+  }, [store, persistBook, hydrateConnection]);
+
+  const cancelAddProfile = useCallback<AppFunctions["cancelAddProfile"]>(async () => {
+    const parked = store.getState().parkedProfileId;
+    if (!parked) return;
+    await switchProfile(parked);
+  }, [store, switchProfile]);
+
+  const setProfileIdentity = useCallback<AppFunctions["setProfileIdentity"]>(
+    async (profileId, { identity, label }) => {
+      // A repeat sign-in folds into the organization's existing row. If both
+      // logins joined a mesh, the new node wins; the old one is forgotten
+      // rather than left behind on disk.
+      if (identity) {
+        const book = store.getState().profileBook;
+        const incoming = book.profiles[profileId];
+        const existing = book.profiles[deriveProfileId(identity)];
+        const integration = meshRef.current;
+        if (
+          integration &&
+          existing &&
+          existing.id !== profileId &&
+          existing.mesh &&
+          incoming?.mesh &&
+          existing.mesh.id !== incoming.mesh.id
+        ) {
+          const orphan = existing.mesh;
+          await bestEffort("forget replaced node", () => integration.onDisconnect(orphan));
+        }
+      }
+      await persistBook((book) => {
+        let next = book;
+        let id = profileId;
+        if (identity) ({ book: next, id } = reidentifyProfile(next, profileId, identity));
+        if (label) next = updateProfileLabel(next, id, label);
+        return next;
+      });
+    },
+    [store, persistBook],
+  );
 
   const reconnect = useCallback<AppFunctions["reconnect"]>(async () => {
     console.log("[ArkitektProvider] reconnect called");
     const endpoint = store.getState().storedSession?.endpoint || await loadStoredEndpoint(storageProvider);
     if (!endpoint) {
-      console.error("[ArkitektProvider] reconnect failed: no endpoint found");
+      console.warn("[ArkitektProvider] reconnect failed: no endpoint found");
       throw new Error("No endpoint found in local storage");
     }
-    await connect({ endpoint, controller: new AbortController() });
+    await connect({
+      endpoint,
+      controller: new AbortController(),
+      replaceProfileId: store.getState().profileBook.activeProfileId ?? undefined,
+    });
   }, [store, connect]);
 
   const cancelConnection = useCallback<AppFunctions["cancelConnection"]>(() => {
@@ -696,28 +977,51 @@ export const ArkitektProvider = <T extends ServiceBuilderMap, S extends ServiceB
       retryModule,
       clearServiceCache,
       clearAllServiceCaches,
+      switchProfile,
+      signOutProfile,
+      addProfile,
+      cancelAddProfile,
+      setProfileIdentity,
     }),
-    [connect, disconnect, reconnect, cancelConnection, retryService, retryModule, clearServiceCache, clearAllServiceCaches],
+    [
+      connect,
+      disconnect,
+      reconnect,
+      cancelConnection,
+      retryService,
+      retryModule,
+      clearServiceCache,
+      clearAllServiceCaches,
+      switchProfile,
+      signOutProfile,
+      addProfile,
+      cancelAddProfile,
+      setProfileIdentity,
+    ],
   );
 
-  // ── ONE useEffect: detect cached fakts, hydrate, then run health checks ──
+  // ── ONE useEffect: load the book, bring the active login live, then run health checks ──
   useEffect(() => {
     const run = async () => {
+      let activeId: string | null = null;
       try {
-        const [enhancedManifest, session] = await Promise.all([
+        const [enhancedManifest, book] = await Promise.all([
           resolveEnhancedManifest(),
-          loadValidatedStoredSession(),
+          loadProfileBook(),
         ]);
+        store.setState({ profileBook: book });
 
-        console.log("[ArkitektProvider]: Bootstrapping ArkitektProvider with session:", session);
+        const active = getActiveProfile(book);
+        activeId = active?.id ?? null;
+        console.log("[ArkitektProvider] Bootstrapping with profile:", activeId, "of", Object.keys(book.profiles).length);
 
-        if (!session) {
-          console.log("[ArkitektProvider] Bootstrap: no cached session, marking bootstrapped");
+        if (!active) {
+          console.log("[ArkitektProvider] Bootstrap: no active profile, marking bootstrapped");
           setBootstrapped();
           return;
         }
 
-        stageStoredSession(session, {
+        stageStoredSession(active.session, {
           manifest: enhancedManifest,
           autoLoginError: undefined,
         });
@@ -731,12 +1035,16 @@ export const ArkitektProvider = <T extends ServiceBuilderMap, S extends ServiceB
           throw new Error("Stored session missing after refresh");
         }
 
-        // Rejoin from the node's on-disk state (no key needed) when an alias
-        // lives on the mesh; the health checks below wait for it as needed.
+        // Rejoin from the node's on-disk state (no key needed) when this
+        // login has a mesh and an alias lives on it; none runs otherwise.
         const integration = meshRef.current;
         if (integration) {
           await bestEffort("restore", () =>
-            integration.onRestore({ endpoint: refreshedSession.endpoint, fakts: refreshedSession.fakts }),
+            integration.onRestore({
+              endpoint: refreshedSession.endpoint,
+              fakts: refreshedSession.fakts,
+              mesh: getActiveProfile(store.getState().profileBook)?.mesh,
+            }),
           );
         }
 
@@ -748,13 +1056,17 @@ export const ArkitektProvider = <T extends ServiceBuilderMap, S extends ServiceB
         console.log("[ArkitektProvider] Hydrated connection from stored session:", store.getState().connection);
 
         console.log("[ArkitektProvider] Bootstrap: starting background health checks");
-        void Promise.all(Object.keys(serviceBuilderMap).map((k) => validateService(k)));
+        void validateAllServices();
       } catch (error) {
-        const message = error instanceof Error
-          ? error.message
-          : "Auto-login failed";
-
-        console.error("[ArkitektProvider] Bootstrap error:", error);
+        const message = errorMessage(error, "Auto-login failed");
+        console.warn("[ArkitektProvider] Bootstrap error:", error);
+        if (activeId && isRejectedRefresh(error)) {
+          // Dead for good: keep the row (to sign in again from), but not live.
+          const id = activeId;
+          await persistBook((book) =>
+            setActiveProfile(markProfileStale(book, id, "Session expired — sign in again"), null),
+          );
+        }
         setBootstrapError(message);
       }
     };
@@ -762,6 +1074,17 @@ export const ArkitektProvider = <T extends ServiceBuilderMap, S extends ServiceB
     void run();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // runs once on mount
+
+  // Changes the mesh makes to the live login's record (its switch, the
+  // suffix its node learned) belong on that login's profile.
+  useEffect(() => {
+    mesh?.bind?.((next) => {
+      void persistBook((book) => {
+        const owner = Object.values(book.profiles).find((profile) => profile.mesh?.id === next.id);
+        return owner ? updateProfileMesh(book, owner.id, next) : book;
+      });
+    });
+  }, [mesh, persistBook]);
 
   // When the mesh's routes change (the node came up, a forward was re-bound
   // after the app came back from the background, the mesh was switched on or

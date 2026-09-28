@@ -1,0 +1,18 @@
+mutation SetMessageFlags($input: SetMessageFlagsInput!) {
+  setMessageFlags(input: $input) {
+    ...MessageState
+  }
+}
+
+mutation MarkMessagesRead($input: MarkMessagesInput!) {
+  markMessagesRead(input: $input) {
+    ...MessageState
+  }
+}
+
+# Without `permanent` this moves the mail into its mailbox's Trash.
+mutation DeleteMessages($input: DeleteMessagesInput!) {
+  deleteMessages(input: $input) {
+    deleted
+  }
+}

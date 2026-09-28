@@ -2,6 +2,8 @@ import { manifest } from "@/lib/constants";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as WebBrowser from "expo-web-browser";
 import { buildArkitekt } from "../arkitekt";
+import { bankServiceDefinition } from "../bank/service";
+import { kuvertServiceDefinition } from "../kuvert/service";
 import { livekitServiceDefinition } from "../livekit/service";
 import { lokServiceBuilder } from "../lok/service";
 import { lovekitServiceDefinition } from "../lovekit/service";
@@ -75,6 +77,8 @@ export const App = buildArkitekt({
     lovekit: lovekitServiceDefinition,
     mikro: mikroServiceDefinition ,
     livekit: livekitServiceDefinition,
+    kuvert: kuvertServiceDefinition,
+    bank: bankServiceDefinition,
 
   },
   selfServiceBuilder: lokServiceBuilder,
@@ -92,5 +96,7 @@ export const Guard = {
   Rekuest: App.buildServiceGuard("rekuest"),
   Lovekit: App.buildServiceGuard("lovekit"),
   Livekit: App.buildServiceGuard("livekit"),
+  Kuvert: App.buildServiceGuard("kuvert"),
+  Bank: App.buildServiceGuard("bank"),
 };
 

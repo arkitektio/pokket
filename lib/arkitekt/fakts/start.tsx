@@ -71,7 +71,7 @@ export const deviceAuthorization = async ({
 
   const parsed = DeviceAuthorizationSchema.safeParse(json);
   if (!parsed.success) {
-    console.error("Malformed device authorization response", parsed.error, json);
+    console.warn("Malformed device authorization response", parsed.error, json);
     throw new Error("Malformed device authorization response");
   }
 

@@ -19,6 +19,7 @@ const SOURCE_STYLE: Record<LoggedError['source'], string> = {
   js: 'bg-destructive',
   promise: 'bg-accent',
   console: 'bg-muted',
+  warning: 'bg-muted',
   request: 'bg-secondary',
 };
 

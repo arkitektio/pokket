@@ -50,7 +50,7 @@ export const buildAliases = async ({
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error);
       if (!req.optional) {
-        console.error(`[ArkitektProvider] buildAliases: FAILED required service "${req.key}":`, reason);
+        console.warn(`[ArkitektProvider] buildAliases: FAILED required service "${req.key}":`, reason);
         functional = false
         aliasReports[req.key] = {
           valid: false,

@@ -56,7 +56,7 @@ export const discover = async ({
   );
 
   if (!fulfilled) {
-    console.error("No valid Fakts endpoint found", attempts);
+    console.warn("No valid Fakts endpoint found", attempts);
     // Surface why. A deployment still speaking the pre-OAuth protocol answers
     // discovery happily but fails schema validation, and collapsing that into
     // "no endpoint found" reads as "server unreachable" instead of "wrong

@@ -26,7 +26,7 @@ export const popOutWindowOpen = async ({
       try {
         win.close?.();
       } catch (e) {
-        console.error("Window close failed", e);
+        console.warn("Window close failed", e);
       }
     },
   };

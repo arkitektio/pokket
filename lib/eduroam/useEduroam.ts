@@ -62,7 +62,7 @@ export function useEduroam() {
       const data = JSON.parse(content);
       setDiscoveryData(data);
     } catch (err) {
-      console.error("Failed to initialize Eduroam:", err);
+      console.warn("Failed to initialize Eduroam:", err);
       setError("Failed to load Eduroam data");
     } finally {
       setLoading(false);
@@ -81,7 +81,7 @@ export function useEduroam() {
       const data = JSON.parse(content);
       setDiscoveryData(data);
     } catch (err) {
-      console.error("Failed to refresh Eduroam:", err);
+      console.warn("Failed to refresh Eduroam:", err);
       setError("Failed to refresh Eduroam data");
     } finally {
       setLoading(false);
@@ -127,7 +127,7 @@ export function useEduroam() {
 
       return eapConfig;
     } catch (err) {
-      console.error("Failed to fetch EAP config:", err);
+      console.warn("Failed to fetch EAP config:", err);
       setError("Failed to fetch university configuration");
       throw err;
     } finally {

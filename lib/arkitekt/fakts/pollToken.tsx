@@ -37,7 +37,7 @@ export type RefreshResult = {
 export const splitGrantResponse = (json: unknown): GrantResult => {
   const parsed = TokenGrantResponseSchema.safeParse(json);
   if (!parsed.success) {
-    console.error("Malformed token response", parsed.error, json);
+    console.warn("Malformed token response", parsed.error, json);
     throw new Error("Malformed token response");
   }
 
@@ -72,7 +72,7 @@ export const splitRefreshResponse = (json: unknown): RefreshResult => {
 
   const parsed = TokenResponseSchema.safeParse(json);
   if (!parsed.success) {
-    console.error("Malformed refresh response", parsed.error, json);
+    console.warn("Malformed refresh response", parsed.error, json);
     throw new Error("Malformed refresh response");
   }
 

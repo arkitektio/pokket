@@ -16,7 +16,15 @@ import {
   useService
 } from "@/lib/arkitekt/provider";
 import { Manifest, Requirement } from "./fakts/manifestSchema";
-import { useSelfService } from "./hooks";
+import {
+  useActiveProfile,
+  useActiveProfileId,
+  useParkedProfileId,
+  useProfileActions,
+  useProfiles,
+  useSelfService,
+  useSwitchingProfileId,
+} from "./hooks";
 import { MeshIntegration, NodeIDProvider, WindowPopper } from "./types";
 // When using the Tauri API npm package:
 
@@ -123,5 +131,11 @@ export const buildArkitekt = <T extends ServiceBuilderMap, S extends ServiceBuil
       return arkitekt.connection?.token?.access_token || arkitekt.storedSession?.token?.access_token || null;
     },
     useArkitekt: useArkitekt,
+    useProfiles,
+    useActiveProfile,
+    useActiveProfileId,
+    useSwitchingProfileId,
+    useParkedProfileId,
+    useProfileActions,
   };
 };

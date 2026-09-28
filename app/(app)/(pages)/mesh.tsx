@@ -101,14 +101,15 @@ export default function MeshScreen() {
 
         {available && endpoint?.mesh_coord_url && !record ? (
           <Notice title="Not on this deployment's mesh">
-            {endpoint.name} has a mesh, but this login was not let into it. Sign out and in again,
-            and allow the mesh when you approve pokket.
+            {endpoint.name} has a mesh, but this organization's login was not let into it. Add the
+            organization again from the switcher, and allow the mesh when you approve pokket.
           </Notice>
         ) : null}
 
         {available && !endpoint?.mesh_coord_url && !record ? (
           <Notice title="No mesh">
-            {endpoint?.name ?? 'This deployment'} does not run an organisation mesh.
+            {endpoint?.name ?? 'This deployment'} does not run an organisation mesh, so every
+            service of this organization is reached directly.
           </Notice>
         ) : null}
 

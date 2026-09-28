@@ -1,0 +1,9 @@
+query ListBankAccounts(
+  $filters: BankAccountFilter
+  $ordering: [BankAccountOrder!]! = [{ kind: ASC }, { name: ASC }]
+  $pagination: OffsetPaginationInput
+) {
+  bankAccounts(filters: $filters, ordering: $ordering, pagination: $pagination) {
+    ...ListBankAccount
+  }
+}

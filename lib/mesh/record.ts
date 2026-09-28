@@ -4,26 +4,15 @@ import type { FaktsEndpoint } from "@/lib/arkitekt/fakts/endpointSchema";
 import type { GrantedMesh } from "@/lib/arkitekt/fakts/meshGrant";
 import { isValidControlUrl } from "./classify";
 
-/**
- * The mesh this device's session belongs to — orkestrator's `ProfileMesh`,
- * for pokket's single session. It records WHICH mesh and how to reach it,
- * never the key: the key is used once, at join, and the node's own state
- * (under the app's files) carries the login from then on.
- */
-export const ProfileMeshSchema = z.object({
-  /** Also the node's state directory name, hence the charset. */
-  id: z.string().regex(/^[A-Za-z0-9_-]{1,64}$/),
-  label: z.string(),
-  controlUrl: z.string(),
-  /** Hosts pinned to the mesh beyond what their names say. */
-  hosts: z.array(z.string()).default([]),
-  /** The user's switch (Mesh screen). Off: no node, no key asked for. */
-  enabled: z.boolean().default(true),
-  /** Learned from the running node; lets short MagicDNS names count as on-mesh. */
-  magicDnsSuffix: z.string().optional(),
-});
+import { ProfileMeshSchema, type ProfileMesh } from "@/lib/arkitekt/fakts/profileStorageSchema";
 
-export type ProfileMesh = z.infer<typeof ProfileMeshSchema>;
+/**
+ * The mesh a login belongs to lives on its profile (`ProfileMesh`, in the
+ * profile book). This module keeps what builds one from a grant, and reads
+ * the single record pokket kept before there were profiles, for migration.
+ */
+export { ProfileMeshSchema };
+export type { ProfileMesh };
 
 export const MeshRecordSchema = z.object({
   /** The deployment (`.well-known/fakts` base_url) the mesh came with. */
@@ -33,6 +22,7 @@ export const MeshRecordSchema = z.object({
 
 export type MeshRecord = z.infer<typeof MeshRecordSchema>;
 
+/** Where pokket kept its one mesh before profiles; read once, to migrate. */
 const STORAGE_KEY = "pokket.mesh";
 
 export const normalizeBaseUrl = (url: string): string => url.trim().replace(/\/+$/, "").toLowerCase();

@@ -1,0 +1,9 @@
+# Every mailbox with its synced folders: unread counts, and where Trash is.
+query MailboxTree {
+  mailAccounts {
+    ...MailboxAccount
+    folders(filters: { syncEnabled: true }) {
+      ...MailboxFolder
+    }
+  }
+}

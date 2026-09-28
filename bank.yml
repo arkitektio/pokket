@@ -1,0 +1,29 @@
+overwrite: true
+schema:
+  "http://jhnnsrs-lab/bank/schema":
+    handleAsSDL: true
+documents: "graphql/bank/**/*.graphql"
+generates:
+  lib/bank/api/fragments.ts:
+    plugins:
+      - "fragment-matcher"
+  lib/bank/api/graphql.ts:
+    plugins:
+      - "typescript"
+      - "typescript-operations"
+      - "typescript-react-apollo"
+    config:
+      withHooks: true
+      reactApolloVersion: 3
+      apolloReactHooksImportFrom: "@/lib/bank/funcs"
+
+  lib/bank/graphql.schema.json:
+    plugins:
+      - "introspection"
+config:
+  scalars:
+    # Isoformat strings on the wire. Decimals stay strings so money is never
+    # rounded through a float; parse only where you format.
+    Date: string
+    DateTime: string
+    Decimal: string

@@ -170,7 +170,7 @@ export function decodeResponse(base64Value: string | null): string | null {
   try {
     return atob(base64Value);
   } catch (err) {
-    console.error("Failed to decode response:", err);
+    console.warn("Failed to decode response:", err);
     return null;
   }
 }
@@ -195,7 +195,7 @@ export function parseImprovStatus(
     const statusCode = decoded.charCodeAt(0);
     return statusCode as ImprovStatus;
   } catch (err) {
-    console.error("Failed to parse status:", err);
+    console.warn("Failed to parse status:", err);
     return null;
   }
 }
@@ -213,7 +213,7 @@ export function parseImprovError(
     const errorCode = decoded.charCodeAt(0);
     return errorCode as ImprovError;
   } catch (err) {
-    console.error("Failed to parse error:", err);
+    console.warn("Failed to parse error:", err);
     return null;
   }
 }
@@ -234,7 +234,7 @@ export function parseManifest(
   try {
     raw = JSON.parse(decoded);
   } catch (err) {
-    console.error("Failed to parse manifest JSON:", err);
+    console.warn("Failed to parse manifest JSON:", err);
     return null;
   }
 

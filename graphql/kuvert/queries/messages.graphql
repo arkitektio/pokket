@@ -1,0 +1,5 @@
+query GetMessage($id: ID!, $allowRemote: Boolean! = false) {
+  message(id: $id) {
+    ...Message
+  }
+}

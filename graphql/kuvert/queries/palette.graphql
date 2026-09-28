@@ -1,0 +1,13 @@
+# The search palette's mail hits: substring and meaning, in the server's order.
+query KuvertPaletteSearch($search: String!, $limit: Int!) {
+  messages(filters: { search: $search }, pagination: { limit: $limit }) {
+    id
+    subject
+    senderName
+    senderAddress
+    date
+    thread {
+      id
+    }
+  }
+}

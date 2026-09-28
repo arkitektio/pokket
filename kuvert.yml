@@ -1,0 +1,26 @@
+overwrite: true
+schema:
+  "http://jhnnsrs-lab/kuvert/schema":
+    handleAsSDL: true
+documents: "graphql/kuvert/**/*.graphql"
+generates:
+  lib/kuvert/api/fragments.ts:
+    plugins:
+      - "fragment-matcher"
+  lib/kuvert/api/graphql.ts:
+    plugins:
+      - "typescript"
+      - "typescript-operations"
+      - "typescript-react-apollo"
+    config:
+      withHooks: true
+      reactApolloVersion: 3
+      apolloReactHooksImportFrom: "@/lib/kuvert/funcs"
+
+  lib/kuvert/graphql.schema.json:
+    plugins:
+      - "introspection"
+config:
+  scalars:
+    DateTime: string
+    ByteCount: number

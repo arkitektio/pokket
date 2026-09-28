@@ -1,0 +1,14 @@
+fragment MailboxAccount on MailAccount {
+  id
+  name
+  emailAddress
+  unreadCount
+  syncing
+}
+
+fragment MailboxFolder on MailFolder {
+  id
+  name
+  role
+  unreadCount
+}

@@ -1,0 +1,25 @@
+fragment Balance on BalanceSnapshot {
+  id
+  date
+  balanceType
+  amount
+  currency
+}
+
+fragment ListBankAccount on BankAccount {
+  id
+  iban
+  name
+  kind
+  currency
+  lastSyncedAt
+  isSyncing
+  latestBalance {
+    ...Balance
+  }
+  connection {
+    id
+    aspspName
+    needsReauth
+  }
+}

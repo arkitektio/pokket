@@ -1,6 +1,9 @@
 import '~/global.css';
 
 import { AlertDialogProvider } from '@/components/ui/alert-dialog';
+import { ProfileIdentitySync } from '@/components/profile/ProfileIdentitySync';
+import { TabsProvider } from '@/lib/tabs/TabsProvider';
+import { PushRegistration } from '@/lib/push/PushRegistration';
 import { App } from '@/lib/app/App';
 import { useArkitekt } from '@/lib/arkitekt/provider';
 import { ErrorOverlay } from '@/lib/debug/ErrorOverlay';
@@ -48,14 +51,10 @@ export const AppLayout = () => {
   return (
     <Stack>
       <Stack.Protected guard={isLoggedIn}>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false, title: "Pokket" }} />
-        <Stack.Screen name="broadcasts" options={{ title: 'Broadcasts' }} />
-        <Stack.Screen name="solo-broadcast/start" options={{ title: 'Start Solo Broadcast' }} />
-        <Stack.Screen name="solo-broadcast/[id]" options={{ title: 'Solo Broadcast' }} />
-        <Stack.Screen name="debug" options={{ title: 'Debug' }} />
-        <Stack.Screen name="provision" options={{ title: 'Provision' }} />
-        <Stack.Screen name="tasks" options={{ title: 'Tasks' }} />
-        <Stack.Screen name="mesh" options={{ title: 'Mesh' }} />
+        {/* The sidebar and the one page view (app/(app)). */}
+        <Stack.Screen name="(app)" options={{ headerShown: false, title: "Pokket" }} />
+        {/* Search: the palette, over everything. */}
+        <Stack.Screen name="search" options={{ headerShown: false, presentation: 'fullScreenModal', animation: 'fade' }} />
       </Stack.Protected>
       <Stack.Protected guard={!isLoggedIn} >
         <Stack.Screen name="login" options={{ headerShown: false }} />
@@ -100,7 +99,12 @@ export default function RootLayout() {
         <BrandProvider>
           <AlertDialogProvider>
             <StatusBar style={'light'} />
-            <AppLayout />
+            <TabsProvider>
+              <AppLayout />
+            </TabsProvider>
+            <ProfileIdentitySync />
+            {/* Silent, and only while push is switched on in Settings. */}
+            <PushRegistration />
             {SELFTEST_ENABLED && <MeshSelfTestBoot />}
             {/* lib/lok/funcs.tsx has always reported mutation failures with
                 `toast.error`, but nothing ever mounted the renderer, so every one

@@ -1,0 +1,71 @@
+fragment Address on Address {
+  name
+  address
+}
+
+fragment ListMessage on Message {
+  id
+  subject
+  senderName
+  senderAddress
+  date
+  snippet
+  isRead
+  isFlagged
+  isAnswered
+  hasAttachments
+  syncState
+  account {
+    id
+    name
+    emailAddress
+  }
+  folder {
+    id
+    name
+    role
+  }
+  thread {
+    id
+    messageCount
+  }
+}
+
+fragment Message on Message {
+  ...ListMessage
+  receivedAt
+  textBody
+  hasRemoteImages
+  size
+  truncated
+  html(allowRemote: $allowRemote)
+  sender {
+    ...Address
+  }
+  replyTo {
+    ...Address
+  }
+  to {
+    ...Address
+  }
+  cc {
+    ...Address
+  }
+  attachments {
+    ...Attachment
+  }
+}
+
+# What a triage mutation changes; written back into the cache by id.
+fragment MessageState on Message {
+  id
+  isRead
+  isFlagged
+  isAnswered
+  syncState
+  folder {
+    id
+    name
+    role
+  }
+}

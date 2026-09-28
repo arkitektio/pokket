@@ -3,6 +3,7 @@ import { useStore } from "zustand";
 import { useShallow } from "zustand/react/shallow";
 
 import { ArkitektContext } from "./context";
+import { getActiveProfile, listProfiles, StoredProfile } from "./fakts/profileStorageSchema";
 import {
   AppContext,
   AppFunctions,
@@ -22,7 +23,7 @@ const useArkitektContext = () => {
   return context;
 };
 
-const useArkitektStore = <T,>(selector: (state: AppContext) => T) => {
+export const useArkitektStore = <T,>(selector: (state: AppContext) => T) => {
   const { store } = useArkitektContext();
 
   return useStore(store, selector);
@@ -91,3 +92,37 @@ export const useManifest = () => useArkitektStore((state) => state.manifest);
 
 export const useConfigurationIssues = (): string[] =>
   useArkitektStore((state) => state.configurationIssues);
+
+// ── profiles (kept logins, one per organization) ──
+
+/** Every kept login, most recently used first. */
+export const useProfiles = (): StoredProfile[] => {
+  const book = useArkitektStore((state) => state.profileBook);
+  return useMemo(() => listProfiles(book), [book]);
+};
+
+export const useActiveProfileId = (): string | null =>
+  useArkitektStore((state) => state.profileBook.activeProfileId);
+
+export const useActiveProfile = (): StoredProfile | null =>
+  useArkitektStore((state) => getActiveProfile(state.profileBook));
+
+export const useSwitchingProfileId = (): string | null =>
+  useArkitektStore((state) => state.switchingProfileId);
+
+export const useParkedProfileId = (): string | null =>
+  useArkitektStore((state) => state.parkedProfileId);
+
+export const useProfileActions = () => {
+  const actions = useArkitektActions();
+  return useMemo(
+    () => ({
+      switchProfile: actions.switchProfile,
+      signOutProfile: actions.signOutProfile,
+      addProfile: actions.addProfile,
+      cancelAddProfile: actions.cancelAddProfile,
+      setProfileIdentity: actions.setProfileIdentity,
+    }),
+    [actions],
+  );
+};

@@ -45,7 +45,7 @@ export function BleDebug() {
             await bleDevice.connect(device.id);
             await bleDevice.discoverServices();
         } catch (err) {
-            console.error('Failed to connect/discover:', err);
+            console.warn('Failed to connect/discover:', err);
         }
     }, [scanner, bleDevice]);
 

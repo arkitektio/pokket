@@ -2,14 +2,20 @@ import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { App } from '@/lib/app/App';
 import { discover } from '@/lib/arkitekt/fakts/discover';
+import { ProfileList } from '@/components/profile/ProfileList';
+import { profileTitle } from '@/lib/arkitekt/fakts/profileStorageSchema';
 import { cn } from '@/lib/utils';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React from 'react';
-import { ActivityIndicator, Animated, Image, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Animated, Image, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 
 export default function LoginScreen() {
   const connect = App.useConnect();
+  const profiles = App.useProfiles();
+  const parkedId = App.useParkedProfileId();
+  const parked = profiles.find((profile) => profile.id === parkedId);
+  const { cancelAddProfile } = App.useProfileActions();
   const [url, setUrl] = React.useState('https://go.arkitekt.live');
   const [isLoading, setIsLoading] = React.useState(false);
   const [advanced, setAdvanced] = React.useState(false);
@@ -139,6 +145,32 @@ export default function LoginScreen() {
           <ThemedText className="text-sm text-red-400 mt-3 text-center">{error}</ThemedText>
         ) : null}
 
+        {parked ? (
+          <TouchableOpacity
+            style={{ marginTop: 16 }}
+            activeOpacity={0.8}
+            onPress={() => {
+              cancelAddProfile().then(
+                () => router.replace('/'),
+                (err: Error) => setError(err.message),
+              );
+            }}
+          >
+            <ThemedText className="text-sm text-indigo-300">Back to {profileTitle(parked)}</ThemedText>
+          </TouchableOpacity>
+        ) : null}
+
+        {profiles.length > 0 ? (
+          <View style={styles.saved}>
+            <ThemedText className="mb-2 px-3 text-xs uppercase tracking-wide text-muted-foreground">
+              Signed in before
+            </ThemedText>
+            <ScrollView style={{ maxHeight: 260 }}>
+              <ProfileList onSwitched={() => router.replace('/')} />
+            </ScrollView>
+          </View>
+        ) : null}
+
       </View>
     </View>
   );
@@ -160,5 +192,6 @@ const styles = StyleSheet.create({
   advInner: { padding: 12, borderRadius: 12 },
   advHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   connectRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12 },
+  saved: { width: '100%', marginTop: 28 },
   abortButton: { marginLeft: 12, paddingVertical: 10, paddingHorizontal: 14, borderRadius: 10, backgroundColor: 'transparent', borderWidth: 1, borderColor: '#334155' },
 });

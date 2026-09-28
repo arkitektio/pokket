@@ -44,6 +44,8 @@ const MAPPING = {
   'bell.slash': 'notifications-off',
   'exclamationmark.triangle': 'warning',
   'network': 'hub',
+  'envelope.fill': 'mail',
+  'creditcard.fill': 'credit-card',
 } as IconMapping;
 
 /**

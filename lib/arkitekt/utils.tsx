@@ -110,7 +110,7 @@ export const enhanceManifest = async (
   try {
     node_id = await nodeIDProvider();
   } catch (e) {
-    console.error("Failed to get node ID:", e);
+    console.warn("Failed to get node ID:", e);
     node_id = undefined
   }
 
@@ -147,7 +147,7 @@ export const report = async (
       );
     }
   } catch (e) {
-    console.error("Report request error:", e);
+    console.warn("Report request error:", e);
   }
 }
 

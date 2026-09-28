@@ -9,7 +9,6 @@ import { meshNeeded, onMesh } from "./meshNeed";
 import {
   loadMeshRecord,
   meshFromGrant,
-  normalizeBaseUrl,
   writeMeshRecord,
   type MeshRecord,
   type ProfileMesh,
@@ -19,12 +18,19 @@ import { ensureStatusSubscription, nodeStatus, onNodeStatus, waitForRunning } fr
 /**
  * pokket's side of the organisation mesh, handed to the arkitekt provider.
  *
- *  - A login to a deployment whose `.well-known/fakts` names a mesh asks lok
- *    for a one-shot key, unless the mesh is switched off (Mesh screen).
+ * The mesh is conditional, and per login: a login uses it only when its hub
+ * exposes one — the deployment's `.well-known/fakts` names a control server
+ * and lok granted this login a node — and only while some alias needs it.
+ *
+ *  - A login to a deployment that names a mesh asks lok for a one-shot key,
+ *    unless that login's mesh is switched off (Mesh screen).
  *  - If the approver allows it, the key comes back with the tokens; the node
- *    joins with it at once, and the record keeps the mesh — never the key.
- *  - From then on the node rejoins from its own state whenever the session's
- *    fakts put an alias on the mesh.
+ *    joins with it at once, and the login's profile keeps the mesh — never
+ *    the key. The provider stores it (`onGrant` returns it).
+ *  - From then on the node rejoins from its own state whenever the active
+ *    login's fakts put an alias on the mesh.
+ *  - Switching to another login stops this login's node but keeps its state,
+ *    so switching back rejoins without a key; a login with no mesh runs none.
  *  - Aliases on the mesh are reached through a loopback reverse proxy per
  *    alias (`forward`), which is what service clients are built against.
  *
@@ -49,7 +55,7 @@ const nodeHostname = (): string => {
 };
 
 export type MeshController = MeshIntegration & {
-  /** The current record, for the Mesh screen. */
+  /** The active login's mesh, for the Mesh screen; null when it has none. */
   record: () => MeshRecord | null;
   subscribeRecord: (listener: () => void) => () => void;
   /** The Mesh screen's switch. */
@@ -58,11 +64,10 @@ export type MeshController = MeshIntegration & {
 
 export const createMeshIntegration = (): MeshController => {
   ensureStatusSubscription();
+  /** The ACTIVE login's mesh; every other login's node is stopped. */
   let record: MeshRecord | null = null;
-  const loaded = loadMeshRecord().then((stored) => {
-    record = stored;
-    recordListeners.forEach((listener) => listener());
-  });
+  /** Where changes to a login's mesh (switch, learned suffix) are kept: its profile. */
+  let persist: ((mesh: ProfileMesh) => void) | undefined;
 
   /** alias key → the loopback stand-in currently serving it. */
   const forwards = new Map<string, { alias: Alias; standIn: Alias }>();
@@ -71,33 +76,59 @@ export const createMeshIntegration = (): MeshController => {
 
   const notifyRoutes = () => routeListeners.forEach((listener) => listener());
 
-  const saveRecord = async (next: MeshRecord | null) => {
+  const notifyRecord = () => recordListeners.forEach((listener) => listener());
+
+  /** The active login's mesh changed: tell the Mesh screen, and its profile. */
+  const saveRecord = (next: MeshRecord) => {
     record = next;
-    recordListeners.forEach((listener) => listener());
-    await writeMeshRecord(next);
+    notifyRecord();
+    persist?.(next.mesh);
   };
 
   const activeMesh = (): ProfileMesh | undefined =>
     record?.mesh.enabled && meshNative() ? record.mesh : undefined;
 
+  /**
+   * Nodes this process started and has not stopped. Status events arrive
+   * asynchronously, so a node started a moment ago may not report yet; this
+   * is what makes a quick switch away still stop it.
+   */
+  const started = new Set<string>();
+
   const start = async (mesh: ProfileMesh, authKey?: string) => {
     const native = meshNative();
     if (!native) return;
     ensureStatusSubscription();
+    started.add(mesh.id);
     await native.start(mesh.id, mesh.controlUrl, nodeHostname(), authKey ?? null);
   };
 
   const stop = async (mesh: ProfileMesh) => {
     forwards.clear();
+    started.delete(mesh.id);
     await meshNative()?.stop(mesh.id);
   };
 
-  /** Leave the mesh for good: the node's identity goes with it. */
-  const forget = async () => {
+  const isUp = (mesh: ProfileMesh) => {
+    const state = nodeStatus(mesh.id)?.state;
+    return started.has(mesh.id) || (state !== undefined && state !== "stopped");
+  };
+
+  /**
+   * Make `next` the active login's mesh. Another login's node is stopped —
+   * not forgotten: its state on disk is how switching back rejoins with no
+   * key. Its forwards go with it, so routes change.
+   */
+  const activate = async (next: MeshRecord | null) => {
     const previous = record;
-    forwards.clear();
-    if (previous) await meshNative()?.forget(previous.mesh.id);
-    await saveRecord(null);
+    record = next;
+    notifyRecord();
+    if (previous && previous.mesh.id !== next?.mesh.id) {
+      const hadRoutes = forwards.size > 0;
+      forwards.clear();
+      if (isUp(previous.mesh)) await stop(previous.mesh);
+      if (hadRoutes) notifyRoutes();
+    }
   };
 
   /** Join with the one-shot key, then let the node go once it ran (or gave up). */
@@ -105,7 +136,7 @@ export const createMeshIntegration = (): MeshController => {
     await start(mesh, authKey);
     await waitForRunning(mesh.id, { timeoutMs: JOIN_AND_PARK_TIMEOUT_MS });
     // Only park it if nothing started needing it in the meantime.
-    if (forwards.size === 0) await meshNative()?.stop(mesh.id);
+    if (forwards.size === 0 && record?.mesh.id === mesh.id) await stop(mesh);
   };
 
   // Keep what the running node teaches us (its MagicDNS suffix makes short
@@ -117,7 +148,7 @@ export const createMeshIntegration = (): MeshController => {
     lastState = { ...lastState, [status.id]: status.state };
     if (!record || record.mesh.id !== status.id) return;
     if (status.magicDnsSuffix && status.magicDnsSuffix !== record.mesh.magicDnsSuffix) {
-      void saveRecord({ ...record, mesh: { ...record.mesh, magicDnsSuffix: status.magicDnsSuffix } });
+      saveRecord({ ...record, mesh: { ...record.mesh, magicDnsSuffix: status.magicDnsSuffix } });
     }
     if (status.state === "running" && was !== undefined && was !== "running") notifyRoutes();
   });
@@ -157,7 +188,6 @@ export const createMeshIntegration = (): MeshController => {
     },
 
     prepare: async (alias, controller) => {
-      await loaded;
       const mesh = activeMesh();
       const native = meshNative();
       if (!mesh || !native || !onMesh(alias.host, mesh)) return alias;
@@ -176,7 +206,15 @@ export const createMeshIntegration = (): MeshController => {
       return standIn;
     },
 
-    resolve: (alias) => forwards.get(aliasKey(alias))?.standIn ?? alias,
+    // One forward serves every alias on the same host, port and TLS — services
+    // behind one gateway differ only by path. So the stand-in lends its port,
+    // and the alias keeps its own path, id and challenge: handing back the
+    // stored stand-in whole would send one service's queries to whichever
+    // service was prepared first on that host.
+    resolve: (alias) => {
+      const entry = forwards.get(aliasKey(alias));
+      return entry ? { ...alias, host: entry.standIn.host, port: entry.standIn.port, ssl: false } : alias;
+    },
   };
 
   return {
@@ -189,33 +227,35 @@ export const createMeshIntegration = (): MeshController => {
       return () => recordListeners.delete(listener);
     },
 
-    wantsKey: (endpoint: FaktsEndpoint) => {
-      if (!meshNative() || !endpoint.mesh_coord_url) return false;
-      // The switch belongs to the deployment it was flipped for.
-      if (record && normalizeBaseUrl(record.baseUrl) === normalizeBaseUrl(endpoint.base_url)) {
-        return record.mesh.enabled;
-      }
-      return true;
+    bind: (listener) => {
+      persist = listener;
     },
 
-    onGrant: async ({ endpoint, fakts, granted }: { endpoint: FaktsEndpoint; fakts: ActiveFakts; granted?: GrantedMesh }) => {
-      await loaded;
-      const baseUrl = endpoint.base_url;
-      const sameDeployment = !!record && normalizeBaseUrl(record.baseUrl) === normalizeBaseUrl(baseUrl);
-      // A different deployment's node must not carry over into this session.
-      if (record && !sameDeployment) await forget();
+    takeLegacy: async () => {
+      const legacy = await loadMeshRecord();
+      if (legacy) await writeMeshRecord(null);
+      return legacy;
+    },
 
-      const previous = sameDeployment ? record?.mesh : undefined;
+    wantsKey: (endpoint: FaktsEndpoint, mesh?: ProfileMesh) => {
+      // No control server named: this hub exposes no mesh, so none is asked for.
+      if (!meshNative() || !endpoint.mesh_coord_url) return false;
+      // The switch belongs to the login it was flipped for.
+      return mesh?.enabled ?? true;
+    },
+
+    onGrant: async ({ endpoint, fakts, granted, previous }) => {
+      const baseUrl = endpoint.base_url;
       const mesh = meshFromGrant(endpoint, granted, previous);
 
       if (mesh && granted) {
         // Another control server means another node: drop the old identity.
         if (previous && previous.id !== mesh.id) await meshNative()?.forget(previous.id);
-        await saveRecord({ baseUrl, mesh });
-        if (!mesh.enabled) return;
+        await activate({ baseUrl, mesh });
+        if (!mesh.enabled) return mesh;
         // A node still up (say, one whose membership lapsed) would ignore the
         // new key: start is idempotent. Restart it so the key is applied.
-        if (nodeStatus(mesh.id) && nodeStatus(mesh.id)?.state !== "stopped") await stop(mesh);
+        if (isUp(mesh)) await stop(mesh);
         if (meshNeeded(fakts, mesh)) {
           // Joining now; the alias checks wait for it to come up.
           await start(mesh, granted.authKey);
@@ -226,19 +266,24 @@ export const createMeshIntegration = (): MeshController => {
             console.warn("[mesh] join-and-park failed:", error),
           );
         }
-        return;
+        return mesh;
       }
 
-      // No key this time (not asked, not granted): a node that joined earlier
-      // may still get in from its own state.
+      // No key this time (not asked, not granted): a node this login joined
+      // earlier may still get in from its own state.
+      await activate(previous ? { baseUrl, mesh: previous } : null);
       if (previous?.enabled && meshNeeded(fakts, previous)) await start(previous);
+      return previous;
     },
 
-    onRestore: async ({ endpoint, fakts }) => {
-      await loaded;
-      if (!record || normalizeBaseUrl(record.baseUrl) !== normalizeBaseUrl(endpoint.base_url)) return;
+    onRestore: async ({ endpoint, fakts, mesh: profileMesh }) => {
+      await activate(profileMesh ? { baseUrl: endpoint.base_url, mesh: profileMesh } : null);
       const mesh = activeMesh();
-      if (!mesh) return;
+      if (!mesh) {
+        // Switched off: nothing of it may keep running.
+        if (profileMesh && isUp(profileMesh)) await stop(profileMesh);
+        return;
+      }
       if (meshNeeded(fakts, mesh)) {
         // Don't wait: the checks of mesh aliases do.
         await start(mesh);
@@ -247,9 +292,22 @@ export const createMeshIntegration = (): MeshController => {
       }
     },
 
-    onDisconnect: async () => {
-      await loaded;
-      await forget();
+    onPark: async () => {
+      await activate(null);
+    },
+
+    onDisconnect: async (mesh) => {
+      const target = mesh ?? record?.mesh;
+      if (record && (!mesh || record.mesh.id === mesh.id)) {
+        forwards.clear();
+        record = null;
+        notifyRecord();
+        notifyRoutes();
+      }
+      if (target) {
+        started.delete(target.id);
+        await meshNative()?.forget(target.id);
+      }
     },
 
     subscribe: (listener) => {
@@ -258,10 +316,9 @@ export const createMeshIntegration = (): MeshController => {
     },
 
     setEnabled: async (enabled, fakts) => {
-      await loaded;
       if (!record) return;
       const mesh = { ...record.mesh, enabled };
-      await saveRecord({ ...record, mesh });
+      saveRecord({ ...record, mesh });
       if (!meshNative()) return;
       if (enabled) {
         if (meshNeeded(fakts, mesh)) await start(mesh);

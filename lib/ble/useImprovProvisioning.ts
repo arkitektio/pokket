@@ -180,7 +180,7 @@ export function useImprovProvisioning(): UseImprovProvisioningResult {
 
         return parseStatus(statusData);
       } catch (err) {
-        console.error("Failed to get status:", err);
+        console.warn("Failed to get status:", err);
         return null;
       }
     },
@@ -227,7 +227,7 @@ export function useImprovProvisioning(): UseImprovProvisioningResult {
             : err instanceof Error
               ? err.message
               : "Failed to get manifest";
-        console.error("Manifest validation failed:", errorMsg);
+        console.warn("Manifest validation failed:", errorMsg);
         setError(errorMsg);
         setManifest(null);
         return null;
@@ -411,7 +411,7 @@ export function useImprovProvisioning(): UseImprovProvisioningResult {
           } catch (pemErr) {
             const pemErrMsg =
               pemErr instanceof Error ? pemErr.message : String(pemErr);
-            console.error(
+            console.warn(
               `[Provision] Step 4.7: Failed to write PEM certificate (${pemByteLength} raw chars / ${pemPayloadLength} base64 chars). Error: ${pemErrMsg}`,
             );
             throw new Error(
@@ -473,7 +473,7 @@ export function useImprovProvisioning(): UseImprovProvisioningResult {
       } catch (err) {
         const errorMsg =
           err instanceof Error ? err.message : "Provisioning failed";
-        console.error("[Provision] Provisioning failed:", errorMsg, err);
+        console.warn("[Provision] Provisioning failed:", errorMsg, err);
         setError(errorMsg);
         setStatus(null);
         setIsProvisioning(false);

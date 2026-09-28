@@ -32,6 +32,7 @@ export const installGlobalErrorHandlers = () => {
   installUncaughtHandler();
   installRejectionTracker();
   installConsoleMirror();
+  installWarningMirror();
 };
 
 /** Uncaught throws outside of render — timers, event handlers, native callbacks. */
@@ -111,6 +112,29 @@ const installConsoleMirror = () => {
           describe(first),
           rest.length > 0 ? rest.map(describe).join('\n') : undefined,
         );
+      } finally {
+        reentrant = false;
+      }
+    }
+    original(...args);
+  };
+};
+
+/**
+ * Mirrors `console.warn` too, as `warning`: pokket reports the failures it
+ * handles there (an alias that did not answer, a cancelled sign-in), so they
+ * stay findable in the log without turning its badge red.
+ */
+const installWarningMirror = () => {
+  const original = console.warn;
+  let reentrant = false;
+
+  console.warn = (...args: unknown[]) => {
+    if (!reentrant) {
+      reentrant = true;
+      try {
+        const [first, ...rest] = args;
+        reportError('warning', describe(first), rest.length > 0 ? rest.map(describe).join('\n') : undefined);
       } finally {
         reentrant = false;
       }

@@ -19,6 +19,9 @@ export type ErrorSource =
   | 'js'
   | 'promise'
   | 'console'
+  /** `console.warn`: a failure the app handled (a service not reachable, a
+   *  cancelled sign-in). Logged, but no reason for a red badge. */
+  | 'warning'
   /** Not a failure — every GraphQL operation, so that "it never ran" is
    *  distinguishable from "it ran and failed". Those look identical from the
    *  UI and have completely different causes. */
@@ -36,8 +39,8 @@ export type LoggedError = {
   count: number;
 };
 
-/** `request` entries are traffic, not problems. */
-export const isFailure = (entry: LoggedError) => entry.source !== 'request';
+/** `request` entries are traffic, and `warning`s were handled: neither is a problem. */
+export const isFailure = (entry: LoggedError) => entry.source !== 'request' && entry.source !== 'warning';
 
 /** Old entries are worth less than a bounded heap on a phone. */
 const LIMIT = 100;

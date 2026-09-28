@@ -64,7 +64,7 @@ export function BleProvisioningDemo() {
                 arkitektToken,
             });
         } catch (err) {
-            console.error('Provisioning failed:', err);
+            console.warn('Provisioning failed:', err);
         }
     };
 

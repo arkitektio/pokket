@@ -78,7 +78,7 @@ export function useBLEDevice(): UseBLEDeviceResult {
       });
 
     } catch (err) {
-    console.error('Connection error:', err);
+    console.warn('Connection error:', err);
       setError(err instanceof Error ? err.message : 'Connection failed');
       setIsConnected(false);
       throw err;

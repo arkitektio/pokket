@@ -51,7 +51,7 @@ export const useThemeColors = () => React.useContext(ColorsContext);
  * the organization's". So a member who set only a hue keeps the organization's
  * chroma rather than dropping the whole pair.
  */
-const resolveBrand = (data: MyBrandQuery | undefined): Brand => {
+export const resolveBrand = (data: MyBrandQuery | undefined): Brand => {
   const organization = data?.mycontext?.organization;
   if (!organization) return DEFAULT_BRAND;
 

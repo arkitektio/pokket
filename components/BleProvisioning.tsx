@@ -274,7 +274,7 @@ export function BleProvisioning() {
                 pemCertificate: selectedProfile.pemCertificate,
             });
             } catch (err) {
-                console.error('Provisioning error:', err);
+                console.warn('Provisioning error:', err);
                 throw err;
             }
 

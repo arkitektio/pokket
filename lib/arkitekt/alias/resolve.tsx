@@ -44,7 +44,7 @@ export const checkAliasHealth = async (
     console.log(`[ArkitektProvider] Alias health check result: ${url} -> ${response.status} ${response.ok ? "OK" : "FAIL"}`);
     return response.ok;
   } catch (error) {
-    console.error(`[ArkitektProvider] Alias health check error: ${url} ->`, error instanceof Error ? error.message : error);
+    console.warn(`[ArkitektProvider] Alias health check error: ${url} ->`, error instanceof Error ? error.message : error);
     throw error;
   }
 }
@@ -95,6 +95,6 @@ export const resolveWorkingAlias = async ({
     }
   }
 
-  console.error(`[ArkitektProvider] No working alias found for service: ${instance.service}`);
+  console.warn(`[ArkitektProvider] No working alias found for service: ${instance.service}`);
   throw new Error(`No working alias found for service: ${instance.service}`);
 };
