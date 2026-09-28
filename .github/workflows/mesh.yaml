@@ -242,6 +242,8 @@ jobs:
         continue-on-error: true
         run: |
           brew tap facebook/fb
+          # Homebrew refuses third-party taps until they are trusted.
+          brew trust facebook/fb || true
           brew install idb-companion
           python3 -m pip install --break-system-packages fb-idb
           python3 -c 'import sysconfig; print(sysconfig.get_path("scripts"))' >> "$GITHUB_PATH"

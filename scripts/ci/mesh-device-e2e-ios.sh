@@ -64,9 +64,20 @@ screen_text() {
 
 # Taps the on-screen text $1 (a system alert's button) through idb: the
 # simulator has no other way to press a button from a script.
+# Without idb: bring the Simulator app forward and press Return, which a
+# UIKit alert takes as its default action ("Open" on the link prompt).
+press_return() {
+  open -a Simulator --args -CurrentDeviceUDID "$udid" 2> /dev/null || return 1
+  sleep 5
+  osascript -e 'tell application "Simulator" to activate' \
+    -e 'delay 1' \
+    -e 'tell application "System Events" to key code 36' || return 1
+  echo "pressed Return in the Simulator app"
+}
+
 tap_text() {
   local label="$1" pos size x y
-  command -v idb > /dev/null || { echo "no idb to tap \"$label\""; return 1; }
+  command -v idb > /dev/null || { echo "no idb to tap \"$label\"; pressing Return instead"; press_return; return; }
   xcrun simctl io "$udid" screenshot "$work/tap.png" > /dev/null 2>&1 || return 1
   pos="$("$work/ocr" "$work/tap.png" "$label" 2>/dev/null)" || { echo "\"$label\" is not on screen"; return 1; }
   size="$(idb describe --json 2>/dev/null | python3 -c '
@@ -96,7 +107,7 @@ open_link() {
   # the app ("Open in "pokket"?"), as a phone does the first time a link is
   # tapped. Answer it the way a user would.
   if [[ "$last_screen" == *"Open in"* ]]; then
-    if tap_text Open; then mark "tapped Open on the link prompt"; else mark "could not tap Open on the link prompt"; fi
+    if tap_text Open || press_return; then mark "answered the link prompt"; else mark "could not answer the link prompt"; fi
     sleep 5
     screen_text "link$link_count-after"
   fi
