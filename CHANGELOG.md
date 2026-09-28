@@ -1,3 +1,22 @@
+# [1.5.0](https://github.com/arkitektio/pokket/compare/v1.4.1...v1.5.0) (2026-09-28)
+
+
+### Bug Fixes
+
+* **mesh:** give the node a cache and temp dir in Android app processes ([f2ed5c8](https://github.com/arkitektio/pokket/commit/f2ed5c8ee818eb5866d209a084b205a003f5a060))
+* **mesh:** iOS pod headers, host-only e2e test, Gradle diagnostics ([c4d260a](https://github.com/arkitektio/pokket/commit/c4d260aa84d8929cad4fbb5bc2e8138c4a7b88fb))
+* **mesh:** permissions, no log upload, and real end-to-end tests ([d432119](https://github.com/arkitektio/pokket/commit/d432119ce46a86d8e53dffd8b9bbabfa955e1aed))
+* search navigation, whole-app re-renders and slow sidebar switches ([9152d09](https://github.com/arkitektio/pokket/commit/9152d09119be018dbca88336d61d2a29d172ddd0))
+
+
+### Features
+
+* ask before back leaves the app on Android ([e1f32aa](https://github.com/arkitektio/pokket/commit/e1f32aa1cdfe1902b38481cbde0da887ee5fb919))
+* **fakts:** mesh key grant and identity from the current protocol 2 ([def5d1e](https://github.com/arkitektio/pokket/commit/def5d1ea9f14fb7b5344f70f5e2ec704005b1e6a))
+* **mesh:** development builds keep the mesh across reloads; check deep links ([5151e51](https://github.com/arkitektio/pokket/commit/5151e51d817ff16dd1fd555e2ecbba19fbc571af))
+* **mesh:** in-app Tailscale node for the organisation mesh ([6e2b046](https://github.com/arkitektio/pokket/commit/6e2b0460446ecb831e1dbf69da4bf085d865b267))
+* over-the-air updates, iOS TestFlight releases, real app version ([1cc9813](https://github.com/arkitektio/pokket/commit/1cc981313b842c241196159aefcb4a3ca96cc63a))
+
 ## [1.4.1](https://github.com/arkitektio/pokket/compare/v1.4.0...v1.4.1) (2026-08-24)
 
 
