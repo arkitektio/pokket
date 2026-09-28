@@ -23,7 +23,17 @@ const RUNNING_TIMEOUT_MS = 120_000;
 
 type Step = { name: string; ok: boolean; detail: string };
 
-const log = (message: string) => console.log(`[mesh-selftest] ${message}`);
+/** Where to stream progress (the test env's side channel), set per run. */
+let progressUrl: string | undefined;
+let progressSeq = 0;
+
+const log = (message: string) => {
+  console.log(`[mesh-selftest] ${message}`);
+  if (!progressUrl) return;
+  // Fire and forget, numbered: Release builds keep console.log out of the
+  // device log, and a device that never gets onto the mesh can still say why.
+  fetch(progressUrl, { method: 'POST', body: `${++progressSeq} ${message}` }).catch(() => {});
+};
 
 const withTimeout = <T,>(promise: Promise<T>, ms: number, what: string): Promise<T> =>
   Promise.race([
@@ -66,7 +76,12 @@ const webSocketEcho = (url: string, message: string): Promise<string> =>
     ws.onerror = (event: any) => reject(new Error(event?.message || 'websocket error'));
   });
 
-async function runSelfTest(params: { control: string; key: string; host: string; port: number }, onStep: (s: Step) => void) {
+async function runSelfTest(
+  params: { control: string; key: string; host: string; port: number; progress?: string },
+  onStep: (s: Step) => void,
+) {
+  progressUrl = params.progress;
+  log('self-test started');
   const steps: Step[] = [];
   const step = async (name: string, run: () => Promise<string>) => {
     try {
@@ -140,7 +155,7 @@ async function runSelfTest(params: { control: string; key: string; host: string;
 }
 
 export default function MeshSelfTestScreen() {
-  const params = useLocalSearchParams<{ control?: string; key?: string; host?: string; port?: string }>();
+  const params = useLocalSearchParams<{ control?: string; key?: string; host?: string; port?: string; progress?: string }>();
   const [steps, setSteps] = React.useState<Step[]>([]);
   const [result, setResult] = React.useState<'running' | 'pass' | 'fail' | null>(null);
   const started = React.useRef(false);
@@ -150,10 +165,16 @@ export default function MeshSelfTestScreen() {
     started.current = true;
     setResult('running');
     void runSelfTest(
-      { control: params.control, key: params.key, host: params.host, port: Number(params.port) },
+      {
+        control: params.control,
+        key: params.key,
+        host: params.host,
+        port: Number(params.port),
+        progress: params.progress,
+      },
       (s) => setSteps((prev) => [...prev, s]),
     ).then((ok) => setResult(ok ? 'pass' : 'fail'));
-  }, [params.control, params.key, params.host, params.port]);
+  }, [params.control, params.key, params.host, params.port, params.progress]);
 
   if (!ENABLED) {
     return (

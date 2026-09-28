@@ -114,6 +114,9 @@ func tsnetLogf(id string) func(string, ...any) {
 	return func(format string, args ...any) {
 		if verbose.Load() {
 			log.Printf("[%s] "+format, append([]any{id}, args...)...)
+			// Also as a log event: on iOS stderr reaches no log the tools can
+			// read, so the app is the only one that can pass these on.
+			emitLog(id, "tsnet: "+fmt.Sprintf(format, args...))
 		}
 		debugLogf(format, args...)
 	}

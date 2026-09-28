@@ -42,6 +42,7 @@ import json, sys, urllib.parse
 env = json.load(open(sys.argv[1]))
 query = urllib.parse.urlencode({
     "control": env["controlUrl"], "key": env["authKey"], "host": env["host"], "port": env["port"],
+    "progress": env["progressUrl"],
 })
 print(f"pokket://mesh-selftest?{query}")
 PY

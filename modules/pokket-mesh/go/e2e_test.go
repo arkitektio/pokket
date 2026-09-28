@@ -412,11 +412,27 @@ func TestDeviceEnv(t *testing.T) {
 		ip = "127.0.0.1"
 	}
 	tn := startTailnet(t, ip)
+
+	// A plain HTTP side channel, NOT through the mesh: the self-test streams
+	// every step and log line here, so a device that never gets onto the
+	// mesh still says what happened (Release RN logs reach no device log).
+	progressLn, err := net.Listen("tcp", net.JoinHostPort(ip, "0"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	progress := &http.Server{Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(io.LimitReader(r.Body, 64<<10))
+		t.Logf("device: %s", body)
+	})}
+	go progress.Serve(progressLn)
+	t.Cleanup(func() { progress.Close() })
+
 	env, _ := json.Marshal(map[string]any{
-		"controlUrl": tn.controlURL,
-		"authKey":    testAuthKey,
-		"host":       testSvcName,
-		"port":       testSvcPort,
+		"progressUrl": "http://" + progressLn.Addr().String() + "/progress",
+		"controlUrl":  tn.controlURL,
+		"authKey":     testAuthKey,
+		"host":        testSvcName,
+		"port":        testSvcPort,
 	})
 	if out := os.Getenv("MESH_E2E_OUT"); out != "" {
 		if err := os.WriteFile(out+".tmp", env, 0o644); err != nil {
