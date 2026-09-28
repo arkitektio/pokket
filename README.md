@@ -88,8 +88,9 @@ Currently available for Android devices with BLE support. Just download the APK 
    ```bash
    pnpm build:mesh:android && npx expo run:android   # or: pnpm build:mesh:ios && npx expo run:ios
    # or, after pnpm build:mesh: eas build --profile development
-   # or skip the local build: run the "Dev client" workflow in GitHub Actions
-   # and install its artifact (Android APK / iOS simulator .app)
+   # or skip the local build: the "Dev client" GitHub workflow publishes the
+   # latest build to the "dev-client" pre-release; on the phone, open
+   # https://github.com/arkitektio/pokket/releases/download/dev-client/pokket-dev.apk
    pnpm expo start --dev-client                      # then iterate on the JS as usual
    ```
 

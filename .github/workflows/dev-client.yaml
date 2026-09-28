@@ -7,7 +7,11 @@ name: Dev client
 #  - ios:     a simulator .app (unsigned; a physical iPhone needs a signed build)
 # Run it from the Actions tab ("Run workflow", once this file is on main). It
 # also runs on pushes to main (both), and on pull requests (Android only).
-# Then: install the artifact and `pnpm expo start --dev-client`.
+# The latest builds are also published to the "dev-client" pre-release, at
+# stable links (open the first one on the phone to install):
+#   https://github.com/arkitektio/pokket/releases/download/dev-client/pokket-dev.apk
+#   https://github.com/arkitektio/pokket/releases/download/dev-client/pokket-dev-simulator.zip
+# Then: `pnpm expo start --dev-client`.
 
 on:
   workflow_dispatch:
@@ -25,6 +29,7 @@ on:
       - "package.json"
       - "pnpm-lock.yaml"
       - "scripts/build-mesh-mobile.sh"
+      - "scripts/ci/publish-dev-client.sh"
       - ".github/workflows/dev-client.yaml"
   pull_request:
     paths:
@@ -33,7 +38,12 @@ on:
       - "package.json"
       - "pnpm-lock.yaml"
       - "scripts/build-mesh-mobile.sh"
+      - "scripts/ci/publish-dev-client.sh"
       - ".github/workflows/dev-client.yaml"
+
+# To publish the builds to the "dev-client" pre-release.
+permissions:
+  contents: write
 
 concurrency:
   group: dev-client-${{ github.ref }}
@@ -85,6 +95,11 @@ jobs:
           path: ${{ runner.temp }}/out/*.apk
           retention-days: 14
 
+      - name: Publish to the dev-client pre-release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: scripts/ci/publish-dev-client.sh "$RUNNER_TEMP"/out/*.apk pokket-dev.apk
+
   ios-simulator:
     if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.platform != 'android')
     runs-on: macos-latest
@@ -128,3 +143,8 @@ jobs:
           name: pokket-dev-ios-simulator
           path: ${{ runner.temp }}/out/*.zip
           retention-days: 14
+
+      - name: Publish to the dev-client pre-release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: scripts/ci/publish-dev-client.sh "$RUNNER_TEMP"/out/*.zip pokket-dev-simulator.zip
