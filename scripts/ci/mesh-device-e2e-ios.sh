@@ -35,11 +35,19 @@ xcrun simctl boot "$udid" || true
 xcrun simctl bootstatus "$udid" -b
 
 # idb (installed by the workflow) drives the simulator's UI; see tap_text.
+# The companion can take a while to come up on a busy runner (Metro building
+# next to it), so keep trying for a minute.
+idb_connect() {
+  for _ in $(seq 1 30); do
+    idb connect localhost 10882 > /dev/null 2>&1 && idb describe > /dev/null 2>&1 && return 0
+    sleep 2
+  done
+  return 1
+}
 if command -v idb_companion > /dev/null && command -v idb > /dev/null; then
   mkdir -p "$work"
   idb_companion --udid "$udid" > "$work/idb-companion.log" 2>&1 &
-  sleep 5
-  idb connect localhost 10882 || echo "idb connect failed"
+  idb_connect || { echo "idb connect failed; companion log:"; tail -n 20 "$work/idb-companion.log"; }
 else
   echo "idb is not installed; link prompts cannot be answered"
 fi
@@ -64,11 +72,23 @@ screen_text() {
 
 # Taps the on-screen text $1 (a system alert's button) through idb: the
 # simulator has no other way to press a button from a script.
+# Without idb: bring the Simulator app forward and press Return, which a
+# UIKit alert takes as its default action ("Open" on the link prompt).
+press_return() {
+  open -a Simulator --args -CurrentDeviceUDID "$udid" 2> /dev/null || return 1
+  sleep 5
+  osascript -e 'tell application "Simulator" to activate' \
+    -e 'delay 1' \
+    -e 'tell application "System Events" to key code 36' || return 1
+  echo "pressed Return in the Simulator app"
+}
+
 tap_text() {
   local label="$1" pos size x y
-  command -v idb > /dev/null || { echo "no idb to tap \"$label\""; return 1; }
+  command -v idb > /dev/null || { echo "no idb to tap \"$label\"; pressing Return instead"; press_return; return; }
   xcrun simctl io "$udid" screenshot "$work/tap.png" > /dev/null 2>&1 || return 1
   pos="$("$work/ocr" "$work/tap.png" "$label" 2>/dev/null)" || { echo "\"$label\" is not on screen"; return 1; }
+  idb describe > /dev/null 2>&1 || idb_connect || { echo "idb is not connected"; return 1; }
   size="$(idb describe --json 2>/dev/null | python3 -c '
 import json, sys
 d = json.load(sys.stdin)["screen_dimensions"]
@@ -96,7 +116,7 @@ open_link() {
   # the app ("Open in "pokket"?"), as a phone does the first time a link is
   # tapped. Answer it the way a user would.
   if [[ "$last_screen" == *"Open in"* ]]; then
-    if tap_text Open; then mark "tapped Open on the link prompt"; else mark "could not tap Open on the link prompt"; fi
+    if tap_text Open || press_return; then mark "answered the link prompt"; else mark "could not answer the link prompt"; fi
     sleep 5
     screen_text "link$link_count-after"
   fi
