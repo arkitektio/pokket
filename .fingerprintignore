@@ -1,0 +1,11 @@
+# The mesh sidecar's compiled Go libraries (scripts/build-mesh-mobile.sh). CI
+# rebuilds them for every release and the bytes are not guaranteed to repeat,
+# so hashing them would give every release a new runtime version and no
+# over-the-air update would ever match an installed app. The Go sources in
+# modules/pokket-mesh/go are fingerprinted instead: they decide the build.
+modules/pokket-mesh/android/libs/**/*
+modules/pokket-mesh/android/src/main/jniLibs/**/*
+modules/pokket-mesh/ios/Meshmobile.xcframework/**/*
+
+# Tests of the Go sources change nothing that ships.
+modules/pokket-mesh/go/**/*_test.go

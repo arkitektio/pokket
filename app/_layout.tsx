@@ -4,6 +4,7 @@ import { AlertDialogProvider } from '@/components/ui/alert-dialog';
 import { ProfileIdentitySync } from '@/components/profile/ProfileIdentitySync';
 import { TabsProvider } from '@/lib/tabs/TabsProvider';
 import { PushRegistration } from '@/lib/push/PushRegistration';
+import { UpdatePrompt } from '@/lib/updates/UpdatePrompt';
 import { App } from '@/lib/app/App';
 import { useArkitektStore } from '@/lib/arkitekt/hooks';
 import { ErrorOverlay } from '@/lib/debug/ErrorOverlay';
@@ -104,6 +105,8 @@ export default function RootLayout() {
             <ProfileIdentitySync />
             {/* Silent, and only while push is switched on in Settings. */}
             <PushRegistration />
+            {/* Offers a restart once a released update has downloaded. */}
+            <UpdatePrompt />
             {SELFTEST_ENABLED && <MeshSelfTestBoot />}
             {/* lib/lok/funcs.tsx has always reported mutation failures with
                 `toast.error`, but nothing ever mounted the renderer, so every one

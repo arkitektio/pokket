@@ -6,7 +6,8 @@
     "apk": {
       "android": {
         "buildType": "apk"
-      }
+      },
+      "channel": "production"
     },
     "development": {
       "developmentClient": true,
@@ -16,11 +17,16 @@
       }
     },
     "preview": {
-      "distribution": "internal"
+      "distribution": "internal",
+      "channel": "preview"
     },
-    "production": {}
+    "production": {
+      "channel": "production"
+    }
   },
   "submit": {
-    "production": {}
+    "production": {
+      "ios": {}
+    }
   }
 }

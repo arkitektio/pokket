@@ -5,7 +5,8 @@ import { profileTitle } from '@/lib/arkitekt/fakts/profileStorageSchema';
 import { showPage } from '@/lib/navigation';
 import { disablePush, enablePush, PushStatus, pushUnavailableReason, reregisterPush, usePush } from '@/lib/push/push';
 import { useThemeColors } from '@/lib/theme/BrandProvider';
-import { Bell, Bug, ChevronRight } from 'lucide-react-native';
+import { Bell, Bug, ChevronRight, RefreshCw } from 'lucide-react-native';
+import { useUpdateInfo } from '@/lib/updates/useUpdateInfo';
 import * as React from 'react';
 import { ActivityIndicator, Linking, Pressable, ScrollView, Switch, View } from 'react-native';
 
@@ -101,6 +102,71 @@ function PushSetting() {
   );
 }
 
+function Fact({ label, value }: { label: string; value: string | null }) {
+  if (!value) return null;
+  return (
+    <View className="flex-row justify-between gap-4 border-b border-border py-2">
+      <Text className="text-sm text-muted-foreground">{label}</Text>
+      <Text selectable numberOfLines={1} className="shrink text-right text-sm text-card-foreground">
+        {value}
+      </Text>
+    </View>
+  );
+}
+
+/** Which Pokket this is, and whether a newer one is out. */
+function About() {
+  const colors = useThemeColors();
+  const { info, check, checkNow, restart } = useUpdateInfo();
+  const status =
+    check.kind === 'checking'
+      ? 'Checking…'
+      : check.kind === 'current'
+        ? 'You have the latest version.'
+        : check.kind === 'downloaded'
+          ? 'A new version is ready.'
+          : check.kind === 'unavailable'
+            ? check.reason
+            : check.kind === 'error'
+              ? `Could not check: ${check.message}`
+              : null;
+
+  return (
+    <Card className="border-border bg-card">
+      <CardContent className="gap-3 py-3">
+        <View>
+          <Fact label="Version" value={info.version} />
+          <Fact label="Channel" value={info.channel} />
+          <Fact
+            label="Running"
+            value={info.updateId ? `update ${info.updateId.slice(0, 8)}` : 'the version it was installed with'}
+          />
+          <Fact label="Updated" value={info.updatedAt ? info.updatedAt.toLocaleString() : null} />
+        </View>
+        {status ? <Text className="text-sm text-muted-foreground">{status}</Text> : null}
+        {check.kind === 'downloaded' ? (
+          <Pressable onPress={() => void restart()} className="self-start rounded-lg bg-primary px-3 py-2 active:opacity-80">
+            <Text className="text-sm font-medium text-primary-foreground">Restart to update</Text>
+          </Pressable>
+        ) : (
+          <Pressable
+            onPress={() => void checkNow()}
+            disabled={check.kind === 'checking'}
+            className="flex-row items-center gap-2 self-start rounded-lg bg-muted px-3 py-2 active:opacity-70"
+          >
+            {check.kind === 'checking' ? (
+              <ActivityIndicator size="small" color={colors.primary} />
+            ) : (
+              <RefreshCw size={14} color={colors.foreground} />
+            )}
+            <Text className="text-sm text-foreground">Check for updates</Text>
+          </Pressable>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 function Row({ icon: Icon, label, onPress }: { icon: typeof Bug; label: string; onPress: () => void }) {
   const colors = useThemeColors();
   return (
@@ -119,6 +185,10 @@ export default function SettingsScreen() {
         <View className="gap-2">
           <Text className="px-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Notifications</Text>
           <PushSetting />
+        </View>
+        <View className="gap-2">
+          <Text className="px-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">About</Text>
+          <About />
         </View>
         <View className="gap-2">
           <Text className="px-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Advanced</Text>

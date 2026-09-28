@@ -45,3 +45,8 @@ app-example
 modules/pokket-mesh/android/libs/
 modules/pokket-mesh/android/src/main/jniLibs/
 modules/pokket-mesh/ios/Meshmobile.xcframework/
+
+# EAS local credentials (`eas credentials` → download): the signing
+# certificate's password and the paths to it. Never commit.
+credentials.json
+credentials/
