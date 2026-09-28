@@ -37,6 +37,6 @@ echo "::group::test tailnet log"
 cat "$work/env.log"
 echo "::endgroup::"
 echo "::group::device log"
-adb logcat -d | grep -E "mesh-selftest|ReactNativeJS|GoLog|PokketMesh|AndroidRuntime|CLEARTEXT" | tail -n 1500 || true
+adb logcat -d | grep -E "mesh-selftest|ReactNativeJS|GoLog|PokketMesh|AndroidRuntime|CLEARTEXT|DEBUG|libc|panic|FATAL|tombstone" | tail -n 1500 || true
 echo "::endgroup::"
 exit "$status"

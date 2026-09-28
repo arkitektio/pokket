@@ -28,6 +28,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"path/filepath"
 	"reflect"
 	"sort"
 	"strings"
@@ -188,6 +189,9 @@ func Start(id, stateDir, controlURL, hostname, authKey string) error {
 	if err := os.MkdirAll(stateDir, 0o700); err != nil {
 		return fmt.Errorf("state dir: %w", err)
 	}
+	// Before tsnet starts: on Android it would otherwise panic looking for a
+	// logs directory (see procdirs.go). The parent is the app's mesh dir.
+	ensureProcessDirs(filepath.Dir(stateDir))
 
 	srv := &tsnet.Server{
 		Dir:        stateDir,
