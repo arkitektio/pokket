@@ -135,6 +135,20 @@ export const MODULE_CATALOG: ModuleDecl[] = [
     ],
   },
   {
+    key: "timeline",
+    label: "Timeline",
+    icon: "route",
+    route: "/timeline",
+    navLinks: [
+      {
+        label: "Timeline",
+        route: "/timeline",
+        home: true,
+        keywords: ["location", "places", "trips", "history", "map", "gps"],
+      },
+    ],
+  },
+  {
     key: "settings",
     label: "Settings",
     icon: "settings",
@@ -144,7 +158,7 @@ export const MODULE_CATALOG: ModuleDecl[] = [
         label: "Settings",
         route: "/settings",
         home: true,
-        keywords: ["preferences", "push", "notifications", "permissions"],
+        keywords: ["preferences", "push", "notifications", "permissions", "location"],
       },
     ],
   },

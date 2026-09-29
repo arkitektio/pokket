@@ -60,7 +60,27 @@
       "expo-status-bar",
       "@livekit/react-native-expo-plugin",
       "@config-plugins/react-native-webrtc",
-      "./modules/pokket-mesh/app.plugin.js"
+      "./modules/pokket-mesh/app.plugin.js",
+      [
+        "expo-location",
+        {
+          "locationAlwaysPermission": "Allow $(PRODUCT_NAME) to record where you go for your private timeline. It is stored on this phone only.",
+          "locationAlwaysAndWhenInUsePermission": "Allow $(PRODUCT_NAME) to record where you go for your private timeline. It is stored on this phone only.",
+          "locationWhenInUsePermission": "Allow $(PRODUCT_NAME) to use your location for your private timeline. It is stored on this phone only.",
+          "isIosBackgroundLocationEnabled": true,
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true
+        }
+      ],
+      [
+        "expo-sqlite",
+        {
+          "useSQLCipher": true
+        }
+      ],
+      "expo-secure-store",
+      "expo-sharing",
+      "@maplibre/maplibre-react-native"
     ],
     "experiments": {
       "typedRoutes": true

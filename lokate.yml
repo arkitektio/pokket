@@ -1,0 +1,25 @@
+overwrite: true
+schema:
+  "http://jhnnsrs-lab/lokate/schema":
+    handleAsSDL: true
+documents: "graphql/lokate/**/*.graphql"
+generates:
+  lib/lokate/api/fragments.ts:
+    plugins:
+      - "fragment-matcher"
+  lib/lokate/api/graphql.ts:
+    plugins:
+      - "typescript"
+      - "typescript-operations"
+      - "typescript-react-apollo"
+    config:
+      withHooks: true
+      reactApolloVersion: 3
+      apolloReactHooksImportFrom: "@/lib/lokate/funcs"
+
+  lib/lokate/graphql.schema.json:
+    plugins:
+      - "introspection"
+config:
+  scalars:
+    DateTime: string

@@ -4,6 +4,7 @@ import * as WebBrowser from "expo-web-browser";
 import { buildArkitekt } from "../arkitekt";
 import { bankServiceDefinition } from "../bank/service";
 import { kuvertServiceDefinition } from "../kuvert/service";
+import { lokateServiceDefinition } from "../lokate/service";
 import { livekitServiceDefinition } from "../livekit/service";
 import { lokServiceBuilder } from "../lok/service";
 import { lovekitServiceDefinition } from "../lovekit/service";
@@ -79,6 +80,7 @@ export const App = buildArkitekt({
     livekit: livekitServiceDefinition,
     kuvert: kuvertServiceDefinition,
     bank: bankServiceDefinition,
+    lokate: lokateServiceDefinition,
 
   },
   selfServiceBuilder: lokServiceBuilder,
@@ -98,5 +100,6 @@ export const Guard = {
   Livekit: App.buildServiceGuard("livekit"),
   Kuvert: App.buildServiceGuard("kuvert"),
   Bank: App.buildServiceGuard("bank"),
+  Lokate: App.buildServiceGuard("lokate"),
 };
 

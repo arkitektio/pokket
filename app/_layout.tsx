@@ -1,9 +1,14 @@
 import '~/global.css';
+// Defines the background location task; must run before anything else, since
+// the OS may start the app headless just to deliver locations to it.
+import '@/lib/timeline/task';
 
 import { AlertDialogProvider } from '@/components/ui/alert-dialog';
 import { ProfileIdentitySync } from '@/components/profile/ProfileIdentitySync';
 import { TabsProvider } from '@/lib/tabs/TabsProvider';
 import { PushRegistration } from '@/lib/push/PushRegistration';
+import { TimelineSync } from '@/lib/timeline/TimelineSync';
+import { LokateBackup } from '@/lib/timeline/LokateBackup';
 import { UpdatePrompt } from '@/lib/updates/UpdatePrompt';
 import { App } from '@/lib/app/App';
 import { useArkitektStore } from '@/lib/arkitekt/hooks';
@@ -105,6 +110,10 @@ export default function RootLayout() {
             <ProfileIdentitySync />
             {/* Silent, and only while push is switched on in Settings. */}
             <PushRegistration />
+            {/* Only acts while the location timeline is switched on in Settings. */}
+            <TimelineSync />
+            {/* Only while the timeline backup is on, for the organization it goes to. */}
+            <LokateBackup />
             {/* Offers a restart once a released update has downloaded. */}
             <UpdatePrompt />
             {SELFTEST_ENABLED && <MeshSelfTestBoot />}

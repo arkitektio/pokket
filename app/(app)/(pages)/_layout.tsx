@@ -70,6 +70,8 @@ export default function PagesLayout() {
         <Stack.Screen name="wifi/standard" options={{ title: 'Standard Wi-Fi' }} />
         <Stack.Screen name="provision" options={page('Provision')} />
         <Stack.Screen name="mesh" options={page('Mesh')} />
+        <Stack.Screen name="timeline/index" options={page('Timeline')} />
+        <Stack.Screen name="timeline/place/[id]" options={{ title: 'Place' }} />
         <Stack.Screen name="settings" options={page('Settings')} />
         <Stack.Screen name="debug" options={page('Debug')} />
       </Stack>

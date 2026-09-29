@@ -1,0 +1,27 @@
+query SyncState {
+  syncState {
+    lastPointTs
+    pointCount
+    segmentsFrom
+  }
+}
+
+query Changes($cursor: String, $limit: Int) {
+  changes(cursor: $cursor, limit: $limit) {
+    points {
+      ...LokatePoint
+    }
+    visits {
+      ...LokateVisit
+    }
+    trips {
+      ...LokateTrip
+    }
+    places {
+      ...LokatePlace
+    }
+    deletedPlaces
+    nextCursor
+    hasMore
+  }
+}

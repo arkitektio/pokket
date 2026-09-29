@@ -1,0 +1,28 @@
+mutation UploadPoints($points: [PointInput!]!) {
+  uploadPoints(points: $points) {
+    accepted
+    duplicates
+  }
+}
+
+mutation ReplaceSegments($from: DateTime!, $visits: [VisitInput!]!, $trips: [TripInput!]!) {
+  replaceSegments(from: $from, visits: $visits, trips: $trips) {
+    deletedVisits
+    deletedTrips
+    visits
+    trips
+  }
+}
+
+mutation SyncPlaces($places: [PlaceInput!]!, $deleted: [DeletedInput!]!) {
+  syncPlaces(places: $places, deleted: $deleted) {
+    applied
+    stale {
+      ...LokatePlace
+    }
+  }
+}
+
+mutation DeleteServerCopy($confirm: String!) {
+  deleteServerCopy(confirm: $confirm)
+}

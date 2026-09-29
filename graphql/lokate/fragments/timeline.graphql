@@ -1,0 +1,44 @@
+fragment LokatePoint on Point {
+  clientId
+  deviceId
+  ts
+  lat
+  lon
+  acc
+  speed
+  heading
+  alt
+}
+
+fragment LokateVisit on Visit {
+  clientId
+  deviceId
+  start
+  end
+  lat
+  lon
+  radius
+  pointCount
+  placeClientId
+}
+
+fragment LokateTrip on Trip {
+  clientId
+  deviceId
+  start
+  end
+  fromVisit
+  toVisit
+  distance
+  mode
+}
+
+fragment LokatePlace on Place {
+  clientId
+  name
+  lat
+  lon
+  radius
+  updatedAt
+  deletedAt
+}
