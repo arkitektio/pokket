@@ -1,3 +1,10 @@
+# [1.6.0](https://github.com/arkitektio/pokket/compare/v1.5.0...v1.6.0) (2026-09-29)
+
+
+### Features
+
+* lokate ([6c6abfa](https://github.com/arkitektio/pokket/commit/6c6abfaa4950da6ac0f2d26f510e0bec2cf84ea3))
+
 # [1.5.0](https://github.com/arkitektio/pokket/compare/v1.4.1...v1.5.0) (2026-09-28)
 
 
