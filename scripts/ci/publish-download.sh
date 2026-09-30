@@ -11,14 +11,22 @@ tag="$1"
 title="$2"
 file="$3"
 name="$4"
-# On pull requests GITHUB_SHA is the merge commit; name the branch commit.
-sha="${HEAD_SHA:-$GITHUB_SHA}"
+# The commit checked out: in the release workflow that is the release commit,
+# which main may already have moved past.
+sha="${HEAD_SHA:-$(git rev-parse HEAD)}"
 notes="${NOTES:-}
 
 Latest upload: ${name} from ${GITHUB_HEAD_REF:-$GITHUB_REF_NAME} @ ${sha::7} ($(date -u +%Y-%m-%dT%H:%MZ))."
 
 if ! gh release view "$tag" > /dev/null 2>&1; then
-  gh release create "$tag" --prerelease --target "$sha" --title "$title" --notes "$notes"
+  # Tag first, then the release on it: with the Actions token, creating a
+  # release with --target on a commit that is not its branch's head fails
+  # with HTTP 403 (https://github.com/cli/cli/issues/9514). The refs API
+  # takes any commit.
+  if ! gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$tag" > /dev/null 2>&1; then
+    gh api "repos/$GITHUB_REPOSITORY/git/refs" -f "ref=refs/tags/$tag" -f "sha=$sha" > /dev/null
+  fi
+  gh release create "$tag" --prerelease --verify-tag --title "$title" --notes "$notes"
 else
   gh release edit "$tag" --notes "$notes"
 fi
