@@ -101,7 +101,7 @@ export default function MeshScreen() {
 
         {available && endpoint?.mesh_coord_url && !record ? (
           <Notice title="Not on this deployment's mesh">
-            {endpoint.name} has a mesh, but this organization's login was not let into it. Add the
+            {endpoint.name} has a mesh, but this organization&apos;s login was not let into it. Add the
             organization again from the switcher, and allow the mesh when you approve pokket.
           </Notice>
         ) : null}

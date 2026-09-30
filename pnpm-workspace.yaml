@@ -27,3 +27,5 @@ minimumReleaseAgeExclude:
   - expo-router@57.0.24
   - expo-task-manager@57.0.21
   - expo-updates@57.0.24
+  - '@expo/dom-webview@57.0.1'
+  - '@expo/metro-runtime@57.0.16'

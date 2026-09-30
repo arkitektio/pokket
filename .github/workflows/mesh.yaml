@@ -21,6 +21,7 @@ on:
       - "lib/arkitekt/**"
       - "lib/testing/**"
       - "app/mesh*.tsx"
+      - "app/(app)/(pages)/mesh.tsx"
       - "app/_layout.tsx"
       - "app.json"
       - "package.json"
@@ -35,6 +36,7 @@ on:
       - "lib/arkitekt/**"
       - "lib/testing/**"
       - "app/mesh*.tsx"
+      - "app/(app)/(pages)/mesh.tsx"
       - "app/_layout.tsx"
       - "app.json"
       - "package.json"
@@ -86,7 +88,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm test --ci
       - run: >
-          pnpm exec eslint app/mesh.tsx app/mesh-selftest.tsx lib/mesh lib/testing
+          pnpm exec eslint "app/(app)/(pages)/mesh.tsx" app/mesh-selftest.tsx lib/mesh lib/testing
           modules/pokket-mesh/index.ts modules/pokket-mesh/app.plugin.js
 
   android:
