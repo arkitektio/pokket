@@ -1,3 +1,5 @@
+## [1.7.4](https://github.com/arkitektio/pokket/compare/v1.7.3...v1.7.4) (2026-09-30)
+
 ## [1.7.3](https://github.com/arkitektio/pokket/compare/v1.7.2...v1.7.3) (2026-09-30)
 
 
