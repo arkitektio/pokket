@@ -176,6 +176,31 @@ export const updateProfileSession = (
   session: StoredArkitektSession,
 ): StoredProfileBook => patchProfile(book, id, (p) => ({ ...p, session }));
 
+/** When a session's token was issued; one without a stamp counts as oldest. */
+const tokenReceivedAt = (session: StoredArkitektSession) => session.token.received_at ?? 0;
+
+/**
+ * `next`, with each session whose token is older than the stored one's
+ * taking the stored token (and the fakts that came with it).
+ *
+ * Refresh tokens rotate on every use, and the app is not the only one that
+ * refreshes: the timeline's background backup does too, straight into
+ * storage. Writing the book back from memory would put the consumed refresh
+ * token back — a dead login. So whoever writes keeps the newest token.
+ */
+export const keepNewerTokens = (next: StoredProfileBook, stored: StoredProfileBook): StoredProfileBook => {
+  let book = next;
+  for (const [id, profile] of Object.entries(next.profiles)) {
+    const theirs = stored.profiles[id];
+    if (!theirs || tokenReceivedAt(theirs.session) <= tokenReceivedAt(profile.session)) continue;
+    book = patchProfile(book, id, (p) => ({
+      ...p,
+      session: { ...p.session, token: theirs.session.token, fakts: theirs.session.fakts },
+    }));
+  }
+  return book;
+};
+
 export const markProfileStale = (book: StoredProfileBook, id: string, reason?: string): StoredProfileBook =>
   patchProfile(book, id, (p) => ({ ...p, status: "stale", staleReason: reason }));
 

@@ -18,6 +18,7 @@ import {
   deriveProfileId,
   emptyProfileBook,
   getActiveProfile,
+  keepNewerTokens,
   listProfiles,
   loadStoredProfileBook,
   markProfileOk,
@@ -194,9 +195,23 @@ export const ArkitektProvider = <T extends ServiceBuilderMap, S extends ServiceB
     persistBookRef.current = (update) => {
       const next = update(store.getState().profileBook);
       store.setState({ profileBook: next });
-      const write = writes.then(() => writeStoredProfileBook(next, storageProvider));
-      writes = write.catch((error) => console.error("[ArkitektProvider] Writing profiles failed:", error));
-      return write.then(() => next);
+      const write = writes.then(async () => {
+        // The timeline's background backup refreshes tokens straight into
+        // storage; writing this book over them would put a consumed refresh
+        // token back. Keep whichever token is newer.
+        const stored = await loadStoredProfileBook(storageProvider).catch(() => null);
+        const merged = stored ? keepNewerTokens(next, stored) : next;
+        if (stored && merged !== next) {
+          store.setState({ profileBook: keepNewerTokens(store.getState().profileBook, stored) });
+        }
+        await writeStoredProfileBook(merged, storageProvider);
+        return merged;
+      });
+      writes = write.then(
+        () => undefined,
+        (error) => console.error("[ArkitektProvider] Writing profiles failed:", error),
+      );
+      return write;
     };
   }
   const persistBook = persistBookRef.current;
@@ -208,13 +223,36 @@ export const ArkitektProvider = <T extends ServiceBuilderMap, S extends ServiceB
 
     // The coalescing + forced-vs-raced rule lives in TokenRotation
     // (runtime/tokenRotation.ts); this callback is just the round-trip.
-    const rotation = new TokenRotation(async () => {
+    const rotation = new TokenRotation(async ({ forceRefresh }) => {
       // The login this refresh is for; a switch may land while it is in flight.
       const profileId = store.getState().profileBook.activeProfileId;
-      const session = store.getState().storedSession;
+      let session = store.getState().storedSession;
       if (!session) {
         console.warn("[ArkitektProvider] No stored session available to refresh");
         throw new Error("No stored session available");
+      }
+
+      // The timeline's background backup may have refreshed this login since
+      // (lib/timeline/backgroundBackup.ts): its refresh token is the live one,
+      // ours is consumed. Take it, and its access token while that is fresh.
+      if (profileId) {
+        const stored = await loadStoredProfileBook(storageProvider).catch(() => null);
+        const theirs = stored?.profiles[profileId]?.session;
+        if (theirs && (theirs.token.received_at ?? 0) > (session.token.received_at ?? 0)) {
+          dlog("[ArkitektProvider] Adopting a token refreshed in the background");
+          session = { ...session, token: theirs.token, fakts: theirs.fakts };
+          const adopted = session;
+          const connection = store.getState().connection;
+          store.setState({
+            storedSession: adopted,
+            profileBook: stored ? keepNewerTokens(store.getState().profileBook, stored) : store.getState().profileBook,
+            connection: connection
+              ? { ...connection, token: adopted.token, fakts: adopted.fakts, serviceInstanceMap: adopted.fakts.instances }
+              : connection,
+          });
+          const adoptedToken = normalizeToken(adopted.token);
+          if (!forceRefresh && !shouldRefreshToken(adoptedToken)) return adoptedToken;
+        }
       }
 
       const currentToken = normalizeToken(session.token);

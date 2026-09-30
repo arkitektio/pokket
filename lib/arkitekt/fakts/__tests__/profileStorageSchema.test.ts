@@ -7,6 +7,7 @@ import {
   getActiveProfile,
   groupProfilesByDeployment,
   isProvisionalProfileId,
+  keepNewerTokens,
   loadStoredProfileBook,
   markProfileStale,
   PROFILE_BOOK_STORAGE_KEY,
@@ -115,5 +116,35 @@ describe("profile book", () => {
 
   it("has no book before the first write", async () => {
     expect(await loadStoredProfileBook(memoryStorage())).toBeNull();
+  });
+});
+
+describe("keepNewerTokens", () => {
+  const at = (book: StoredProfileBook, id: string, refresh: string, receivedAt: number) =>
+    upsertProfile(book, {
+      ...book.profiles[id],
+      session: { ...book.profiles[id].session, token: { ...book.profiles[id].session.token, refresh_token: refresh, received_at: receivedAt } },
+    });
+
+  it("keeps a token refreshed elsewhere over the older one in memory", () => {
+    const id = provisionalProfileId(endpoint.base_url);
+    const memory = at(withProfile(id), id, "consumed", 1_000);
+    const stored = at(withProfile(id), id, "live", 2_000);
+    const merged = keepNewerTokens(memory, stored);
+    expect(merged.profiles[id].session.token.refresh_token).toBe("live");
+    expect(merged.activeProfileId).toBe(memory.activeProfileId);
+  });
+
+  it("leaves the book as it is when memory holds the newest token", () => {
+    const id = provisionalProfileId(endpoint.base_url);
+    const memory = at(withProfile(id), id, "live", 2_000);
+    const stored = at(withProfile(id), id, "consumed", 1_000);
+    expect(keepNewerTokens(memory, stored)).toBe(memory);
+  });
+
+  it("ignores logins only one side has", () => {
+    const a = provisionalProfileId(endpoint.base_url);
+    const memory = at(withProfile(a), a, "live", 2_000);
+    expect(keepNewerTokens(memory, emptyProfileBook())).toBe(memory);
   });
 });
