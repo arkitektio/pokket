@@ -8,8 +8,11 @@
 # changed only JS: installed apps get it over the air, and no build is needed.
 #
 # Usage:
-#   scripts/ci/native-build.sh check <android|ios>   # writes runtime_version, tag, needed to $GITHUB_OUTPUT
-#   scripts/ci/native-build.sh mark  <tag>           # records the tag on HEAD
+#   scripts/ci/native-build.sh check <android|ios> [kind]  # writes runtime_version, tag, needed to $GITHUB_OUTPUT
+#   scripts/ci/native-build.sh mark  <tag>                  # records the tag on HEAD
+#
+# `kind` names what was built, `native` (the default: the release's binaries)
+# or `dev-client`; each has its own tags.
 #
 # To force a rebuild, delete the tag (git push origin :refs/tags/native/...)
 # and re-run that platform's job (Android or iOS) of the latest release run.
@@ -21,15 +24,16 @@ repo="${GITHUB_REPOSITORY:?}"
 case "$cmd" in
   check)
     platform="$2"
+    kind="${3:-native}"
     # Resolved on the platform's own runner, as the build and `eas update` will.
     rv="$(npx expo-updates runtimeversion:resolve --platform "$platform" | jq -r .runtimeVersion)"
-    tag="native/$platform/$rv"
+    tag="$kind/$platform/$rv"
     if gh api "repos/$repo/git/ref/tags/$tag" > /dev/null 2>&1; then
       needed=false
-      echo "Runtime $rv already has a native $platform build ($tag): over-the-air update only."
+      echo "Runtime $rv already has a $kind $platform build ($tag)."
     else
       needed=true
-      echo "Runtime $rv has no native $platform build yet: building one."
+      echo "Runtime $rv has no $kind $platform build yet: building one."
     fi
     {
       echo "runtime_version=$rv"

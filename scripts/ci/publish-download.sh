@@ -4,6 +4,7 @@
 #   https://github.com/<repo>/releases/download/<tag>/<name>
 # Usage: scripts/ci/publish-download.sh <tag> <title> <file> <name>
 # The release notes come from $NOTES; a line naming this upload is added.
+# $LABEL, if set, is shown for the file instead of its name.
 set -euo pipefail
 
 tag="$1"
@@ -22,5 +23,5 @@ else
   gh release edit "$tag" --notes "$notes"
 fi
 cp "$file" "$RUNNER_TEMP/$name"
-gh release upload "$tag" "$RUNNER_TEMP/$name" --clobber
+gh release upload "$tag" "$RUNNER_TEMP/$name${LABEL:+#$LABEL}" --clobber
 echo "https://github.com/$GITHUB_REPOSITORY/releases/download/$tag/$name"

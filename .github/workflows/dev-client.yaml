@@ -1,51 +1,43 @@
 name: Dev client
 
-# Builds the development client (expo-dev-client, JS from Metro) on GitHub's
-# runners instead of the EAS queue, mesh sidecar included, and uploads it:
+# Builds the development client (expo-dev-client: the native app, JS from
+# Metro or a pull request's preview update) on GitHub's runners, mesh sidecar
+# included:
 #  - android: a debug APK (arm64 phones, x86_64 emulators, armv7), signed with
 #             the template's shared debug key, so it installs over earlier builds
 #  - ios:     a simulator .app (unsigned; a physical iPhone needs a signed build)
-# Run it from the Actions tab ("Run workflow", once this file is on main). It
-# also runs on pushes to main (both), and on pull requests (Android only).
-# The latest builds are also published to the "dev-client" pre-release, at
-# stable links (open the first one on the phone to install):
+#
+# When: whenever main's native side has no dev client yet. As in the release
+# workflow, "native side" is the runtime version (the native fingerprint), and
+# each build is recorded as a tag `dev-build/<platform>/<runtime version>`
+# (scripts/ci/native-build.sh). So the published dev client always matches
+# the newest native code on main, and a JS-only push builds nothing.
+#
+# main's builds are published to the "Dev client" pre-release, at fixed links:
 #   https://github.com/arkitektio/pokket/releases/download/dev-client/pokket-dev.apk
 #   https://github.com/arkitektio/pokket/releases/download/dev-client/pokket-dev-simulator.zip
-# Then: `pnpm expo start --dev-client`.
+# A pull request that changes native code gets an Android dev client of its
+# own, as an artifact of its run; it never replaces the published one.
+# "Run workflow" in the Actions tab builds the current branch, and with
+# `force` builds even when its runtime version already has one.
 
 on:
+  push:
+    branches: [main]
+  pull_request:
   workflow_dispatch:
     inputs:
       platform:
         description: Which dev client to build
         type: choice
-        options: [android, ios, both]
-        default: android
-  push:
-    branches: [main]
-    paths:
-      - "modules/**"
-      - "plugins/**"
-      - "app.json"
-      - "app.config.ts"
-      - "package.json"
-      - "pnpm-lock.yaml"
-      - "scripts/build-mesh-mobile.sh"
-      - "scripts/ci/publish-download.sh"
-      - ".github/workflows/dev-client.yaml"
-  pull_request:
-    paths:
-      - "modules/**"
-      - "plugins/**"
-      - "app.json"
-      - "app.config.ts"
-      - "package.json"
-      - "pnpm-lock.yaml"
-      - "scripts/build-mesh-mobile.sh"
-      - "scripts/ci/publish-download.sh"
-      - ".github/workflows/dev-client.yaml"
+        options: [both, android, ios]
+        default: both
+      force:
+        description: Build even if this runtime version already has a dev client
+        type: boolean
+        default: false
 
-# To publish the builds to the "dev-client" pre-release.
+# To publish the builds to the "Dev client" pre-release and record them.
 permissions:
   contents: write
 
@@ -55,6 +47,19 @@ concurrency:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  GH_TOKEN: ${{ github.token }}
+  # Only main's builds are published and recorded.
+  PUBLISH: ${{ github.ref == 'refs/heads/main' && github.event_name != 'pull_request' }}
+  DEV_CLIENT_NOTES: >-
+    The development client (expo-dev-client) of main's newest native code, mesh sidecar included.
+    It is rebuilt whenever main's native side changes; each file's label names the runtime version and
+    commit it was built from.
+
+    Android phone or emulator: open pokket-dev.apk on the device and install it.
+    iOS simulator: unzip pokket-dev-simulator.zip, then `xcrun simctl install booted pokket.app`.
+
+    Then run `pnpm expo start --dev-client` and open pokket, or open a pull request's preview update
+    (linked in its "Preview on your phone" comment).
 
 jobs:
   android:
@@ -68,18 +73,28 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Does this runtime version need a dev client?
+        id: native
+        run: |
+          scripts/ci/native-build.sh check android dev-build
+          if [ "${{ inputs.force }}" = "true" ]; then echo "needed=true" >> "$GITHUB_OUTPUT"; fi
+
       - uses: actions/setup-java@v4
+        if: steps.native.outputs.needed == 'true'
         with:
           java-version: "17"
           distribution: temurin
       - uses: actions/setup-go@v5
+        if: steps.native.outputs.needed == 'true'
         with:
           go-version-file: modules/pokket-mesh/go/go.mod
           cache-dependency-path: modules/pokket-mesh/go/go.sum
-      - run: pnpm install --frozen-lockfile
 
       - name: Restore the mesh library
         id: mesh
+        if: steps.native.outputs.needed == 'true'
         uses: actions/cache@v4
         with:
           path: |
@@ -88,41 +103,46 @@ jobs:
           key: mesh-android-${{ hashFiles('modules/pokket-mesh/go/**', 'scripts/build-mesh-mobile.sh') }}
 
       - name: Build the mesh library
-        if: steps.mesh.outputs.cache-hit != 'true'
+        if: steps.native.outputs.needed == 'true' && steps.mesh.outputs.cache-hit != 'true'
         run: pnpm build:mesh:android
 
       - name: Prebuild
+        if: steps.native.outputs.needed == 'true'
         run: npx expo prebuild --platform android --no-install --clean
 
       - name: Build the debug APK
+        if: steps.native.outputs.needed == 'true'
         working-directory: android
         # The Go library is built for arm64, armv7 and x86_64 only.
         run: |
-          ./gradlew :app:assembleDebug -PreactNativeArchitectures=arm64-v8a,armeabi-v7a,x86_64 --no-daemon \
-            "-Dorg.gradle.jvmargs=-Xmx6g -XX:MaxMetaspaceSize=1g"
+          ./gradlew :app:assembleDebug -PreactNativeArchitectures=arm64-v8a,armeabi-v7a,x86_64 --no-daemon
           mkdir -p "$RUNNER_TEMP/out"
           cp app/build/outputs/apk/debug/app-debug.apk "$RUNNER_TEMP/out/pokket-dev-${GITHUB_SHA::7}.apk"
 
       - uses: actions/upload-artifact@v4
+        if: steps.native.outputs.needed == 'true'
         with:
           name: pokket-dev-android
           path: ${{ runner.temp }}/out/*.apk
           retention-days: 14
 
-      - name: Publish to the dev-client pre-release
+      - name: Publish to the Dev client release
+        if: steps.native.outputs.needed == 'true' && env.PUBLISH == 'true'
         env:
-          GH_TOKEN: ${{ github.token }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-          NOTES: >-
-            Development client (expo-dev-client) with the mesh sidecar, built by the "Dev client" workflow.
-            Android: install pokket-dev.apk on the phone. iOS simulator: unzip pokket-dev-simulator.zip, then
-            `xcrun simctl install booted pokket.app`. Then run `pnpm expo start --dev-client` and open the app.
-        run: scripts/ci/publish-download.sh dev-client "Development client" "$RUNNER_TEMP"/out/*.apk pokket-dev.apk
+          NOTES: ${{ env.DEV_CLIENT_NOTES }}
+          LABEL: "pokket-dev.apk · Android · runtime ${{ steps.native.outputs.runtime_version }} · ${{ github.sha }}"
+        run: scripts/ci/publish-download.sh dev-client "Dev client" "$RUNNER_TEMP"/out/*.apk pokket-dev.apk
 
+      - name: Record the build
+        if: steps.native.outputs.needed == 'true' && env.PUBLISH == 'true'
+        run: scripts/ci/native-build.sh mark "${{ steps.native.outputs.tag }}"
+
+  # Pull requests: Android only (the Mac takes long, and PR previews are tried
+  # on phones). main and manual runs build both.
   ios-simulator:
     if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.platform != 'android')
     runs-on: macos-latest
-    timeout-minutes: 75
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -130,32 +150,44 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      # Resolved here on the Mac, as the build will be.
+      - name: Does this runtime version need a dev client?
+        id: native
+        run: |
+          scripts/ci/native-build.sh check ios dev-build
+          if [ "${{ inputs.force }}" = "true" ]; then echo "needed=true" >> "$GITHUB_OUTPUT"; fi
+
       - uses: actions/setup-go@v5
+        if: steps.native.outputs.needed == 'true'
         with:
           go-version-file: modules/pokket-mesh/go/go.mod
           cache-dependency-path: modules/pokket-mesh/go/go.sum
-      - run: pnpm install --frozen-lockfile
 
       - name: Restore the mesh framework
         id: mesh
+        if: steps.native.outputs.needed == 'true'
         uses: actions/cache@v4
         with:
-          path: |
-            modules/pokket-mesh/ios/Meshmobile.xcframework
+          path: modules/pokket-mesh/ios/Meshmobile.xcframework
           key: mesh-ios-${{ hashFiles('modules/pokket-mesh/go/**', 'scripts/build-mesh-mobile.sh') }}
 
       - name: Build the mesh framework
-        if: steps.mesh.outputs.cache-hit != 'true'
+        if: steps.native.outputs.needed == 'true' && steps.mesh.outputs.cache-hit != 'true'
         run: pnpm build:mesh:ios
 
       - name: Prebuild
+        if: steps.native.outputs.needed == 'true'
         run: npx expo prebuild --platform ios --no-install --clean
 
       - name: Install pods
+        if: steps.native.outputs.needed == 'true'
         working-directory: ios
         run: pod install
 
       - name: Build the Debug simulator app
+        if: steps.native.outputs.needed == 'true'
         working-directory: ios
         run: |
           set -o pipefail
@@ -167,17 +199,19 @@ jobs:
             "$RUNNER_TEMP/out/pokket-dev-simulator-${GITHUB_SHA::7}.zip"
 
       - uses: actions/upload-artifact@v4
+        if: steps.native.outputs.needed == 'true'
         with:
           name: pokket-dev-ios-simulator
           path: ${{ runner.temp }}/out/*.zip
           retention-days: 14
 
-      - name: Publish to the dev-client pre-release
+      - name: Publish to the Dev client release
+        if: steps.native.outputs.needed == 'true' && env.PUBLISH == 'true'
         env:
-          GH_TOKEN: ${{ github.token }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-          NOTES: >-
-            Development client (expo-dev-client) with the mesh sidecar, built by the "Dev client" workflow.
-            Android: install pokket-dev.apk on the phone. iOS simulator: unzip pokket-dev-simulator.zip, then
-            `xcrun simctl install booted pokket.app`. Then run `pnpm expo start --dev-client` and open the app.
-        run: scripts/ci/publish-download.sh dev-client "Development client" "$RUNNER_TEMP"/out/*.zip pokket-dev-simulator.zip
+          NOTES: ${{ env.DEV_CLIENT_NOTES }}
+          LABEL: "pokket-dev-simulator.zip · iOS simulator · runtime ${{ steps.native.outputs.runtime_version }} · ${{ github.sha }}"
+        run: scripts/ci/publish-download.sh dev-client "Dev client" "$RUNNER_TEMP"/out/*.zip pokket-dev-simulator.zip
+
+      - name: Record the build
+        if: steps.native.outputs.needed == 'true' && env.PUBLISH == 'true'
+        run: scripts/ci/native-build.sh mark "${{ steps.native.outputs.tag }}"

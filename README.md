@@ -59,10 +59,13 @@ request's preview.
 | **iOS simulator** | [`pokket-dev-simulator.zip`](https://github.com/arkitektio/pokket/releases/download/dev-client/pokket-dev-simulator.zip) | Unzip it, then `xcrun simctl install booted pokket.app`. |
 | **Physical iPhone** | Build it yourself | `pnpm build:mesh:ios && npx expo run:ios --device`. It needs signing, so CI does not build one. |
 
-Both downloads are on the [`dev-client`](https://github.com/arkitektio/pokket/releases/tag/dev-client)
-pre-release. The "Dev client" workflow rebuilds them when the native side changes (`modules/`,
-`plugins/`, the app config or dependencies). A development build you make yourself only has the
-mesh if you ran `pnpm build:mesh:<platform>` first (see below).
+Both downloads are on the [Dev client](https://github.com/arkitektio/pokket/releases/tag/dev-client)
+pre-release, and always match the newest native code on `main`. They are rebuilt whenever `main`'s
+native side changes, detected the same way as for releases (see below). Each file's label names the
+runtime version and commit it was built from. A pull request that changes native code gets an
+Android dev client of its own, under its "Dev client" run's artifacts. It never replaces the
+published one. A development build you make yourself only has the mesh if you ran
+`pnpm build:mesh:<platform>` first (see below).
 
 **Pull request previews.** Every pull request from a branch of this repository publishes its JS
 as an over-the-air update on the EAS branch `pr-<number>`. A comment on the pull request links
@@ -77,7 +80,7 @@ Everything builds on GitHub's runners, never in the EAS build queue.
 |---|---|---|
 | **Checks** (`checks.yaml`) | Every pull request, pushes to `main` | Runs the tests and publishes the pull request preview. A few minutes, on Linux. |
 | **Release** (`release.yaml`) | Every push to `main` | semantic-release picks the version: patch by default, minor if a commit starts with `feat:`, major for a `BREAKING CHANGE:`. Commit prefixes are optional. Each platform then checks whether its native side changed (see below). If it didn't, it publishes an over-the-air update only, in minutes. If it did, it also builds the APK (attached to the release and to `pokket.apk`) or the iOS build (uploaded to TestFlight), and then publishes the update. |
-| **Dev client** (`dev-client.yaml`) | Native changes on `main` or in pull requests, or by hand | Rebuilds the development clients above. |
+| **Dev client** (`dev-client.yaml`) | Every push to `main` and pull request, or by hand | Checks whether the native side has a dev client yet, recorded as tag `dev-build/<platform>/<runtime version>`. If not, it builds one. `main`'s builds go to the Dev client release; a pull request's go to its run's artifacts (Android only). By hand, with `force`, it rebuilds regardless. |
 | **Mesh sidecar** (`mesh.yaml`) | Changes to the mesh | End-to-end mesh tests on an emulator and a simulator. |
 
 "Native side changed" means the app's **runtime version** is new. That version is Expo's

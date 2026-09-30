@@ -85,7 +85,8 @@ jobs:
           the QR code with the camera, with the [development client](https://github.com/$GITHUB_REPOSITORY/releases/tag/dev-client) installed.
 
           It only runs on a development client with the same native side (runtime ${RUNTIME}). If this pull request
-          changes native code, the \"Dev client\" workflow builds a new one for it first.
+          changes native code, the published one will not do: the \"Dev client\" run of this pull request builds an
+          Android dev client for it, under that run's artifacts.
 
           _Updated for ${HEAD_SHA::7}._"
           id=$(gh api "repos/$GITHUB_REPOSITORY/issues/$PR/comments" --paginate \
