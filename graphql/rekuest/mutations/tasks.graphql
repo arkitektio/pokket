@@ -1,0 +1,35 @@
+mutation CancelTask($task: ID!) {
+  cancel(input: { task: $task }) {
+    id
+    latestEventKind
+    latestInstructKind
+    isDone
+  }
+}
+
+mutation InterruptTask($task: ID!) {
+  interrupt(input: { task: $task }) {
+    id
+    latestEventKind
+    latestInstructKind
+    isDone
+  }
+}
+
+mutation PauseTask($task: ID!) {
+  pause(input: { task: $task }) {
+    id
+    latestEventKind
+    latestInstructKind
+    isDone
+  }
+}
+
+mutation ResumeTask($task: ID!) {
+  resume(input: { task: $task }) {
+    id
+    latestEventKind
+    latestInstructKind
+    isDone
+  }
+}

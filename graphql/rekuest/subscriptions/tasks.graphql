@@ -1,0 +1,23 @@
+# Root task changes across the organization: creates and every event.
+subscription WatchTasks {
+  tasks {
+    create {
+      ...TaskChange
+    }
+    event {
+      ...TaskEventChange
+    }
+  }
+}
+
+# Create/update of every descendant of a task (scalars only, no events).
+subscription WatchChildTasks($id: ID!) {
+  childTasks(id: $id) {
+    create {
+      ...TaskChange
+    }
+    update {
+      ...TaskChange
+    }
+  }
+}

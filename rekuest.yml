@@ -1,5 +1,7 @@
 overwrite: true
-schema: "http://jhnnsrs-lab/rekuest/graphql"
+schema:
+  "http://jhnnsrs-lab/rekuest/schema":
+    handleAsSDL: true
 documents: "graphql/rekuest/**/*.graphql"
 generates:
   lib/rekuest/api/fragments.ts:

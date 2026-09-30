@@ -61,7 +61,8 @@ export default function PagesLayout() {
         <Stack.Screen name="mail/thread/[id]" options={{ title: '' }} />
         <Stack.Screen name="bank/index" options={page('Bank')} />
         <Stack.Screen name="bank/transaction/[id]" options={{ title: 'Transaction' }} />
-        <Stack.Screen name="tasks" options={page('Tasks')} />
+        <Stack.Screen name="tasks/index" options={page('Tasks')} />
+        <Stack.Screen name="tasks/[id]" options={{ title: 'Task' }} />
         <Stack.Screen name="broadcasts" options={page('Broadcasts')} />
         <Stack.Screen name="solo-broadcast/start" options={{ title: 'Start Solo Broadcast' }} />
         <Stack.Screen name="solo-broadcast/[id]" options={{ title: 'Solo Broadcast' }} />

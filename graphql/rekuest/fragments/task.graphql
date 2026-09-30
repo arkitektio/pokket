@@ -1,8 +1,136 @@
-fragment Task on Assignation {
+# Row shape. The newest few `events` let a row show progress and the latest
+# message; the task stream prepends live events onto the same field.
+fragment ListTask on Task {
   id
+  reference
+  latestEventKind
+  isDone
+  createdAt
+  finishedAt
   action {
+    id
     name
   }
+  agent {
+    id
+    name
+  }
+  events(pagination: { limit: 3 }, ordering: [{ createdAt: DESC }]) {
+    ...TaskEvent
+  }
+}
+
+fragment TaskEvent on TaskEvent {
+  id
+  kind
+  level
+  message
+  progress
+  returns
   createdAt
+}
+
+fragment TaskPort on ArgPort {
+  key
+  label
+  kind
+  identifier
+  description
+}
+
+fragment TaskReturnPort on ReturnPort {
+  key
+  label
+  kind
+  identifier
+  description
+}
+
+fragment ChildTask on Task {
+  id
+  reference
   latestEventKind
+  isDone
+  createdAt
+  finishedAt
+  parentStep
+  callKey
+  action {
+    id
+    name
+  }
+}
+
+fragment DetailTask on Task {
+  id
+  reference
+  latestEventKind
+  latestInstructKind
+  isDone
+  args
+  createdAt
+  finishedAt
+  action {
+    id
+    name
+    description
+    args {
+      ...TaskPort
+    }
+    returns {
+      ...TaskReturnPort
+    }
+  }
+  implementation {
+    id
+    interface
+  }
+  agent {
+    id
+    name
+    connected
+  }
+  parent {
+    id
+    action {
+      id
+      name
+    }
+  }
+  root {
+    id
+  }
+  # The newest 200, as orkestrator mounts; the stream prepends live ones.
+  events(pagination: { limit: 200 }, ordering: [{ createdAt: DESC }]) {
+    ...TaskEvent
+  }
+  children(ordering: [{ createdAt: ASC }]) {
+    ...ChildTask
+  }
+}
+
+# Thin subscription deltas: relations are scalar ids, so the client merges hot
+# scalars and events into the normalized cache and refetches on creates.
+fragment TaskChange on TaskChange {
+  id
+  reference
+  isDone
+  latestEventKind
+  latestInstructKind
+  statusMessage
+  root
+  parent
+  createdAt
+  updatedAt
+  finishedAt
+}
+
+fragment TaskEventChange on TaskEventChange {
+  id
+  task
+  kind
+  message
+  progress
+  returns
+  createdAt
 }

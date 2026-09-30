@@ -1,5 +1,11 @@
-query Tasks($filters: AssignationFilter, $order: AssignationOrder, $pagination: OffsetPaginationInput) {
-  tasks(filters: $filters, order: $order, pagination: $pagination) {
-    ...Task
+query ListTasks($filter: TaskFilter, $ordering: [TaskOrder!], $pagination: OffsetPaginationInput) {
+  tasks(filters: $filter, ordering: $ordering, pagination: $pagination) {
+    ...ListTask
+  }
+}
+
+query DetailTask($id: ID!) {
+  task(id: $id) {
+    ...DetailTask
   }
 }

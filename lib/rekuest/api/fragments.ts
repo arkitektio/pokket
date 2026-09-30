@@ -6,9 +6,14 @@
       }
       const result: PossibleTypesResultData = {
   "possibleTypes": {
+    "AgentSnapshotEventStatePatchEvent": [
+      "AgentSnapshotEvent",
+      "StatePatchEvent"
+    ],
     "AssignWidget": [
       "ChoiceAssignWidget",
       "CustomAssignWidget",
+      "ProxyWidget",
       "SearchAssignWidget",
       "SliderAssignWidget",
       "StateChoiceAssignWidget",
@@ -23,10 +28,14 @@
       "ChoiceReturnWidget",
       "CustomReturnWidget"
     ],
-    "UIChild": [
-      "UIGrid",
-      "UISplit",
-      "UIState"
+    "StateSnapshotEventStatePatchEvent": [
+      "StatePatchEvent",
+      "StateSnapshotEvent"
+    ],
+    "_Entity": [
+      "MediaStore",
+      "Session",
+      "User"
     ]
   }
 };
