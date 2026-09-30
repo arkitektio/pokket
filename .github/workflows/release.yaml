@@ -267,7 +267,9 @@ jobs:
           jq --arg id "$ASC_APP_ID" '.submit.production.ios.ascAppId = $id' eas.json > eas.json.tmp
           mv eas.json.tmp eas.json
           # No --what-to-test: EAS only takes a changelog on its Enterprise plan.
-          eas submit --platform ios --profile production --path ./pokket.ipa --non-interactive
+          # --no-wait: once EAS has scheduled the upload it is EAS's; waiting
+          # only lets a network blip on the runner fail a delivered build.
+          eas submit --platform ios --profile production --path ./pokket.ipa --non-interactive --no-wait
           # eas.json is part of the native fingerprint: left edited, the update
           # below would go to a runtime version no installed app has.
           git checkout -- eas.json
