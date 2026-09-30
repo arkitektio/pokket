@@ -1,3 +1,10 @@
+## [1.7.3](https://github.com/arkitektio/pokket/compare/v1.7.2...v1.7.3) (2026-09-30)
+
+
+### Bug Fixes
+
+* **ci:** APK download link and TestFlight upload ([b083f78](https://github.com/arkitektio/pokket/commit/b083f78f4339113571e779e7fb38acf6d25634f3))
+
 ## [1.7.2](https://github.com/arkitektio/pokket/compare/v1.7.1...v1.7.2) (2026-09-30)
 
 ## [1.7.1](https://github.com/arkitektio/pokket/compare/v1.7.0...v1.7.1) (2026-09-30)
