@@ -39,13 +39,13 @@ node, the machines it sees, which services it carries, and lets you switch it of
 
 | Platform | Where | Notes |
 |---|---|---|
-| **Android** | [`pokket.apk`](https://github.com/arkitektio/pokket/releases/download/android/pokket.apk) | Open the link on the phone and install it (allow installs from your browser when asked). Every version's APK is also on its [release](https://github.com/arkitektio/pokket/releases), when that version needed a new app. |
+| **Android** | [`pokket.apk`](https://github.com/arkitektio/pokket/releases/latest/download/pokket.apk) | Open the link on the phone and install it (allow installs from your browser when asked). It is also on the **Latest** release on the [Releases](https://github.com/arkitektio/pokket/releases/latest) page, which says what to install from where. |
 | **iPhone / iPad** | [TestFlight](https://testflight.apple.com/) | Ask a maintainer to add you as a tester; you get an e-mail invite. Install TestFlight from the App Store and accept it. |
 
 **Updates install themselves.** Most releases change only the app's JavaScript. They are
 delivered over the air: pokket downloads them on launch and offers a restart. You only need
-a new APK or TestFlight build when a release changes the native app, and TestFlight tells
-you when that happens. For Android, download `pokket.apk` again from the same link.
+a new APK or TestFlight build when a release changes the native app. TestFlight tells you
+when that happens; for Android, the release notes say "A new app", and the same link has it.
 
 ### Developing pokket
 
@@ -79,7 +79,7 @@ Everything builds on GitHub's runners, never in the EAS build queue.
 | Workflow | When | What it does |
 |---|---|---|
 | **Checks** (`checks.yaml`) | Every pull request, pushes to `main` | Runs the tests and publishes the pull request preview. A few minutes, on Linux. |
-| **Release** (`release.yaml`) | Every push to `main` | semantic-release picks the version: patch by default, minor if a commit starts with `feat:`, major for a `BREAKING CHANGE:`. Commit prefixes are optional. Each platform then checks whether its native side changed (see below). If it didn't, it publishes an over-the-air update only, in minutes. If it did, it also builds the APK (attached to the release and to `pokket.apk`) or the iOS build (uploaded to TestFlight), and then publishes the update. |
+| **Release** (`release.yaml`) | Every push to `main` | semantic-release picks the version: patch by default, minor if a commit starts with `feat:`, major for a `BREAKING CHANGE:`. Commit prefixes are optional. Each platform then checks whether its native side changed (see below). If it didn't, it publishes an over-the-air update only, in minutes. If it did, it also builds the APK or the iOS build (uploaded to TestFlight), and then publishes the update. Every release carries `pokket.apk` (a copy of the newest one if nothing native changed), and its notes list what to install and every commit. |
 | **Dev client** (`dev-client.yaml`) | Every push to `main` and pull request, or by hand | Checks whether the native side has a dev client yet, recorded as tag `dev-build/<platform>/<runtime version>`. If not, it builds one. `main`'s builds go to the Dev client release; a pull request's go to its run's artifacts (Android only). By hand, with `force`, it rebuilds regardless. |
 | **Mesh sidecar** (`mesh.yaml`) | Changes to the mesh | End-to-end mesh tests on an emulator and a simulator. |
 

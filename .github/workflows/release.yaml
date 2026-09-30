@@ -10,9 +10,11 @@ name: Release (Android APK, iOS TestFlight, over-the-air)
 #    download it on their next launch and offer a restart (lib/updates).
 #    A few minutes.
 #  - Native changes: also build a new binary on GitHub's runners (never the
-#    EAS build queue) — an APK on the GitHub release and at a fixed download
-#    link, an iOS build on TestFlight — and record it, so the next JS-only
-#    release knows it needs none.
+#    EAS build queue) — an APK, and an iOS build on TestFlight — and record
+#    it, so the next JS-only release knows it needs none.
+#  - Either way the release carries pokket.apk (a JS-only release a copy of
+#    the newest one), so the "Latest" release always has the download, and
+#    its notes say what to install from where (scripts/ci/release-notes.sh).
 #
 # Where to download what is in README.md ("Install").
 
@@ -85,6 +87,10 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       VERSION: ${{ needs.release.outputs.version }}
+    # For the release notes (scripts/ci/release-notes.sh).
+    outputs:
+      apk: ${{ steps.apk.outputs.apk }}
+      apk_from: ${{ steps.apk.outputs.from }}
     steps:
       # The release commit and tag semantic-release just pushed: package.json
       # there carries the new version (app.config.ts reads it).
@@ -150,22 +156,23 @@ jobs:
         if: steps.native.outputs.needed == 'true'
         run: eas build --platform android --profile apk --non-interactive --local --output=./pokket.apk
 
-      - name: Attach APK to the GitHub release
-        if: steps.native.outputs.needed == 'true'
+      # Every release carries pokket.apk, so the "Latest" release always has
+      # the download, and releases/latest/download/pokket.apk always works.
+      - name: Attach the APK to the release
+        id: apk
         run: |
-          cp pokket.apk "pokket-$VERSION.apk"
-          gh release upload "v$VERSION" "pokket-$VERSION.apk" --clobber
-
-      # The link in the README: always the newest APK, whichever release built it.
-      - name: Publish APK to the fixed download link
-        if: steps.native.outputs.needed == 'true'
-        env:
-          NOTES: >-
-            The newest pokket for Android. On the phone, open
-            https://github.com/${{ github.repository }}/releases/download/android/pokket.apk
-            and install it. It updates itself over the air after that; this
-            file only changes when a release needs a new app (v${{ needs.release.outputs.version }}).
-        run: scripts/ci/publish-download.sh android "Android (latest)" pokket.apk pokket.apk
+          if [ "${{ steps.native.outputs.needed }}" = "true" ]; then
+            gh release upload "v$VERSION" "pokket.apk#pokket $VERSION for Android" --clobber
+            echo "apk=built" >> "$GITHUB_OUTPUT"
+          else
+            # JS only: the newest APK is still the app. It picks this release's
+            # JS up over the air on its first launch.
+            from="$(scripts/ci/copy-apk.sh "v$VERSION" pokket.apk)"
+            gh release upload "v$VERSION" \
+              "pokket.apk#pokket $VERSION for Android (app from $from; updates itself on first launch)" --clobber
+            echo "apk=copied" >> "$GITHUB_OUTPUT"
+            echo "from=$from" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Record the build
         if: steps.native.outputs.needed == 'true'
@@ -194,6 +201,9 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       VERSION: ${{ needs.release.outputs.version }}
+    # For the release notes: whether a new build went to TestFlight.
+    outputs:
+      ios: ${{ steps.native.outputs.needed == 'true' && 'testflight' || 'ota' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -270,3 +280,32 @@ jobs:
         run: >
           eas update --channel production --environment production --platform ios
           --message "v$VERSION" --non-interactive
+
+  # The release's notes: what to install from where, and what changed. Runs
+  # after both platforms, also when one failed, so the notes say so.
+  notes:
+    name: Release notes
+    needs: [release, android, ios]
+    if: always() && needs.release.outputs.published == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: v${{ needs.release.outputs.version }}
+          # The commits since the previous release.
+          fetch-depth: 0
+
+      - name: Write the release notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.release.outputs.version }}
+          ANDROID_RESULT: ${{ needs.android.result }}
+          APK: ${{ needs.android.outputs.apk }}
+          APK_FROM: ${{ needs.android.outputs.apk_from }}
+          IOS_RESULT: ${{ needs.ios.result }}
+          IOS: ${{ needs.ios.outputs.ios }}
+          TESTFLIGHT_URL: ${{ vars.TESTFLIGHT_URL }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: scripts/ci/release-notes.sh

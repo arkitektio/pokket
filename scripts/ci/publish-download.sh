@@ -28,7 +28,7 @@ if ! gh release view "$tag" > /dev/null 2>&1; then
   fi
   gh release create "$tag" --prerelease --verify-tag --title "$title" --notes "$notes"
 else
-  gh release edit "$tag" --notes "$notes"
+  gh release edit "$tag" --title "$title" --notes "$notes"
 fi
 cp "$file" "$RUNNER_TEMP/$name"
 gh release upload "$tag" "$RUNNER_TEMP/$name${LABEL:+#$LABEL}" --clobber
