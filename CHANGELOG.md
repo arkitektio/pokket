@@ -1,3 +1,16 @@
+# [1.8.0](https://github.com/arkitektio/pokket/compare/v1.7.4...v1.8.0) (2026-09-30)
+
+
+### Bug Fixes
+
+* **ci:** don't wait for TestFlight processing ([f83b48e](https://github.com/arkitektio/pokket/commit/f83b48eceb04307df220c743a15359cb1e406256))
+* keep a login's newest token when something else refreshed it ([6ae468e](https://github.com/arkitektio/pokket/commit/6ae468eeed39630d1b22b3f7267a08a410ba9ec6))
+
+
+### Features
+
+* automatic timeline backup to lokate, in the background too ([a85e662](https://github.com/arkitektio/pokket/commit/a85e662ef5befb6632b30d2c19aad16d72b0ca1a))
+
 ## [1.7.4](https://github.com/arkitektio/pokket/compare/v1.7.3...v1.7.4) (2026-09-30)
 
 ## [1.7.3](https://github.com/arkitektio/pokket/compare/v1.7.2...v1.7.3) (2026-09-30)
