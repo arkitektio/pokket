@@ -1,3 +1,10 @@
+# [1.7.0](https://github.com/arkitektio/pokket/compare/v1.6.0...v1.7.0) (2026-09-30)
+
+
+### Features
+
+* live task list and task detail pages ([6fe5595](https://github.com/arkitektio/pokket/commit/6fe55952b04c812207bc48fac1990475ade327d5))
+
 # [1.6.0](https://github.com/arkitektio/pokket/compare/v1.5.0...v1.6.0) (2026-09-29)
 
 
