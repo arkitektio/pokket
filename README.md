@@ -33,9 +33,61 @@ approve it. Pokket then runs its own in-app Tailscale node — no VPN permission
 — and reaches the services that only live on the mesh through it. The **Mesh** screen shows the
 node, the machines it sees, which services it carries, and lets you switch it off.
 
-## Get Started
+## Install
 
-Currently available for Android devices with BLE support. Just download the APK from the [Releases](https://github.com/jhnnsrs/pokket/releases) page and install it on your device.
+### Using pokket
+
+| Platform | Where | Notes |
+|---|---|---|
+| **Android** | [`pokket.apk`](https://github.com/arkitektio/pokket/releases/download/android/pokket.apk) | Open the link on the phone and install it (allow installs from your browser when asked). Every version's APK is also on its [release](https://github.com/arkitektio/pokket/releases), when that version needed a new app. |
+| **iPhone / iPad** | [TestFlight](https://testflight.apple.com/) | Ask a maintainer to add you as a tester; you get an e-mail invite. Install TestFlight from the App Store and accept it. |
+
+**Updates install themselves.** Most releases change only the app's JavaScript. They are
+delivered over the air: pokket downloads them on launch and offers a restart. You only need
+a new APK or TestFlight build when a release changes the native app, and TestFlight tells
+you when that happens. For Android, download `pokket.apk` again from the same link.
+
+### Developing pokket
+
+A **development client** is pokket with its native side (including the mesh) and no
+bundled JS. It loads JS from your machine (`pnpm expo start --dev-client`) or from a pull
+request's preview.
+
+| Platform | Where | Notes |
+|---|---|---|
+| **Android phone or emulator** | [`pokket-dev.apk`](https://github.com/arkitektio/pokket/releases/download/dev-client/pokket-dev.apk) | Install it and open pokket. It connects to Metro on your network. |
+| **iOS simulator** | [`pokket-dev-simulator.zip`](https://github.com/arkitektio/pokket/releases/download/dev-client/pokket-dev-simulator.zip) | Unzip it, then `xcrun simctl install booted pokket.app`. |
+| **Physical iPhone** | Build it yourself | `pnpm build:mesh:ios && npx expo run:ios --device`. It needs signing, so CI does not build one. |
+
+Both downloads are on the [`dev-client`](https://github.com/arkitektio/pokket/releases/tag/dev-client)
+pre-release. The "Dev client" workflow rebuilds them when the native side changes (`modules/`,
+`plugins/`, the app config or dependencies). A development build you make yourself only has the
+mesh if you ran `pnpm build:mesh:<platform>` first (see below).
+
+**Pull request previews.** Every pull request from a branch of this repository publishes its JS
+as an over-the-air update on the EAS branch `pr-<number>`. A comment on the pull request links
+to its update page. Scan the QR code there with the development client installed to run the
+pull request on your phone. This takes a few minutes, with no build.
+
+### How releases are made
+
+Everything builds on GitHub's runners, never in the EAS build queue.
+
+| Workflow | When | What it does |
+|---|---|---|
+| **Checks** (`checks.yaml`) | Every pull request, pushes to `main` | Runs the tests and publishes the pull request preview. A few minutes, on Linux. |
+| **Release** (`release.yaml`) | Every push to `main` | semantic-release picks the version: patch by default, minor if a commit starts with `feat:`, major for a `BREAKING CHANGE:`. Commit prefixes are optional. Each platform then checks whether its native side changed (see below). If it didn't, it publishes an over-the-air update only, in minutes. If it did, it also builds the APK (attached to the release and to `pokket.apk`) or the iOS build (uploaded to TestFlight), and then publishes the update. |
+| **Dev client** (`dev-client.yaml`) | Native changes on `main` or in pull requests, or by hand | Rebuilds the development clients above. |
+| **Mesh sidecar** (`mesh.yaml`) | Changes to the mesh | End-to-end mesh tests on an emulator and a simulator. |
+
+"Native side changed" means the app's **runtime version** is new. That version is Expo's
+fingerprint of everything native, including the mesh's Go sources (`fingerprint.config.js`), but
+not the version number. Each binary the release workflow builds is recorded as a git tag
+`native/<android|ios>/<runtime version>`. A release whose runtime version already has its tag
+changed only JS. To force a new binary, delete the tag
+(`git push origin :refs/tags/native/android/<runtime version>`), then re-run just that platform's job
+(**Android** or **iOS**) of the latest release run in the Actions tab. Re-running the whole
+workflow does nothing, because semantic-release finds no new version.
 
 ## Devlopment Setup
 

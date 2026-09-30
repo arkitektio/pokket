@@ -61,6 +61,7 @@
       "@livekit/react-native-expo-plugin",
       "@config-plugins/react-native-webrtc",
       "./modules/pokket-mesh/app.plugin.js",
+      "./plugins/withGradleMemory.js",
       [
         "expo-location",
         {

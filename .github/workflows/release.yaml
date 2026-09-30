@@ -1,5 +1,21 @@
 name: Release (Android APK, iOS TestFlight, over-the-air)
 
+# On every push to main, semantic-release decides whether the commits since
+# the last release make a new version (feat → minor, fix → patch). If they do:
+#
+#  - Each platform checks whether this version changed anything native, by its
+#    runtime version (the native fingerprint, app.config.ts) — see
+#    scripts/ci/native-build.sh.
+#  - JS only (the usual case): publish an over-the-air update. Installed apps
+#    download it on their next launch and offer a restart (lib/updates).
+#    A few minutes.
+#  - Native changes: also build a new binary on GitHub's runners (never the
+#    EAS build queue) — an APK on the GitHub release and at a fixed download
+#    link, an iOS build on TestFlight — and record it, so the next JS-only
+#    release knows it needs none.
+#
+# Where to download what is in README.md ("Install").
+
 on:
   push:
     branches:
@@ -10,14 +26,21 @@ permissions:
   issues: write
   pull-requests: write
 
+# One release at a time, and never cancel one half-way (a tag without its
+# builds, or a TestFlight upload cut off).
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 env:
   # Opt-in to Node 24 for all actions to satisfy 2026 requirements
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   release:
-    name: Build & Release
+    name: Version
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     outputs:
       published: ${{ steps.semantic.outputs.new_release_published }}
       version: ${{ steps.semantic.outputs.new_release_version }}
@@ -38,20 +61,8 @@ jobs:
           node-version: 22
           cache: "pnpm"
 
-      - name: Setup Java
-        uses: actions/setup-java@v4
-        with:
-          java-version: "17"
-          distribution: "temurin"
-
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
-
-      - name: Setup Expo
-        uses: expo/expo-github-action@v8
-        with:
-          eas-version: latest
-          token: ${{ secrets.EXPO_TOKEN }}
 
       - name: Determine Version and Create Tag
         id: semantic
@@ -63,57 +74,17 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Setup Go
-        if: steps.semantic.outputs.new_release_published == 'true'
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: modules/pokket-mesh/go/go.mod
-          cache-dependency-path: modules/pokket-mesh/go/go.sum
-
-      # The mesh sidecar's Go half (gomobile), picked up by modules/pokket-mesh.
-      # The runner image ships an NDK; the script reads ANDROID_NDK_LATEST_HOME.
-      - name: Build Mesh Sidecar
-        if: steps.semantic.outputs.new_release_published == 'true'
-        run: pnpm build:mesh:android
-
-      - name: Build APK Locally
-        # This only runs if a new version was actually detected
-        if: steps.semantic.outputs.new_release_published == 'true'
-        run: |
-          eas build --platform android --profile apk --non-interactive --local --output=./app-release.apk
-
-      # Over-the-air: installed apps pick this release's JS up on their next
-      # launch (lib/updates offers a restart once it is downloaded). It only
-      # reaches binaries with the same native fingerprint (app.config.ts):
-      # when this release changed native code, only the APK above gets it,
-      # and older installs keep what they have until updated.
-      # Android here; the iOS job publishes iOS's, from the Mac that built it.
-      - name: Publish Over-the-Air Update
-        if: steps.semantic.outputs.new_release_published == 'true'
-        run: >
-          eas update --channel production --environment production --platform android
-          --message "v${{ steps.semantic.outputs.new_release_version }}" --non-interactive
-
-      - name: Upload APK to GitHub Release
-        if: steps.semantic.outputs.new_release_published == 'true'
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v${{ steps.semantic.outputs.new_release_version }}
-          files: ./app-release.apk
-          body: ${{ steps.semantic.outputs.new_release_notes }}
-
-  # iOS: a signed App Store build of the release, uploaded to TestFlight, and
-  # its over-the-air update. Signs with the credentials stored on EAS (the
-  # arkitektio account: distribution certificate, provisioning profile, App
-  # Store Connect API key), so EXPO_TOKEN is all it needs from GitHub — plus
-  # the app's numeric App Store Connect id, which `eas submit` cannot look up
-  # without asking (secret ASC_APP_ID).
-  ios:
-    name: iOS → TestFlight
+  android:
+    name: Android
     needs: release
     if: needs.release.outputs.published == 'true'
-    runs-on: macos-latest
-    timeout-minutes: 120
+    runs-on: ubuntu-latest
+    # A release build takes ~25 minutes. Fail well before GitHub's 6 hours if
+    # Gradle hangs again (see plugins/withGradleMemory.js).
+    timeout-minutes: 90
+    env:
+      GH_TOKEN: ${{ github.token }}
+      VERSION: ${{ needs.release.outputs.version }}
     steps:
       # The release commit and tag semantic-release just pushed: package.json
       # there carries the new version (app.config.ts reads it).
@@ -131,11 +102,112 @@ jobs:
           node-version: 22
           cache: "pnpm"
 
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Setup Expo
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Does this release need a new APK?
+        id: native
+        run: scripts/ci/native-build.sh check android
+
+      - name: Setup Java
+        if: steps.native.outputs.needed == 'true'
+        uses: actions/setup-java@v4
+        with:
+          java-version: "17"
+          distribution: "temurin"
+
       - name: Setup Go
+        if: steps.native.outputs.needed == 'true'
         uses: actions/setup-go@v5
         with:
           go-version-file: modules/pokket-mesh/go/go.mod
           cache-dependency-path: modules/pokket-mesh/go/go.sum
+
+      # The mesh sidecar's Go half (gomobile), picked up by modules/pokket-mesh.
+      # Rebuilt only when its sources change.
+      - name: Restore Mesh Sidecar
+        id: mesh
+        if: steps.native.outputs.needed == 'true'
+        uses: actions/cache@v4
+        with:
+          path: |
+            modules/pokket-mesh/android/libs
+            modules/pokket-mesh/android/src/main/jniLibs
+          key: mesh-android-${{ hashFiles('modules/pokket-mesh/go/**', 'scripts/build-mesh-mobile.sh') }}
+
+      # The runner image ships an NDK; the script reads ANDROID_NDK_LATEST_HOME.
+      - name: Build Mesh Sidecar
+        if: steps.native.outputs.needed == 'true' && steps.mesh.outputs.cache-hit != 'true'
+        run: pnpm build:mesh:android
+
+      - name: Build APK
+        if: steps.native.outputs.needed == 'true'
+        run: eas build --platform android --profile apk --non-interactive --local --output=./pokket.apk
+
+      - name: Attach APK to the GitHub release
+        if: steps.native.outputs.needed == 'true'
+        run: |
+          cp pokket.apk "pokket-$VERSION.apk"
+          gh release upload "v$VERSION" "pokket-$VERSION.apk" --clobber
+
+      # The link in the README: always the newest APK, whichever release built it.
+      - name: Publish APK to the fixed download link
+        if: steps.native.outputs.needed == 'true'
+        env:
+          NOTES: >-
+            The newest pokket for Android. On the phone, open
+            https://github.com/${{ github.repository }}/releases/download/android/pokket.apk
+            and install it. It updates itself over the air after that; this
+            file only changes when a release needs a new app (v${{ needs.release.outputs.version }}).
+        run: scripts/ci/publish-download.sh android "Android (latest)" pokket.apk pokket.apk
+
+      - name: Record the build
+        if: steps.native.outputs.needed == 'true'
+        run: scripts/ci/native-build.sh mark "${{ steps.native.outputs.tag }}"
+
+      # Installed apps on this runtime version pick this release's JS up on
+      # their next launch. After a native build it only reaches the new APK;
+      # older installs keep what they have until they install it.
+      - name: Publish Over-the-Air Update
+        run: >
+          eas update --channel production --environment production --platform android
+          --message "v$VERSION" --non-interactive
+
+  # iOS: the same, on a Mac. A new build is signed with the credentials stored
+  # on EAS (the arkitektio account: distribution certificate, provisioning
+  # profile, App Store Connect API key) and uploaded to TestFlight, so
+  # EXPO_TOKEN is all it needs from GitHub — plus the app's numeric App Store
+  # Connect id, which `eas submit` cannot look up without asking (secret
+  # ASC_APP_ID).
+  ios:
+    name: iOS
+    needs: release
+    if: needs.release.outputs.published == 'true'
+    runs-on: macos-latest
+    timeout-minutes: 150
+    env:
+      GH_TOKEN: ${{ github.token }}
+      VERSION: ${{ needs.release.outputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: v${{ needs.release.outputs.version }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "pnpm"
 
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
@@ -146,16 +218,38 @@ jobs:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
 
-      # The mesh sidecar's Go half, as Meshmobile.xcframework.
+      # Resolved here on the Mac, as the build and the update below will be.
+      - name: Does this release need a new iOS build?
+        id: native
+        run: scripts/ci/native-build.sh check ios
+
+      - name: Setup Go
+        if: steps.native.outputs.needed == 'true'
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: modules/pokket-mesh/go/go.mod
+          cache-dependency-path: modules/pokket-mesh/go/go.sum
+
+      - name: Restore Mesh Sidecar
+        id: mesh
+        if: steps.native.outputs.needed == 'true'
+        uses: actions/cache@v4
+        with:
+          path: modules/pokket-mesh/ios/Meshmobile.xcframework
+          key: mesh-ios-${{ hashFiles('modules/pokket-mesh/go/**', 'scripts/build-mesh-mobile.sh') }}
+
       - name: Build Mesh Sidecar
+        if: steps.native.outputs.needed == 'true' && steps.mesh.outputs.cache-hit != 'true'
         run: pnpm build:mesh:ios
 
-      - name: Build IPA Locally
+      - name: Build IPA
+        if: steps.native.outputs.needed == 'true'
         run: >
           eas build --platform ios --profile production --local --non-interactive
           --freeze-credentials --output=./pokket.ipa
 
       - name: Submit to TestFlight
+        if: steps.native.outputs.needed == 'true'
         env:
           ASC_APP_ID: ${{ secrets.ASC_APP_ID }}
         run: |
@@ -163,9 +257,16 @@ jobs:
           jq --arg id "$ASC_APP_ID" '.submit.production.ios.ascAppId = $id' eas.json > eas.json.tmp
           mv eas.json.tmp eas.json
           eas submit --platform ios --profile production --path ./pokket.ipa --non-interactive \
-            --what-to-test "Pokket v${{ needs.release.outputs.version }}"
+            --what-to-test "Pokket v$VERSION"
+          # eas.json is part of the native fingerprint: left edited, the update
+          # below would go to a runtime version no installed app has.
+          git checkout -- eas.json
+
+      - name: Record the build
+        if: steps.native.outputs.needed == 'true'
+        run: scripts/ci/native-build.sh mark "${{ steps.native.outputs.tag }}"
 
       - name: Publish Over-the-Air Update
         run: >
           eas update --channel production --environment production --platform ios
-          --message "v${{ needs.release.outputs.version }}" --non-interactive
+          --message "v$VERSION" --non-interactive

@@ -25,20 +25,24 @@ on:
     branches: [main]
     paths:
       - "modules/**"
+      - "plugins/**"
       - "app.json"
+      - "app.config.ts"
       - "package.json"
       - "pnpm-lock.yaml"
       - "scripts/build-mesh-mobile.sh"
-      - "scripts/ci/publish-dev-client.sh"
+      - "scripts/ci/publish-download.sh"
       - ".github/workflows/dev-client.yaml"
   pull_request:
     paths:
       - "modules/**"
+      - "plugins/**"
       - "app.json"
+      - "app.config.ts"
       - "package.json"
       - "pnpm-lock.yaml"
       - "scripts/build-mesh-mobile.sh"
-      - "scripts/ci/publish-dev-client.sh"
+      - "scripts/ci/publish-download.sh"
       - ".github/workflows/dev-client.yaml"
 
 # To publish the builds to the "dev-client" pre-release.
@@ -74,7 +78,17 @@ jobs:
           cache-dependency-path: modules/pokket-mesh/go/go.sum
       - run: pnpm install --frozen-lockfile
 
+      - name: Restore the mesh library
+        id: mesh
+        uses: actions/cache@v4
+        with:
+          path: |
+            modules/pokket-mesh/android/libs
+            modules/pokket-mesh/android/src/main/jniLibs
+          key: mesh-android-${{ hashFiles('modules/pokket-mesh/go/**', 'scripts/build-mesh-mobile.sh') }}
+
       - name: Build the mesh library
+        if: steps.mesh.outputs.cache-hit != 'true'
         run: pnpm build:mesh:android
 
       - name: Prebuild
@@ -99,7 +113,11 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-        run: scripts/ci/publish-dev-client.sh "$RUNNER_TEMP"/out/*.apk pokket-dev.apk
+          NOTES: >-
+            Development client (expo-dev-client) with the mesh sidecar, built by the "Dev client" workflow.
+            Android: install pokket-dev.apk on the phone. iOS simulator: unzip pokket-dev-simulator.zip, then
+            `xcrun simctl install booted pokket.app`. Then run `pnpm expo start --dev-client` and open the app.
+        run: scripts/ci/publish-download.sh dev-client "Development client" "$RUNNER_TEMP"/out/*.apk pokket-dev.apk
 
   ios-simulator:
     if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.platform != 'android')
@@ -118,7 +136,16 @@ jobs:
           cache-dependency-path: modules/pokket-mesh/go/go.sum
       - run: pnpm install --frozen-lockfile
 
+      - name: Restore the mesh framework
+        id: mesh
+        uses: actions/cache@v4
+        with:
+          path: |
+            modules/pokket-mesh/ios/Meshmobile.xcframework
+          key: mesh-ios-${{ hashFiles('modules/pokket-mesh/go/**', 'scripts/build-mesh-mobile.sh') }}
+
       - name: Build the mesh framework
+        if: steps.mesh.outputs.cache-hit != 'true'
         run: pnpm build:mesh:ios
 
       - name: Prebuild
@@ -149,4 +176,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-        run: scripts/ci/publish-dev-client.sh "$RUNNER_TEMP"/out/*.zip pokket-dev-simulator.zip
+          NOTES: >-
+            Development client (expo-dev-client) with the mesh sidecar, built by the "Dev client" workflow.
+            Android: install pokket-dev.apk on the phone. iOS simulator: unzip pokket-dev-simulator.zip, then
+            `xcrun simctl install booted pokket.app`. Then run `pnpm expo start --dev-client` and open the app.
+        run: scripts/ci/publish-download.sh dev-client "Development client" "$RUNNER_TEMP"/out/*.zip pokket-dev-simulator.zip
