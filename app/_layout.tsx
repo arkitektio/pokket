@@ -2,6 +2,8 @@ import '~/global.css';
 // Defines the background location task; must run before anything else, since
 // the OS may start the app headless just to deliver locations to it.
 import '@/lib/timeline/task';
+// Likewise the background backup of the timeline, which the OS starts on its schedule.
+import '@/lib/timeline/backgroundBackup';
 
 import { AlertDialogProvider } from '@/components/ui/alert-dialog';
 import { ProfileIdentitySync } from '@/components/profile/ProfileIdentitySync';

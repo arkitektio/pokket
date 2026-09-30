@@ -1,10 +1,10 @@
-import * as Device from "expo-device";
 import { AppState } from "react-native";
 import type { FaktsEndpoint } from "@/lib/arkitekt/fakts/endpointSchema";
 import type { ActiveFakts, Alias } from "@/lib/arkitekt/fakts/faktsSchema";
 import type { GrantedMesh } from "@/lib/arkitekt/fakts/meshGrant";
 import type { AliasRouter, MeshIntegration } from "@/lib/arkitekt/types";
 import { meshNative } from "@/modules/pokket-mesh";
+import { nodeHostname } from "./hostname";
 import { meshNeeded, onMesh } from "./meshNeed";
 import {
   loadMeshRecord,
@@ -44,15 +44,6 @@ const PREPARE_TIMEOUT_MS = 15_000;
 const JOIN_AND_PARK_TIMEOUT_MS = 30_000;
 
 const aliasKey = (alias: Alias) => `${alias.host}|${alias.port ?? 0}|${alias.ssl}`;
-
-/** A DNS-safe node name, e.g. `pokket-pixel-8`. */
-const nodeHostname = (): string => {
-  const device = (Device.deviceName || Device.modelName || "device")
-    .toLowerCase()
-    .replace(/[^a-z0-9-]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-  return `pokket-${device || "device"}`.slice(0, 63).replace(/-+$/, "");
-};
 
 export type MeshController = MeshIntegration & {
   /** The active login's mesh, for the Mesh screen; null when it has none. */

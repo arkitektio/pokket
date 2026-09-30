@@ -3,7 +3,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Text } from '@/components/ui/text';
 import { App } from '@/lib/app/App';
 import { profileTitle } from '@/lib/arkitekt/fakts/profileStorageSchema';
-import { saveTimelineSettings, useTimelineSettings } from '@/lib/timeline/settings';
+import { BACKUP_INTERVALS, saveTimelineSettings, useTimelineSettings } from '@/lib/timeline/settings';
 import { backupNow, BackupStatus, deleteServerCopy, startBackup, useBackupStatus } from '@/lib/timeline/sync';
 import { useThemeColors } from '@/lib/theme/BrandProvider';
 import { CloudUpload } from 'lucide-react-native';
@@ -23,10 +23,44 @@ const describe = (status: BackupStatus, org: string): { text: string; tone: 'mut
   }
 };
 
+const intervalLabel = (min: number) => (min === 0 ? 'Off' : min < 60 ? `${min} min` : `${min / 60} h`);
+
+/** How often to back up on its own: while open, and in the background. Off by default. */
+function AutoBackup({ intervalMin, disabled }: { intervalMin: number; disabled: boolean }) {
+  return (
+    <View className="gap-2 border-t border-border pt-3">
+      <Text className="text-sm font-medium text-card-foreground">Back up automatically</Text>
+      <View className="flex-row flex-wrap gap-2">
+        {BACKUP_INTERVALS.map((min) => {
+          const selected = min === intervalMin;
+          return (
+            <Pressable
+              key={min}
+              disabled={disabled}
+              onPress={() => void saveTimelineSettings({ backupIntervalMin: min })}
+              className={`rounded-full border px-3 py-1.5 ${selected ? 'border-primary bg-primary' : 'border-border bg-card'}`}
+            >
+              <Text className={`text-sm ${selected ? 'text-primary-foreground' : 'text-foreground'}`}>
+                {min === 0 ? 'Off' : `Every ${intervalLabel(min)}`}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+      <Text className="text-xs text-muted-foreground">
+        {intervalMin === 0
+          ? 'Backs up when pokket opens, and on "Back up now".'
+          : `Every ${intervalLabel(intervalMin)} while pokket is open, and in the background at most that often. The system decides when: ` +
+            'iPhones often wait for the phone to charge. It goes through the organization\'s mesh when lokate needs it.'}
+      </Text>
+    </View>
+  );
+}
+
 /**
  * The timeline's backup to the organization's lokate. Off by default; one
- * organization at a time; only while pokket is open and that organization is
- * the one connected.
+ * organization at a time. It runs while pokket is open and that organization
+ * is the one connected, and, with an interval set, in the background too.
  */
 export function TimelineBackup() {
   const colors = useThemeColors();
@@ -97,8 +131,11 @@ export function TimelineBackup() {
 
         {elsewhere ? (
           <Text className="text-sm text-muted-foreground">
-            Backing up to {target ? profileTitle(target) : 'another organization'}; it runs while that one is active. Switching on
-            here moves the backup to {org}.
+            Backing up to {target ? profileTitle(target) : 'another organization'}:{' '}
+            {settings.backupIntervalMin > 0
+              ? `every ${intervalLabel(settings.backupIntervalMin)}, also while ${org} is active, and in the background.`
+              : 'while that one is active. Set it to back up automatically there to back up from here too.'}{' '}
+            Switching on here moves the backup to {org}.
           </Text>
         ) : null}
 
@@ -142,6 +179,7 @@ export function TimelineBackup() {
                 <Text className="text-sm text-destructive">Delete server copy</Text>
               </Pressable>
             </View>
+            <AutoBackup intervalMin={settings.backupIntervalMin} disabled={!loaded} />
           </>
         ) : null}
       </CardContent>

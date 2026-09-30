@@ -1,4 +1,5 @@
 import type { ApolloClient } from "@apollo/client";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useSyncExternalStore } from "react";
 import {
   ChangesDocument,
@@ -49,8 +50,9 @@ import { catchUp } from "./tracking";
  * Backup to the organization's lokate. The phone stays in charge: it records
  * and segments, lokate keeps a copy. Every call is safe to repeat (lokate
  * dedupes on the token's device and each row's client id), so a sync cut off
- * halfway just runs again next time. Only while the app is open — a
- * background start has no fresh token and maybe no mesh.
+ * halfway just runs again next time. It runs while the app is open
+ * (LokateBackup.tsx), and, if an interval is set, in the background
+ * (backgroundBackup.ts) — never both at once.
  *
  * Order: points, then visits and trips, then places.
  */
@@ -298,6 +300,15 @@ const publish = (next: BackupStatus) => {
 };
 const lastAt = () => (status.kind === "working" ? null : status.lastAt);
 
+/** When the last backup finished, kept across launches: background runs happen while no screen shows it. */
+const LAST_BACKUP_KEY = "pokket:timeline:backup:last:v1";
+void AsyncStorage.getItem(LAST_BACKUP_KEY)
+  .then((raw) => {
+    const at = Number(raw);
+    if (at > 0 && status.kind === "idle" && status.lastAt === null) publish({ kind: "idle", lastAt: at });
+  })
+  .catch(() => undefined);
+
 export const useBackupStatus = (): BackupStatus =>
   useSyncExternalStore(
     (listener) => {
@@ -328,11 +339,14 @@ let running: Promise<void> | null = null;
  * One backup run: catch up segmentation, then push what is new. With
  * `restoreIfEmpty` (only when the backup is switched on, never on its own —
  * or "Delete everything" here would quietly come back), an empty timeline is
- * first filled from the backup. Overlapping calls share the run.
+ * first filled from the backup. Overlapping calls share the run, whichever
+ * client they came with.
  */
-export const backupNow = ({ restoreIfEmpty = false, reset = false }: { restoreIfEmpty?: boolean; reset?: boolean } = {}): Promise<void> => {
+export const backupWith = (
+  target: LokateApi | null,
+  { restoreIfEmpty = false, reset = false }: { restoreIfEmpty?: boolean; reset?: boolean } = {},
+): Promise<void> => {
   running ??= (async () => {
-    const target = api;
     if (!target) return;
     const previous = lastAt();
     try {
@@ -348,15 +362,22 @@ export const backupNow = ({ restoreIfEmpty = false, reset = false }: { restoreIf
       await pushSegments(target);
       publish({ kind: "working", step: "Backing up places" });
       await pushPlaces(target);
-      publish({ kind: "idle", lastAt: Date.now() });
+      const at = Date.now();
+      publish({ kind: "idle", lastAt: at });
+      await AsyncStorage.setItem(LAST_BACKUP_KEY, String(at)).catch(() => undefined);
     } catch (error) {
       publish({ kind: "error", message: error instanceof Error ? error.message : String(error), lastAt: previous });
+      throw error;
     } finally {
       running = null;
     }
   })();
   return running;
 };
+
+/** A backup run with the client of the organization connected now (see `setBackupApi`). Never throws. */
+export const backupNow = (options: { restoreIfEmpty?: boolean; reset?: boolean } = {}): Promise<void> =>
+  backupWith(api, options).catch(() => undefined);
 
 /**
  * A backup starting over, right after it is switched on: everything is due,

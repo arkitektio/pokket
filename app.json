@@ -62,6 +62,7 @@
       "@config-plugins/react-native-webrtc",
       "./modules/pokket-mesh/app.plugin.js",
       "./plugins/withGradleMemory.js",
+      "expo-background-task",
       [
         "expo-location",
         {

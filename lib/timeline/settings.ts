@@ -27,6 +27,9 @@ export type ActivityKind = (typeof ACTIVITY_TYPES)[number];
 const num = (min: number, max: number, fallback: number) =>
   z.number().min(min).max(max).catch(fallback).default(fallback);
 
+/** The intervals offered for the automatic backup, in minutes; 0 is off. The OS runs background work at most every 15. */
+export const BACKUP_INTERVALS = [0, 15, 30, 60, 180, 360, 720, 1440] as const;
+
 export const TimelineSettingsSchema = z.object({
   enabled: z.boolean().default(false),
 
@@ -74,7 +77,18 @@ export const TimelineSettingsSchema = z.object({
   // Backup.
   /** The profile (organization) whose lokate keeps a backup; null: no backup. */
   backupProfileId: z.string().nullable().catch(null).default(null),
+  /**
+   * Also back up every this many minutes: while pokket is open, and in the
+   * background as often as the OS allows (lib/timeline/backgroundBackup.ts).
+   * 0: only when pokket opens, and on "Back up now".
+   */
+  backupIntervalMin: z
+    .number()
+    .refine((v) => (BACKUP_INTERVALS as readonly number[]).includes(v))
+    .catch(0)
+    .default(0),
 });
+
 
 export type TimelineSettings = z.infer<typeof TimelineSettingsSchema>;
 
