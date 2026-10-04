@@ -1,10 +1,11 @@
 import { ExitGuard } from '@/components/navigation/ExitGuard';
-import { MenuButton, SearchButton } from '@/components/navigation/HeaderButtons';
+import { MenuButton, SearchButton, ShareButton } from '@/components/navigation/HeaderButtons';
 import { routeOf } from '@/lib/modules/catalog';
 import { useSyncActiveTabRoute } from '@/lib/tabs/TabsProvider';
 import { Stack, useGlobalSearchParams, usePathname } from 'expo-router';
 import type { DrawerNavigationProp } from 'expo-router/drawer';
 import * as React from 'react';
+import { View } from 'react-native';
 
 type ParamList = Record<string, object | undefined>;
 
@@ -33,7 +34,12 @@ const screenOptions = ({ navigation }: { navigation: Nav }) => ({
   headerLeft: navigation.canGoBack()
     ? undefined
     : () => <MenuButton onPress={() => drawerOf(navigation)?.openDrawer()} />,
-  headerRight: () => <SearchButton />,
+  headerRight: () => (
+    <View className="flex-row items-center">
+      <ShareButton />
+      <SearchButton />
+    </View>
+  ),
 });
 
 /**

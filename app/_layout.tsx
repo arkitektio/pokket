@@ -5,6 +5,7 @@ import '@/lib/timeline/task';
 // Likewise the background backup of the timeline, which the OS starts on its schedule.
 import '@/lib/timeline/backgroundBackup';
 
+import { DeepLinkGate } from '@/components/deeplink/DeepLinkGate';
 import { AlertDialogProvider } from '@/components/ui/alert-dialog';
 import { ProfileIdentitySync } from '@/components/profile/ProfileIdentitySync';
 import { TabsProvider } from '@/lib/tabs/TabsProvider';
@@ -108,6 +109,8 @@ export default function RootLayout() {
             <StatusBar style={'light'} />
             <TabsProvider>
               <AppLayout />
+              {/* Opens the link the app was launched with, in the organization it belongs to. */}
+              <DeepLinkGate />
             </TabsProvider>
             <ProfileIdentitySync />
             {/* Silent, and only while push is switched on in Settings. */}

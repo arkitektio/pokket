@@ -68,6 +68,8 @@ type TabsContextValue = {
   /** The route a tab switch is taking the page view to, until it arrives. */
   navigatingTo: React.MutableRefObject<string | null>;
   ready: boolean;
+  /** The organization whose tabs are loaded; behind the active one while a switch boots. */
+  bootedId: string | null;
 };
 
 const TabsContext = React.createContext<TabsContextValue | null>(null);
@@ -93,6 +95,7 @@ export function TabsProvider({ children }: { children: React.ReactNode }) {
   const [store] = React.useState(() => createStore(initialTabs()));
   const navigatingTo = React.useRef<string | null>(null);
   const [ready, setReady] = React.useState(false);
+  const [bootedId, setBootedId] = React.useState<string | null>(null);
   const bootedFor = React.useRef<string | null>(null);
 
   const connected = App.useIsConnected();
@@ -112,6 +115,7 @@ export function TabsProvider({ children }: { children: React.ReactNode }) {
       if (cancelled) return;
       const previous = bootedFor.current;
       bootedFor.current = profileId;
+      setBootedId(profileId);
       // A first sign-in runs under a provisional id until lok names the
       // login; the tabs opened meanwhile are this organization's already.
       if (!loaded && previous && isProvisionalProfileId(previous)) {
@@ -145,7 +149,7 @@ export function TabsProvider({ children }: { children: React.ReactNode }) {
     };
   }, [store]);
 
-  const value = React.useMemo(() => ({ store, navigatingTo, ready }), [store, ready]);
+  const value = React.useMemo(() => ({ store, navigatingTo, ready, bootedId }), [store, ready, bootedId]);
   return <TabsContext.Provider value={value}>{children}</TabsContext.Provider>;
 }
 
@@ -153,6 +157,12 @@ export const useTabs = (): TabsState => {
   const { store } = useTabsContext();
   return React.useSyncExternalStore(store.subscribe, store.get, store.get);
 };
+
+/**
+ * Which organization's tabs are loaded. A tab opened while this is not the
+ * active organization would be wiped by the boot still to come.
+ */
+export const useTabsBootedFor = (): string | null => useTabsContext().bootedId;
 
 /** Everything the strip, the search and "+" do with tabs, navigation included. */
 export const useTabActions = () => {

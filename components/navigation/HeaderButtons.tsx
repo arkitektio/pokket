@@ -1,8 +1,11 @@
 import { ProfileAvatar } from '@/components/profile/ProfileAvatar';
 import { App } from '@/lib/app/App';
+import { useShareLink } from '@/lib/deeplink/useShareLink';
+import { activeTab } from '@/lib/tabs/tabs';
+import { useTabs } from '@/lib/tabs/TabsProvider';
 import { useThemeColors } from '@/lib/theme/BrandProvider';
 import { router } from 'expo-router';
-import { Menu, Search } from 'lucide-react-native';
+import { Menu, Search, Share2 } from 'lucide-react-native';
 import { Pressable } from 'react-native';
 
 /** Opens the sidebar: the live organization's badge, as orkestrator's rail foot. */
@@ -33,6 +36,30 @@ export function SearchButton() {
       className="ml-3 active:opacity-70"
     >
       <Search size={22} color={colors.foreground} />
+    </Pressable>
+  );
+}
+
+/**
+ * Share the page on show as a link that opens it in pokket — orkestrator's
+ * share button. A tap shares the link scoped to this organization; a long
+ * press shares the private form, which names neither server nor organization.
+ */
+export function ShareButton() {
+  const colors = useThemeColors();
+  const route = activeTab(useTabs()).route;
+  const { share, sharePrivate } = useShareLink(route);
+  return (
+    <Pressable
+      onPress={share}
+      onLongPress={sharePrivate}
+      hitSlop={10}
+      accessibilityRole="button"
+      accessibilityLabel="Share a link to this page"
+      accessibilityHint="Long press for a private link"
+      className="ml-3 active:opacity-70"
+    >
+      <Share2 size={20} color={colors.foreground} />
     </Pressable>
   );
 }
