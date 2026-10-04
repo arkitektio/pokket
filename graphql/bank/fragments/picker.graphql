@@ -1,0 +1,17 @@
+fragment PickerCategory on Category {
+  ...TransactionCategory
+  parent {
+    id
+    name
+  }
+}
+
+fragment PickerMerchant on Merchant {
+  id
+  name
+  logoUrl
+  category {
+    id
+    name
+  }
+}

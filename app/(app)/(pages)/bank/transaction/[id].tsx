@@ -1,4 +1,6 @@
+import { CategorySheet } from '@/components/bank/CategorySheet';
 import { MerchantLogo } from '@/components/bank/MerchantLogo';
+import { MerchantSheet } from '@/components/bank/MerchantSheet';
 import { Money } from '@/components/bank/Money';
 import { BankLoadingState, BankUnavailable } from '@/components/bank/states';
 import { Card, CardContent } from '@/components/ui/card';
@@ -8,8 +10,10 @@ import { TransactionStatus, useGetTransactionQuery } from '@/lib/bank/api/graphq
 import { formatDay, formatIban, toNumber, transactionTitle } from '@/lib/bank/format';
 import { useLocalSearchParams } from 'expo-router';
 import { useTabTitle } from '@/lib/tabs/TabsProvider';
+import { useThemeColors } from '@/lib/theme/BrandProvider';
+import { ChevronRight } from 'lucide-react-native';
 import * as React from 'react';
-import { ScrollView, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
 
 function Fact({ label, value }: { label: string; value?: string | null }) {
   if (!value) return null;
@@ -23,10 +27,45 @@ function Fact({ label, value }: { label: string; value?: string | null }) {
   );
 }
 
+/** A fact you can change: tapping the row opens its picker. */
+function EditableFact({
+  label,
+  value,
+  color,
+  placeholder,
+  onPress,
+}: {
+  label: string;
+  value?: string | null;
+  color?: string | null;
+  placeholder: string;
+  onPress: () => void;
+}) {
+  const colors = useThemeColors();
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`Change ${label.toLowerCase()}`}
+      className="flex-row items-center justify-between gap-4 border-b border-border py-2.5 active:opacity-60"
+    >
+      <Text className="text-sm text-muted-foreground">{label}</Text>
+      <View className="shrink flex-row items-center gap-1.5">
+        {color ? <View style={{ backgroundColor: color }} className="h-2 w-2 rounded-full" /> : null}
+        <Text numberOfLines={1} className={`shrink text-right text-sm ${value ? 'text-primary' : 'text-muted-foreground'}`}>
+          {value || placeholder}
+        </Text>
+        <ChevronRight size={16} color={colors.mutedForeground} />
+      </View>
+    </Pressable>
+  );
+}
+
 function TransactionContent({ id }: { id: string }) {
   const { data, loading, error } = useGetTransactionQuery({ variables: { id }, fetchPolicy: 'cache-and-network' });
   const t = data?.transaction;
   useTabTitle(t ? transactionTitle(t) : null);
+  const [picking, setPicking] = React.useState<'category' | 'merchant' | null>(null);
 
   if (!t) {
     if (loading) return <BankLoadingState message="Loading transaction…" />;
@@ -55,7 +94,19 @@ function TransactionContent({ id }: { id: string }) {
       <View className="px-4 pb-10">
         <Card className="border-border bg-card">
           <CardContent className="py-2">
-            <Fact label="Category" value={t.category?.name ?? 'Uncategorized'} />
+            <EditableFact
+              label="Category"
+              value={t.category?.name}
+              color={t.category?.color}
+              placeholder="Uncategorized"
+              onPress={() => setPicking('category')}
+            />
+            <EditableFact
+              label="Merchant"
+              value={t.merchant?.name}
+              placeholder="Set merchant"
+              onPress={() => setPicking('merchant')}
+            />
             <Fact label="Booked" value={formatDay(t.bookingDate)} />
             <Fact label="Paid on" value={t.transactionDate !== t.bookingDate ? formatDay(t.transactionDate) : null} />
             <Fact label="Account" value={t.account.name || formatIban(t.account.iban)} />
@@ -68,6 +119,8 @@ function TransactionContent({ id }: { id: string }) {
           </CardContent>
         </Card>
       </View>
+      <CategorySheet visible={picking === 'category'} transaction={t} onClose={() => setPicking(null)} />
+      <MerchantSheet visible={picking === 'merchant'} transaction={t} onClose={() => setPicking(null)} />
     </ScrollView>
   );
 }

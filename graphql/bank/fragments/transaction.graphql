@@ -35,6 +35,8 @@ fragment Transaction on Transaction {
   ...ListTransaction
   valueDate
   note
+  categorySource
+  merchantSource
   counterpartyIban
   merchantLocation {
     id

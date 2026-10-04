@@ -200,6 +200,8 @@ export type BankAccount = {
   currency: Scalars['String']['output'];
   /** A depot's positions as of its latest sync (empty for other accounts). */
   currentHoldings: Array<HoldingSnapshot>;
+  /** This object's descriptors, a flat mapping of key to value: the facts about it that an action's port can `require` and a trigger can test (e.g. `@bank/kind`). The keys are the ones bank declares for this structure, and the values are the ones a signal about the object carries. Empty for a structure that declares none */
+  descriptors: Scalars['JSON']['output'];
   /** The account's IBAN, if known. */
   iban?: Maybe<Scalars['String']['output']>;
   id: Scalars['ID']['output'];
@@ -280,6 +282,8 @@ export type BankConnection = {
   createdAt: Scalars['DateTime']['output'];
   /** The user who started the link. */
   creator?: Maybe<User>;
+  /** This object's descriptors, a flat mapping of key to value: the facts about it that an action's port can `require` and a trigger can test (e.g. `@bank/kind`). The keys are the ones bank declares for this structure, and the values are the ones a signal about the object carries. Empty for a structure that declares none */
+  descriptors: Scalars['JSON']['output'];
   id: Scalars['ID']['output'];
   /** PENDING and past `pendingExpiresAt`: the login can no longer be completed. */
   isAbandoned: Scalars['Boolean']['output'];
@@ -421,6 +425,8 @@ export type Budget = {
   createdAt: Scalars['DateTime']['output'];
   /** ISO currency of the limit; only transactions in it count. */
   currency: Scalars['String']['output'];
+  /** This object's descriptors, a flat mapping of key to value: the facts about it that an action's port can `require` and a trigger can test (e.g. `@bank/kind`). The keys are the ones bank declares for this structure, and the values are the ones a signal about the object carries. Empty for a structure that declares none */
+  descriptors: Scalars['JSON']['output'];
   /** Last month the budget applies to, or open-ended. */
   endMonth?: Maybe<Scalars['Date']['output']>;
   id: Scalars['ID']['output'];
@@ -489,6 +495,8 @@ export type Category = {
   createdAt: Scalars['DateTime']['output'];
   /** What belongs here, in words bank lines use. Each comma-separated phrase is a term the category is recognized by. */
   description: Scalars['String']['output'];
+  /** This object's descriptors, a flat mapping of key to value: the facts about it that an action's port can `require` and a trigger can test (e.g. `@bank/kind`). The keys are the ones bank declares for this structure, and the values are the ones a signal about the object carries. Empty for a structure that declares none */
+  descriptors: Scalars['JSON']['output'];
   /** Hidden from pickers, suggestions and automatic assignment. */
   hidden: Scalars['Boolean']['output'];
   id: Scalars['ID']['output'];
@@ -1089,6 +1097,8 @@ export type Merchant = {
   createdAt: Scalars['DateTime']['output'];
   /** Notes about the merchant. */
   description: Scalars['String']['output'];
+  /** This object's descriptors, a flat mapping of key to value: the facts about it that an action's port can `require` and a trigger can test (e.g. `@bank/kind`). The keys are the ones bank declares for this structure, and the values are the ones a signal about the object carries. Empty for a structure that declares none */
+  descriptors: Scalars['JSON']['output'];
   /** Meters from the point of a `near` filter to its closest located store; null without one. */
   distanceMeters?: Maybe<Scalars['Float']['output']>;
   /** The day of its first transaction. */
@@ -2456,6 +2466,8 @@ export type RecurringPayment = {
   amount: Scalars['Decimal']['output'];
   /** ISO currency. */
   currency: Scalars['String']['output'];
+  /** This object's descriptors, a flat mapping of key to value: the facts about it that an action's port can `require` and a trigger can test (e.g. `@bank/kind`). The keys are the ones bank declares for this structure, and the values are the ones a signal about the object carries. Empty for a structure that declares none */
+  descriptors: Scalars['JSON']['output'];
   id: Scalars['ID']['output'];
   /** Days between occurrences (7, 14, 30, 91 or 365). */
   intervalDays: Scalars['Int']['output'];
@@ -2624,6 +2636,8 @@ export type StatementImport = {
   createdAt: Scalars['DateTime']['output'];
   /** The user who uploaded the file. */
   creator?: Maybe<User>;
+  /** This object's descriptors, a flat mapping of key to value: the facts about it that an action's port can `require` and a trigger can test (e.g. `@bank/kind`). The keys are the ones bank declares for this structure, and the values are the ones a signal about the object carries. Empty for a structure that declares none */
+  descriptors: Scalars['JSON']['output'];
   /** FAILED only: why the file could not be read. */
   error?: Maybe<Scalars['String']['output']>;
   /** The file's name as uploaded. */
@@ -2713,6 +2727,8 @@ export type Transaction = {
   createdAt: Scalars['DateTime']['output'];
   /** ISO currency of the amount. */
   currency: Scalars['String']['output'];
+  /** This object's descriptors, a flat mapping of key to value: the facts about it that an action's port can `require` and a trigger can test (e.g. `@bank/kind`). The keys are the ones bank declares for this structure, and the values are the ones a signal about the object carries. Empty for a structure that declares none */
+  descriptors: Scalars['JSON']['output'];
   /** The bank's own reference, when it sends one. */
   entryReference?: Maybe<Scalars['String']['output']>;
   id: Scalars['ID']['output'];
@@ -3033,11 +3049,43 @@ export type BalanceFragment = { __typename?: 'BalanceSnapshot', id: string, date
 
 export type ListBankAccountFragment = { __typename?: 'BankAccount', id: string, iban?: string | null, name?: string | null, kind: AccountKind, currency: string, lastSyncedAt?: string | null, isSyncing: boolean, latestBalance?: { __typename?: 'BalanceSnapshot', id: string, date: string, balanceType: string, amount: string, currency: string } | null, connection?: { __typename?: 'BankConnection', id: string, aspspName: string, needsReauth: boolean } | null };
 
+export type PickerCategoryFragment = { __typename?: 'Category', id: string, name: string, color?: string | null, kind: CategoryKind, parent?: { __typename?: 'Category', id: string, name: string } | null };
+
+export type PickerMerchantFragment = { __typename?: 'Merchant', id: string, name: string, logoUrl?: string | null, category?: { __typename?: 'Category', id: string, name: string } | null };
+
 export type TransactionCategoryFragment = { __typename?: 'Category', id: string, name: string, color?: string | null, kind: CategoryKind };
 
 export type ListTransactionFragment = { __typename?: 'Transaction', id: string, bookingDate?: string | null, transactionDate?: string | null, amount: string, currency: string, status: TransactionStatus, counterparty?: string | null, remittance?: string | null, isTransfer: boolean, kind?: TransactionKind | null, merchant?: { __typename?: 'Merchant', id: string, name: string, logoUrl?: string | null } | null, category?: { __typename?: 'Category', id: string, name: string, color?: string | null, kind: CategoryKind } | null, account: { __typename?: 'BankAccount', id: string, name?: string | null, iban?: string | null } };
 
-export type TransactionFragment = { __typename?: 'Transaction', valueDate?: string | null, note?: string | null, counterpartyIban?: string | null, id: string, bookingDate?: string | null, transactionDate?: string | null, amount: string, currency: string, status: TransactionStatus, counterparty?: string | null, remittance?: string | null, isTransfer: boolean, kind?: TransactionKind | null, merchantLocation?: { __typename?: 'MerchantLocation', id: string, name: string, street?: string | null, city?: string | null } | null, merchant?: { __typename?: 'Merchant', id: string, name: string, logoUrl?: string | null } | null, category?: { __typename?: 'Category', id: string, name: string, color?: string | null, kind: CategoryKind } | null, account: { __typename?: 'BankAccount', id: string, name?: string | null, iban?: string | null } };
+export type TransactionFragment = { __typename?: 'Transaction', valueDate?: string | null, note?: string | null, categorySource: CategorySource, merchantSource: MerchantSource, counterpartyIban?: string | null, id: string, bookingDate?: string | null, transactionDate?: string | null, amount: string, currency: string, status: TransactionStatus, counterparty?: string | null, remittance?: string | null, isTransfer: boolean, kind?: TransactionKind | null, merchantLocation?: { __typename?: 'MerchantLocation', id: string, name: string, street?: string | null, city?: string | null } | null, merchant?: { __typename?: 'Merchant', id: string, name: string, logoUrl?: string | null } | null, category?: { __typename?: 'Category', id: string, name: string, color?: string | null, kind: CategoryKind } | null, account: { __typename?: 'BankAccount', id: string, name?: string | null, iban?: string | null } };
+
+export type CategorizeTransactionMutationVariables = Exact<{
+  input: CategorizeTransactionInput;
+}>;
+
+
+export type CategorizeTransactionMutation = { __typename?: 'Mutation', categorizeTransaction: { __typename?: 'Transaction', valueDate?: string | null, note?: string | null, categorySource: CategorySource, merchantSource: MerchantSource, counterpartyIban?: string | null, id: string, bookingDate?: string | null, transactionDate?: string | null, amount: string, currency: string, status: TransactionStatus, counterparty?: string | null, remittance?: string | null, isTransfer: boolean, kind?: TransactionKind | null, merchantLocation?: { __typename?: 'MerchantLocation', id: string, name: string, street?: string | null, city?: string | null } | null, merchant?: { __typename?: 'Merchant', id: string, name: string, logoUrl?: string | null } | null, category?: { __typename?: 'Category', id: string, name: string, color?: string | null, kind: CategoryKind } | null, account: { __typename?: 'BankAccount', id: string, name?: string | null, iban?: string | null } } };
+
+export type AssignMerchantMutationVariables = Exact<{
+  input: AssignMerchantInput;
+}>;
+
+
+export type AssignMerchantMutation = { __typename?: 'Mutation', assignMerchant: Array<{ __typename?: 'Transaction', valueDate?: string | null, note?: string | null, categorySource: CategorySource, merchantSource: MerchantSource, counterpartyIban?: string | null, id: string, bookingDate?: string | null, transactionDate?: string | null, amount: string, currency: string, status: TransactionStatus, counterparty?: string | null, remittance?: string | null, isTransfer: boolean, kind?: TransactionKind | null, merchantLocation?: { __typename?: 'MerchantLocation', id: string, name: string, street?: string | null, city?: string | null } | null, merchant?: { __typename?: 'Merchant', id: string, name: string, logoUrl?: string | null } | null, category?: { __typename?: 'Category', id: string, name: string, color?: string | null, kind: CategoryKind } | null, account: { __typename?: 'BankAccount', id: string, name?: string | null, iban?: string | null } }> };
+
+export type CreateCategoryMutationVariables = Exact<{
+  input: CreateCategoryInput;
+}>;
+
+
+export type CreateCategoryMutation = { __typename?: 'Mutation', createCategory: { __typename?: 'Category', id: string, name: string, color?: string | null, kind: CategoryKind, parent?: { __typename?: 'Category', id: string, name: string } | null } };
+
+export type CreateMerchantMutationVariables = Exact<{
+  input: CreateMerchantInput;
+}>;
+
+
+export type CreateMerchantMutation = { __typename?: 'Mutation', createMerchant: { __typename?: 'Merchant', id: string, name: string, logoUrl?: string | null, category?: { __typename?: 'Category', id: string, name: string } | null } };
 
 export type ListBankAccountsQueryVariables = Exact<{
   filters?: InputMaybe<BankAccountFilter>;
@@ -3056,6 +3104,21 @@ export type BankPaletteSearchQueryVariables = Exact<{
 
 export type BankPaletteSearchQuery = { __typename?: 'Query', transactions: Array<{ __typename?: 'Transaction', id: string, counterparty?: string | null, remittance?: string | null, amount: string, currency: string, bookingDate?: string | null }>, bankAccounts: Array<{ __typename?: 'BankAccount', id: string, name?: string | null, iban?: string | null, currency: string }>, merchants: Array<{ __typename?: 'Merchant', id: string, name: string, description: string }>, categories: Array<{ __typename?: 'Category', id: string, name: string, description: string }> };
 
+export type CategoryPickerQueryVariables = Exact<{
+  transaction: Scalars['ID']['input'];
+}>;
+
+
+export type CategoryPickerQuery = { __typename?: 'Query', categories: Array<{ __typename?: 'Category', id: string, name: string, color?: string | null, kind: CategoryKind, parent?: { __typename?: 'Category', id: string, name: string } | null }>, suggestCategories: Array<{ __typename?: 'CategorySuggestion', score: number, category: { __typename?: 'Category', id: string, name: string, color?: string | null, kind: CategoryKind, parent?: { __typename?: 'Category', id: string, name: string } | null } }> };
+
+export type MerchantPickerQueryVariables = Exact<{
+  search?: InputMaybe<Scalars['String']['input']>;
+  limit?: Scalars['Int']['input'];
+}>;
+
+
+export type MerchantPickerQuery = { __typename?: 'Query', merchants: Array<{ __typename?: 'Merchant', id: string, name: string, logoUrl?: string | null, category?: { __typename?: 'Category', id: string, name: string } | null }> };
+
 export type ListTransactionsQueryVariables = Exact<{
   filters?: InputMaybe<TransactionFilter>;
   ordering?: Array<TransactionOrder> | TransactionOrder;
@@ -3070,7 +3133,7 @@ export type GetTransactionQueryVariables = Exact<{
 }>;
 
 
-export type GetTransactionQuery = { __typename?: 'Query', transaction: { __typename?: 'Transaction', valueDate?: string | null, note?: string | null, counterpartyIban?: string | null, id: string, bookingDate?: string | null, transactionDate?: string | null, amount: string, currency: string, status: TransactionStatus, counterparty?: string | null, remittance?: string | null, isTransfer: boolean, kind?: TransactionKind | null, merchantLocation?: { __typename?: 'MerchantLocation', id: string, name: string, street?: string | null, city?: string | null } | null, merchant?: { __typename?: 'Merchant', id: string, name: string, logoUrl?: string | null } | null, category?: { __typename?: 'Category', id: string, name: string, color?: string | null, kind: CategoryKind } | null, account: { __typename?: 'BankAccount', id: string, name?: string | null, iban?: string | null } } };
+export type GetTransactionQuery = { __typename?: 'Query', transaction: { __typename?: 'Transaction', valueDate?: string | null, note?: string | null, categorySource: CategorySource, merchantSource: MerchantSource, counterpartyIban?: string | null, id: string, bookingDate?: string | null, transactionDate?: string | null, amount: string, currency: string, status: TransactionStatus, counterparty?: string | null, remittance?: string | null, isTransfer: boolean, kind?: TransactionKind | null, merchantLocation?: { __typename?: 'MerchantLocation', id: string, name: string, street?: string | null, city?: string | null } | null, merchant?: { __typename?: 'Merchant', id: string, name: string, logoUrl?: string | null } | null, category?: { __typename?: 'Category', id: string, name: string, color?: string | null, kind: CategoryKind } | null, account: { __typename?: 'BankAccount', id: string, name?: string | null, iban?: string | null } } };
 
 export type AccountSyncsSubscriptionVariables = Exact<{ [key: string]: never; }>;
 
@@ -3113,6 +3176,26 @@ export const TransactionCategoryFragmentDoc = gql`
   kind
 }
     `;
+export const PickerCategoryFragmentDoc = gql`
+    fragment PickerCategory on Category {
+  ...TransactionCategory
+  parent {
+    id
+    name
+  }
+}
+    ${TransactionCategoryFragmentDoc}`;
+export const PickerMerchantFragmentDoc = gql`
+    fragment PickerMerchant on Merchant {
+  id
+  name
+  logoUrl
+  category {
+    id
+    name
+  }
+}
+    `;
 export const ListTransactionFragmentDoc = gql`
     fragment ListTransaction on Transaction {
   id
@@ -3145,6 +3228,8 @@ export const TransactionFragmentDoc = gql`
   ...ListTransaction
   valueDate
   note
+  categorySource
+  merchantSource
   counterpartyIban
   merchantLocation {
     id
@@ -3154,6 +3239,138 @@ export const TransactionFragmentDoc = gql`
   }
 }
     ${ListTransactionFragmentDoc}`;
+export const CategorizeTransactionDocument = gql`
+    mutation CategorizeTransaction($input: CategorizeTransactionInput!) {
+  categorizeTransaction(input: $input) {
+    ...Transaction
+  }
+}
+    ${TransactionFragmentDoc}`;
+export type CategorizeTransactionMutationFn = Apollo.MutationFunction<CategorizeTransactionMutation, CategorizeTransactionMutationVariables>;
+
+/**
+ * __useCategorizeTransactionMutation__
+ *
+ * To run a mutation, you first call `useCategorizeTransactionMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useCategorizeTransactionMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [categorizeTransactionMutation, { data, loading, error }] = useCategorizeTransactionMutation({
+ *   variables: {
+ *      input: // value for 'input'
+ *   },
+ * });
+ */
+export function useCategorizeTransactionMutation(baseOptions?: ApolloReactHooks.MutationHookOptions<CategorizeTransactionMutation, CategorizeTransactionMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return ApolloReactHooks.useMutation<CategorizeTransactionMutation, CategorizeTransactionMutationVariables>(CategorizeTransactionDocument, options);
+      }
+export type CategorizeTransactionMutationHookResult = ReturnType<typeof useCategorizeTransactionMutation>;
+export type CategorizeTransactionMutationResult = Apollo.MutationResult<CategorizeTransactionMutation>;
+export type CategorizeTransactionMutationOptions = Apollo.BaseMutationOptions<CategorizeTransactionMutation, CategorizeTransactionMutationVariables>;
+export const AssignMerchantDocument = gql`
+    mutation AssignMerchant($input: AssignMerchantInput!) {
+  assignMerchant(input: $input) {
+    ...Transaction
+  }
+}
+    ${TransactionFragmentDoc}`;
+export type AssignMerchantMutationFn = Apollo.MutationFunction<AssignMerchantMutation, AssignMerchantMutationVariables>;
+
+/**
+ * __useAssignMerchantMutation__
+ *
+ * To run a mutation, you first call `useAssignMerchantMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useAssignMerchantMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [assignMerchantMutation, { data, loading, error }] = useAssignMerchantMutation({
+ *   variables: {
+ *      input: // value for 'input'
+ *   },
+ * });
+ */
+export function useAssignMerchantMutation(baseOptions?: ApolloReactHooks.MutationHookOptions<AssignMerchantMutation, AssignMerchantMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return ApolloReactHooks.useMutation<AssignMerchantMutation, AssignMerchantMutationVariables>(AssignMerchantDocument, options);
+      }
+export type AssignMerchantMutationHookResult = ReturnType<typeof useAssignMerchantMutation>;
+export type AssignMerchantMutationResult = Apollo.MutationResult<AssignMerchantMutation>;
+export type AssignMerchantMutationOptions = Apollo.BaseMutationOptions<AssignMerchantMutation, AssignMerchantMutationVariables>;
+export const CreateCategoryDocument = gql`
+    mutation CreateCategory($input: CreateCategoryInput!) {
+  createCategory(input: $input) {
+    ...PickerCategory
+  }
+}
+    ${PickerCategoryFragmentDoc}`;
+export type CreateCategoryMutationFn = Apollo.MutationFunction<CreateCategoryMutation, CreateCategoryMutationVariables>;
+
+/**
+ * __useCreateCategoryMutation__
+ *
+ * To run a mutation, you first call `useCreateCategoryMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useCreateCategoryMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [createCategoryMutation, { data, loading, error }] = useCreateCategoryMutation({
+ *   variables: {
+ *      input: // value for 'input'
+ *   },
+ * });
+ */
+export function useCreateCategoryMutation(baseOptions?: ApolloReactHooks.MutationHookOptions<CreateCategoryMutation, CreateCategoryMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return ApolloReactHooks.useMutation<CreateCategoryMutation, CreateCategoryMutationVariables>(CreateCategoryDocument, options);
+      }
+export type CreateCategoryMutationHookResult = ReturnType<typeof useCreateCategoryMutation>;
+export type CreateCategoryMutationResult = Apollo.MutationResult<CreateCategoryMutation>;
+export type CreateCategoryMutationOptions = Apollo.BaseMutationOptions<CreateCategoryMutation, CreateCategoryMutationVariables>;
+export const CreateMerchantDocument = gql`
+    mutation CreateMerchant($input: CreateMerchantInput!) {
+  createMerchant(input: $input) {
+    ...PickerMerchant
+  }
+}
+    ${PickerMerchantFragmentDoc}`;
+export type CreateMerchantMutationFn = Apollo.MutationFunction<CreateMerchantMutation, CreateMerchantMutationVariables>;
+
+/**
+ * __useCreateMerchantMutation__
+ *
+ * To run a mutation, you first call `useCreateMerchantMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useCreateMerchantMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [createMerchantMutation, { data, loading, error }] = useCreateMerchantMutation({
+ *   variables: {
+ *      input: // value for 'input'
+ *   },
+ * });
+ */
+export function useCreateMerchantMutation(baseOptions?: ApolloReactHooks.MutationHookOptions<CreateMerchantMutation, CreateMerchantMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return ApolloReactHooks.useMutation<CreateMerchantMutation, CreateMerchantMutationVariables>(CreateMerchantDocument, options);
+      }
+export type CreateMerchantMutationHookResult = ReturnType<typeof useCreateMerchantMutation>;
+export type CreateMerchantMutationResult = Apollo.MutationResult<CreateMerchantMutation>;
+export type CreateMerchantMutationOptions = Apollo.BaseMutationOptions<CreateMerchantMutation, CreateMerchantMutationVariables>;
 export const ListBankAccountsDocument = gql`
     query ListBankAccounts($filters: BankAccountFilter, $ordering: [BankAccountOrder!]! = [{kind: ASC}, {name: ASC}], $pagination: OffsetPaginationInput) {
   bankAccounts(filters: $filters, ordering: $ordering, pagination: $pagination) {
@@ -3251,6 +3468,91 @@ export function useBankPaletteSearchLazyQuery(baseOptions?: ApolloReactHooks.Laz
 export type BankPaletteSearchQueryHookResult = ReturnType<typeof useBankPaletteSearchQuery>;
 export type BankPaletteSearchLazyQueryHookResult = ReturnType<typeof useBankPaletteSearchLazyQuery>;
 export type BankPaletteSearchQueryResult = Apollo.QueryResult<BankPaletteSearchQuery, BankPaletteSearchQueryVariables>;
+export const CategoryPickerDocument = gql`
+    query CategoryPicker($transaction: ID!) {
+  categories(
+    filters: {hidden: false}
+    ordering: [{name: ASC}]
+    pagination: {limit: 500}
+  ) {
+    ...PickerCategory
+  }
+  suggestCategories(transaction: $transaction, limit: 4) {
+    score
+    category {
+      ...PickerCategory
+    }
+  }
+}
+    ${PickerCategoryFragmentDoc}`;
+
+/**
+ * __useCategoryPickerQuery__
+ *
+ * To run a query within a React component, call `useCategoryPickerQuery` and pass it any options that fit your needs.
+ * When your component renders, `useCategoryPickerQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useCategoryPickerQuery({
+ *   variables: {
+ *      transaction: // value for 'transaction'
+ *   },
+ * });
+ */
+export function useCategoryPickerQuery(baseOptions: ApolloReactHooks.QueryHookOptions<CategoryPickerQuery, CategoryPickerQueryVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return ApolloReactHooks.useQuery<CategoryPickerQuery, CategoryPickerQueryVariables>(CategoryPickerDocument, options);
+      }
+export function useCategoryPickerLazyQuery(baseOptions?: ApolloReactHooks.LazyQueryHookOptions<CategoryPickerQuery, CategoryPickerQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return ApolloReactHooks.useLazyQuery<CategoryPickerQuery, CategoryPickerQueryVariables>(CategoryPickerDocument, options);
+        }
+export type CategoryPickerQueryHookResult = ReturnType<typeof useCategoryPickerQuery>;
+export type CategoryPickerLazyQueryHookResult = ReturnType<typeof useCategoryPickerLazyQuery>;
+export type CategoryPickerQueryResult = Apollo.QueryResult<CategoryPickerQuery, CategoryPickerQueryVariables>;
+export const MerchantPickerDocument = gql`
+    query MerchantPicker($search: String, $limit: Int! = 30) {
+  merchants(
+    filters: {search: $search}
+    ordering: [{name: ASC}]
+    pagination: {limit: $limit}
+  ) {
+    ...PickerMerchant
+  }
+}
+    ${PickerMerchantFragmentDoc}`;
+
+/**
+ * __useMerchantPickerQuery__
+ *
+ * To run a query within a React component, call `useMerchantPickerQuery` and pass it any options that fit your needs.
+ * When your component renders, `useMerchantPickerQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useMerchantPickerQuery({
+ *   variables: {
+ *      search: // value for 'search'
+ *      limit: // value for 'limit'
+ *   },
+ * });
+ */
+export function useMerchantPickerQuery(baseOptions?: ApolloReactHooks.QueryHookOptions<MerchantPickerQuery, MerchantPickerQueryVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return ApolloReactHooks.useQuery<MerchantPickerQuery, MerchantPickerQueryVariables>(MerchantPickerDocument, options);
+      }
+export function useMerchantPickerLazyQuery(baseOptions?: ApolloReactHooks.LazyQueryHookOptions<MerchantPickerQuery, MerchantPickerQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return ApolloReactHooks.useLazyQuery<MerchantPickerQuery, MerchantPickerQueryVariables>(MerchantPickerDocument, options);
+        }
+export type MerchantPickerQueryHookResult = ReturnType<typeof useMerchantPickerQuery>;
+export type MerchantPickerLazyQueryHookResult = ReturnType<typeof useMerchantPickerLazyQuery>;
+export type MerchantPickerQueryResult = Apollo.QueryResult<MerchantPickerQuery, MerchantPickerQueryVariables>;
 export const ListTransactionsDocument = gql`
     query ListTransactions($filters: TransactionFilter, $ordering: [TransactionOrder!]! = [{bookingDate: DESC}], $pagination: OffsetPaginationInput) {
   transactions(filters: $filters, ordering: $ordering, pagination: $pagination) {

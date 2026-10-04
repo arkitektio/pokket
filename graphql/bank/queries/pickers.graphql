@@ -1,0 +1,19 @@
+# What the category sheet shows for one transaction: every visible category
+# (filtered on the phone as you type) and the server's best guesses for it.
+query CategoryPicker($transaction: ID!) {
+  categories(filters: { hidden: false }, ordering: [{ name: ASC }], pagination: { limit: 500 }) {
+    ...PickerCategory
+  }
+  suggestCategories(transaction: $transaction, limit: 4) {
+    score
+    category {
+      ...PickerCategory
+    }
+  }
+}
+
+query MerchantPicker($search: String, $limit: Int! = 30) {
+  merchants(filters: { search: $search }, ordering: [{ name: ASC }], pagination: { limit: $limit }) {
+    ...PickerMerchant
+  }
+}

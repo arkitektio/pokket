@@ -1,0 +1,23 @@
+mutation CategorizeTransaction($input: CategorizeTransactionInput!) {
+  categorizeTransaction(input: $input) {
+    ...Transaction
+  }
+}
+
+mutation AssignMerchant($input: AssignMerchantInput!) {
+  assignMerchant(input: $input) {
+    ...Transaction
+  }
+}
+
+mutation CreateCategory($input: CreateCategoryInput!) {
+  createCategory(input: $input) {
+    ...PickerCategory
+  }
+}
+
+mutation CreateMerchant($input: CreateMerchantInput!) {
+  createMerchant(input: $input) {
+    ...PickerMerchant
+  }
+}
