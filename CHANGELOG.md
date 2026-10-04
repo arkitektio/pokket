@@ -1,3 +1,12 @@
+# [1.9.0](https://github.com/arkitektio/pokket/compare/v1.8.0...v1.9.0) (2026-10-04)
+
+
+### Features
+
+* **bank:** change a transaction's category and merchant ([723d97b](https://github.com/arkitektio/pokket/commit/723d97b0cd200d0cdbf1cae2c015da523f2ac370))
+* deep links to pages, scoped to their organization ([5305cc1](https://github.com/arkitektio/pokket/commit/5305cc1f6f867d839a03f249252703fe74d590f4))
+* lokate and phone module pages ([bcb8642](https://github.com/arkitektio/pokket/commit/bcb8642ad15535a426137322cab12744b6c3afa3))
+
 # [1.8.0](https://github.com/arkitektio/pokket/compare/v1.7.4...v1.8.0) (2026-09-30)
 
 
