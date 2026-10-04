@@ -2,12 +2,12 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Text } from '@/components/ui/text';
 import { App } from '@/lib/app/App';
 import { profileTitle } from '@/lib/arkitekt/fakts/profileStorageSchema';
+import { useAvailableModules } from '@/lib/modules/useAvailableModules';
 import { showPage } from '@/lib/navigation';
 import { disablePush, enablePush, PushStatus, pushUnavailableReason, reregisterPush, usePush } from '@/lib/push/push';
 import { useThemeColors } from '@/lib/theme/BrandProvider';
 import { TimelineSettings } from '@/components/timeline/TimelineSettings';
-import { TimelineBackup } from '@/components/timeline/TimelineBackup';
-import { Bell, Bug, ChevronRight, RefreshCw } from 'lucide-react-native';
+import { Bell, Bug, ChevronRight, MapPinned, RefreshCw } from 'lucide-react-native';
 import { useUpdateInfo } from '@/lib/updates/useUpdateInfo';
 import * as React from 'react';
 import { ActivityIndicator, Linking, Pressable, ScrollView, Switch, View } from 'react-native';
@@ -180,6 +180,17 @@ function Row({ icon: Icon, label, onPress }: { icon: typeof Bug; label: string; 
   );
 }
 
+/** The backup lives with its service now; from here, a way there when this organization has it. */
+function LokateLink() {
+  const lokate = useAvailableModules().some((m) => m.key === 'lokate');
+  if (!lokate) return null;
+  return (
+    <Card className="overflow-hidden border-border bg-card">
+      <Row icon={MapPinned} label="Backup to your organization: Lokate" onPress={() => showPage('/lokate')} />
+    </Card>
+  );
+}
+
 export default function SettingsScreen() {
   return (
     <ScrollView className="flex-1 bg-background">
@@ -191,7 +202,7 @@ export default function SettingsScreen() {
         <View className="gap-2">
           <Text className="px-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Location timeline</Text>
           <TimelineSettings />
-          <TimelineBackup />
+          <LokateLink />
         </View>
         <View className="gap-2">
           <Text className="px-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">About</Text>

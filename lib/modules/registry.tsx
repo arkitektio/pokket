@@ -11,6 +11,7 @@ import {
   ListChecks,
   Mail,
   MailOpen,
+  MapPinned,
   Network,
   Radio,
   RadioTower,
@@ -21,6 +22,7 @@ import {
   Smartphone,
   TrendingDown,
   TrendingUp,
+  Wifi,
 } from "lucide-react-native";
 
 /** The glyphs `catalog.ts` names — orkestrator's `matchIcon`. */
@@ -35,6 +37,7 @@ const ICONS: Record<string, LucideIcon> = {
   "list-checks": ListChecks,
   mail: Mail,
   "mail-open": MailOpen,
+  "map-pinned": MapPinned,
   network: Network,
   radio: Radio,
   "radio-tower": RadioTower,
@@ -45,6 +48,7 @@ const ICONS: Record<string, LucideIcon> = {
   smartphone: Smartphone,
   "trending-down": TrendingDown,
   "trending-up": TrendingUp,
+  wifi: Wifi,
 };
 
 export const iconFor = (name: string | undefined): LucideIcon => (name && ICONS[name]) || Circle;

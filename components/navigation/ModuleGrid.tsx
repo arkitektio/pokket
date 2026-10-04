@@ -8,7 +8,7 @@ import { Pressable, View } from 'react-native';
 import { ActionSheet } from './ActionSheet';
 
 /** What orkestrator's tile context menu says about a module's service. */
-function ServiceInfo({ serviceKey }: { serviceKey: string }) {
+export function ServiceInfo({ serviceKey }: { serviceKey: string }) {
   const state = useServiceState(serviceKey);
   if (!state) return null;
   const alias = state.alias;

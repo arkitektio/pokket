@@ -25,7 +25,10 @@ describe("module links", () => {
 
   it("finds a page's module by the longest route prefix", () => {
     expect(moduleForPath("/mail/thread/12").key).toBe("mail");
-    expect(moduleForPath("/wifi/eduroam").key).toBe("device");
+    expect(moduleForPath("/wifi/eduroam").key).toBe("phone");
+    expect(moduleForPath("/timeline/place/3").key).toBe("phone");
+    expect(moduleForPath("/settings").key).toBe("phone");
+    expect(moduleForPath("/lokate").key).toBe("lokate");
     expect(moduleForPath("/").key).toBe("home");
     expect(moduleForPath("/somewhere").key).toBe("home");
   });

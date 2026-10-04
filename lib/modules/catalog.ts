@@ -101,21 +101,48 @@ export const MODULE_CATALOG: ModuleDecl[] = [
     ],
   },
   {
-    key: "notifications",
-    label: "Notifications",
-    icon: "bell",
-    route: "/notifications",
-    navLinks: [{ label: "Notifications", route: "/notifications", home: true, keywords: ["alerts"] }],
-  },
-  {
-    key: "device",
-    label: "Device",
-    icon: "smartphone",
-    route: "/wifi",
+    key: "lokate",
+    label: "Lokate",
+    icon: "map-pinned",
+    serviceKey: "lokate",
+    route: "/lokate",
     navLinks: [
-      { label: "Wi-Fi profiles", route: "/wifi", group: "Wi-Fi", keywords: ["network", "wlan"] },
-      { label: "Eduroam", route: "/wifi/eduroam", group: "Wi-Fi", keywords: ["university", "wifi"] },
-      { label: "Standard Wi-Fi", route: "/wifi/standard", group: "Wi-Fi", keywords: ["wpa", "wifi"] },
+      {
+        label: "Lokate",
+        route: "/lokate",
+        home: true,
+        keywords: ["backup", "sync", "timeline", "location", "server"],
+      },
+    ],
+  },
+  // Last: everything of this phone itself, not of the organization — as
+  // orkestrator keeps its rail for services and the rest behind settings.
+  {
+    key: "phone",
+    label: "Phone",
+    icon: "smartphone",
+    route: "/phone",
+    navLinks: [
+      { label: "Phone", route: "/phone", home: true, keywords: ["device", "this phone"] },
+      {
+        label: "Timeline",
+        route: "/timeline",
+        group: "On this phone",
+        icon: "route",
+        description: "Where you have been, stored here",
+        keywords: ["location", "places", "trips", "history", "map", "gps"],
+      },
+      {
+        label: "Notifications",
+        route: "/notifications",
+        group: "On this phone",
+        icon: "bell",
+        description: "What reached this phone",
+        keywords: ["alerts", "push"],
+      },
+      { label: "Wi-Fi profiles", route: "/wifi", group: "Wi-Fi", icon: "wifi", keywords: ["network", "wlan"] },
+      { label: "Eduroam", route: "/wifi/eduroam", group: "Wi-Fi", icon: "wifi", keywords: ["university", "wifi"] },
+      { label: "Standard Wi-Fi", route: "/wifi/standard", group: "Wi-Fi", icon: "wifi", keywords: ["wpa", "wifi"] },
       {
         label: "Provision",
         route: "/provision",
@@ -132,42 +159,23 @@ export const MODULE_CATALOG: ModuleDecl[] = [
         description: "The organization's private network",
         keywords: ["tailscale", "vpn", "tailnet"],
       },
-    ],
-  },
-  {
-    key: "timeline",
-    label: "Timeline",
-    icon: "route",
-    route: "/timeline",
-    navLinks: [
-      {
-        label: "Timeline",
-        route: "/timeline",
-        home: true,
-        keywords: ["location", "places", "trips", "history", "map", "gps"],
-      },
-    ],
-  },
-  {
-    key: "settings",
-    label: "Settings",
-    icon: "settings",
-    route: "/settings",
-    navLinks: [
       {
         label: "Settings",
         route: "/settings",
-        home: true,
+        group: "App",
+        icon: "settings",
+        description: "Push, timeline and updates",
         keywords: ["preferences", "push", "notifications", "permissions", "location"],
       },
+      {
+        label: "Debug",
+        route: "/debug",
+        group: "App",
+        icon: "bug",
+        description: "What went wrong, and why",
+        keywords: ["logs", "errors", "diagnostics"],
+      },
     ],
-  },
-  {
-    key: "debug",
-    label: "Debug",
-    icon: "bug",
-    route: "/debug",
-    navLinks: [{ label: "Debug", route: "/debug", home: true, keywords: ["logs", "errors", "diagnostics"] }],
   },
 ];
 
