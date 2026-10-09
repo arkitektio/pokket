@@ -1,5 +1,6 @@
 import { CallPanel } from '@/components/calls/CallPanel';
 import { InviteSheet } from '@/components/calls/InviteSheet';
+import { TalkingAbout } from '@/components/calls/TalkingAbout';
 import { CallsEmptyState, CallsLoadingState, CallsUnavailable } from '@/components/calls/states';
 import { Text } from '@/components/ui/text';
 import { Guard } from '@/lib/app/App';
@@ -41,13 +42,16 @@ function Call({ call }: { call: CallFragment }) {
   return (
     <>
       <Stack.Screen options={{ title: call.title }} />
-      <CallPanel call={call} onInvite={() => setInviting(true)} />
+      <CallPanel call={call} footer={<TalkingAbout call={call} />} onInvite={() => setInviting(true)} />
       <InviteSheet call={call} visible={inviting} onClose={() => setInviting(false)} />
     </>
   );
 }
 
-/** The call's page — orkestrator's `CallPage`: the room itself. */
+/**
+ * The call's page — orkestrator's `CallPage`: the room itself, and under it
+ * what the call is talking about.
+ */
 function CallContent({ id }: { id: string }) {
   const { data, loading, error } = useGetCallQuery({ variables: { id }, fetchPolicy: 'cache-and-network' });
   const call = data?.call;
