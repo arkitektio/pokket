@@ -1,4 +1,4 @@
-import lovekitResult from "@/lib/mikro/api/fragments";
+import lovekitResult from "@/lib/lovekit/api/fragments";
 import { createGraphQLServiceBuilder } from "../arkitekt/builders/graphQlServiceBuidler";
 import { ServiceDefinition } from "../arkitekt/provider";
 
