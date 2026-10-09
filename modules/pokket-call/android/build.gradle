@@ -1,0 +1,15 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'live.arkitekt.pokket'
+version = '0.1.0'
+
+android {
+  namespace "live.arkitekt.pokket.call"
+  defaultConfig {
+    versionCode 1
+    versionName '0.1.0'
+  }
+}

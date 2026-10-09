@@ -14,7 +14,8 @@
       "infoPlist": {
         "NSBluetoothAlwaysUsageDescription": "Allow $(PRODUCT_NAME) to connect to bluetooth devices",
         "NSBluetoothPeripheralUsageDescription": "Allow $(PRODUCT_NAME) to connect to bluetooth devices",
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "UIBackgroundModes": ["audio"]
       }
     },
     "android": {
@@ -59,7 +60,13 @@
       "expo-image",
       "expo-status-bar",
       "@livekit/react-native-expo-plugin",
-      "@config-plugins/react-native-webrtc",
+      [
+        "@config-plugins/react-native-webrtc",
+        {
+          "cameraPermission": "Allow $(PRODUCT_NAME) to use the camera in calls and broadcasts.",
+          "microphonePermission": "Allow $(PRODUCT_NAME) to use the microphone in calls and broadcasts."
+        }
+      ],
       "./modules/pokket-mesh/app.plugin.js",
       "./plugins/withGradleMemory.js",
       "expo-background-task",

@@ -1,0 +1,10 @@
+{
+  "name": "pokket-call",
+  "version": "0.1.0",
+  "private": true,
+  "description": "pokket's call service: the Android foreground service that keeps a call's audio running in the background",
+  "main": "index.ts",
+  "license": "MIT",
+  "author": "arkitektio",
+  "homepage": "https://github.com/arkitektio/pokket"
+}

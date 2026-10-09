@@ -1,0 +1,6 @@
+{
+  "platforms": ["android"],
+  "android": {
+    "modules": ["live.arkitekt.pokket.call.PokketCallModule"]
+  }
+}

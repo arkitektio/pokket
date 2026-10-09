@@ -1,0 +1,15 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <!-- A call goes on while pokket is in the background: its audio plays, and
+       with the microphone granted, the member is heard. Normal permissions,
+       granted at install without a prompt. -->
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+  <application>
+    <!-- No camera type: the camera is switched off while in the background. -->
+    <service
+      android:name=".CallService"
+      android:exported="false"
+      android:foregroundServiceType="microphone|mediaPlayback" />
+  </application>
+</manifest>
