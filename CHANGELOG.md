@@ -1,3 +1,22 @@
+# [1.10.0](https://github.com/arkitektio/pokket/compare/v1.9.0...v1.10.0) (2026-10-09)
+
+
+### Bug Fixes
+
+* **lovekit:** use lovekit's own fragment matcher ([7cad43a](https://github.com/arkitektio/pokket/commit/7cad43ad9ae84067808ec536d3a150fd7fd11ef4))
+
+
+### Features
+
+* **calls:** announce calls the organization starts ([713f89e](https://github.com/arkitektio/pokket/commit/713f89e5fe8a0bba7e94756bb8e04429941ccf8a))
+* **calls:** background call service ([2334d40](https://github.com/arkitektio/pokket/commit/2334d40af9e4f1d262ab5985ae460ab7c68e960a))
+* **calls:** call about the page on show ([944eed7](https://github.com/arkitektio/pokket/commit/944eed70ed7558695953057c8222e2dd732ef19e))
+* **calls:** call state and pure logic ([600e2bf](https://github.com/arkitektio/pokket/commit/600e2bfa68cd22bc1ad5916a65108cc9a58a7682))
+* **calls:** invitations ([636ded8](https://github.com/arkitektio/pokket/commit/636ded8efd1bc92ecf1cfa2b219d74b07290d6d4))
+* **calls:** join, the room at the app root, and the call page ([477506c](https://github.com/arkitektio/pokket/commit/477506c5dee548fe8c40ad4f776812783c282572))
+* **calls:** what a call is talking about ([b8780ce](https://github.com/arkitektio/pokket/commit/b8780ce033c9f72455827a7569e2296bca88bdd1))
+* **lovekit:** call documents and regenerated api ([10b5d5f](https://github.com/arkitektio/pokket/commit/10b5d5fd489ab094abfa88bd70420d939e40e700))
+
 # [1.9.0](https://github.com/arkitektio/pokket/compare/v1.8.0...v1.9.0) (2026-10-04)
 
 
