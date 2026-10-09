@@ -352,6 +352,9 @@ importers:
       zod:
         specifier: ^4.0.17
         version: 4.4.3
+      zustand:
+        specifier: ^5.0.15
+        version: 5.0.15(@types/react@19.2.18)(react@19.2.3)
     devDependencies:
       '@babel/core':
         specifier: ^7.29.0
