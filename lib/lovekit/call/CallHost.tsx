@@ -2,6 +2,7 @@ import { App, Guard } from "@/lib/app/App";
 import * as React from "react";
 
 import { callAnnouncementStore } from "./announcements";
+import { CallAnnouncementsWatcher } from "./CallAnnouncementsWatcher";
 import { CallConnection } from "./CallConnection";
 import { CallToasts } from "./CallToasts";
 import { CallInvitesWatcher } from "./invites";
@@ -25,6 +26,7 @@ const CallRuntime = () => {
     <>
       <CallConnection />
       <CallInvitesWatcher />
+      <CallAnnouncementsWatcher />
       <CallToasts />
     </>
   );

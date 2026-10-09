@@ -2,10 +2,12 @@ import { usePathname } from "expo-router";
 import * as React from "react";
 import { toast } from "sonner-native";
 
+import { callAnnouncementStore, useCallAnnouncements } from "./announcements";
 import { useCallInvites, useDismissInvite } from "./invites";
 import { showCall } from "./openCall";
 import { currentTopic } from "./structureInput";
 import { structureLabel } from "./structures";
+import { useCallState } from "./store";
 import { useJoinCall } from "./useJoinCall";
 
 /**
@@ -49,7 +51,9 @@ const about = (call: { about: readonly { identifier: string; object: number }[] 
 /**
  * What orkestrator shows in its rail and its Notifications widget, as
  * toasts: on a phone there is no rail, and these have to reach the member
- * on whatever page they are. An invitation offers Join and Dismiss.
+ * on whatever page they are. An invitation offers Join and Dismiss, and so
+ * does a call someone in the organization just started: everyone may join,
+ * so that one is an offer and not a ring, and it goes when the call ends.
  *
  * Joining from here is a tap, so it may ask for the microphone.
  */
@@ -82,6 +86,23 @@ export const CallToasts = () => {
         },
       },
       cancel: { label: "Dismiss", onClick: () => void dismissInvite(invite) },
+    }),
+  );
+
+  const announced = useCallAnnouncements((state) => state.calls);
+  const joined = useCallState((state) => state.call?.id);
+  const announcementItems = React.useMemo(
+    // The call this app is in has the bar; it is not offered as well.
+    () => announced.filter((call) => call.id !== joined).map((call) => ({ key: `call-announced-${call.id}`, call })),
+    [announced, joined],
+  );
+  useStandingToasts(announcementItems, ({ key, call }) =>
+    toast(`${call.creator?.preferredUsername ?? "Someone"} started a call${about(call)}`, {
+      id: key,
+      description: call.title,
+      duration: Infinity,
+      action: { label: "Join", onClick: () => enter(call) },
+      cancel: { label: "Dismiss", onClick: () => callAnnouncementStore.getState().dismiss(call.id) },
     }),
   );
 
