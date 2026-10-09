@@ -1,3 +1,4 @@
+import { CallAboutButton } from '@/components/calls/CallAboutButton';
 import { ExitGuard } from '@/components/navigation/ExitGuard';
 import { MenuButton, SearchButton, ShareButton } from '@/components/navigation/HeaderButtons';
 import { routeOf } from '@/lib/modules/catalog';
@@ -36,6 +37,7 @@ const screenOptions = ({ navigation }: { navigation: Nav }) => ({
     : () => <MenuButton onPress={() => drawerOf(navigation)?.openDrawer()} />,
   headerRight: () => (
     <View className="flex-row items-center">
+      <CallAboutButton />
       <ShareButton />
       <SearchButton />
     </View>
