@@ -1,8 +1,8 @@
 import { Text } from '@/components/ui/text';
 import { callRoute } from '@/lib/lovekit/call/links';
+import { showCall } from '@/lib/lovekit/call/openCall';
 import { callClock } from '@/lib/lovekit/call/lobby';
 import { useCallState } from '@/lib/lovekit/call/store';
-import { afterReturningToApp, showDetail } from '@/lib/navigation';
 import { useThemeColors } from '@/lib/theme/BrandProvider';
 import { RoomContext } from '@livekit/react-native';
 import { usePathname } from 'expo-router';
@@ -34,21 +34,13 @@ function Bar({ id, title }: { id: string; title: string }) {
   const joinedAt = useCallState((state) => state.joinedAt);
   const now = useNow();
 
-  const open = () => {
-    const route = callRoute(id);
-    // From a screen over the app frame (search), a navigation would land in
-    // the root stack; leave it first.
-    if (pathname === '/search') afterReturningToApp(() => showDetail(route));
-    else showDetail(route);
-  };
-
   return (
     <View
       style={{ bottom: insets.bottom + 8, height: CALL_BAR_HEIGHT }}
       className="absolute left-3 right-3 z-40 flex-row items-center gap-3 rounded-2xl border border-border bg-card px-3 shadow-lg"
     >
       <Pressable
-        onPress={open}
+        onPress={() => showCall(id, pathname)}
         accessibilityRole="button"
         accessibilityLabel="Open the call"
         className="flex-1 flex-row items-center gap-3 active:opacity-70"

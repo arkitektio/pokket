@@ -1,11 +1,17 @@
 import { CallRow } from '@/components/calls/CallRow';
+import { InviteRow } from '@/components/calls/InviteRow';
 import { CallsEmptyState, CallsLoadingState, CallsUnavailable } from '@/components/calls/states';
 import { Text } from '@/components/ui/text';
 import { Guard } from '@/lib/app/App';
 import { useListCallsQuery } from '@/lib/lovekit/api/graphql';
+import { useCallInvites } from '@/lib/lovekit/call/invites';
 import { useThemeColors } from '@/lib/theme/BrandProvider';
 import * as React from 'react';
 import { FlatList, RefreshControl, View } from 'react-native';
+
+const SectionTitle = ({ title }: { title: string }) => (
+  <Text className="px-4 pb-2 pt-4 text-xs font-semibold uppercase text-muted-foreground">{title}</Text>
+);
 
 /** The organization's calls in progress — orkestrator's `Calls` page. */
 function CallsContent() {
@@ -17,6 +23,8 @@ function CallsContent() {
   });
   const [refreshing, setRefreshing] = React.useState(false);
   const calls = data?.calls;
+  // Kept current by `CallInvitesWatcher`, at the root.
+  const invites = useCallInvites();
 
   const refresh = async () => {
     setRefreshing(true);
@@ -38,7 +46,13 @@ function CallsContent() {
       renderItem={({ item }) => <CallRow call={item} />}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} tintColor={colors.primary} />}
       ListHeaderComponent={
-        <Text className="px-4 pb-2 pt-4 text-xs font-semibold uppercase text-muted-foreground">In progress</Text>
+        <>
+          {invites.length > 0 ? <SectionTitle title="Invitations" /> : null}
+          {invites.map((invite) => (
+            <InviteRow key={invite.id} invite={invite} />
+          ))}
+          <SectionTitle title="In progress" />
+        </>
       }
       ListEmptyComponent={
         error ? (

@@ -1,4 +1,5 @@
 import { CallPanel } from '@/components/calls/CallPanel';
+import { InviteSheet } from '@/components/calls/InviteSheet';
 import { CallsEmptyState, CallsLoadingState, CallsUnavailable } from '@/components/calls/states';
 import { Text } from '@/components/ui/text';
 import { Guard } from '@/lib/app/App';
@@ -36,10 +37,12 @@ function useJoinOnArrival(call: CallFragment) {
 function Call({ call }: { call: CallFragment }) {
   useTabTitle(call.title);
   useJoinOnArrival(call);
+  const [inviting, setInviting] = React.useState(false);
   return (
     <>
       <Stack.Screen options={{ title: call.title }} />
-      <CallPanel call={call} />
+      <CallPanel call={call} onInvite={() => setInviting(true)} />
+      <InviteSheet call={call} visible={inviting} onClose={() => setInviting(false)} />
     </>
   );
 }

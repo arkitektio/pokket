@@ -3,6 +3,8 @@ import * as React from "react";
 
 import { callAnnouncementStore } from "./announcements";
 import { CallConnection } from "./CallConnection";
+import { CallToasts } from "./CallToasts";
+import { CallInvitesWatcher } from "./invites";
 import { callStore } from "./store";
 
 /**
@@ -19,7 +21,13 @@ const CallRuntime = () => {
     },
     [],
   );
-  return <CallConnection />;
+  return (
+    <>
+      <CallConnection />
+      <CallInvitesWatcher />
+      <CallToasts />
+    </>
+  );
 };
 
 /**
