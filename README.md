@@ -25,6 +25,21 @@ Easily provision ESP32-based devices for your lab or home. Pokket uses the **Imp
 
 Manage your Wi-Fi configurations in one place. Save standard and Eduroam profiles to quickly provision multiple devices without re-entering credentials.
 
+### 📞 Calls
+
+Video calls with your organisation through `lovekit`, the same calls orkestrator has. **Calls**
+lists the ones in progress and anyone in the organisation can join; a phone button in the header
+of a task, a transaction, a conversation or a broadcast starts a call about it (or finds the one
+already running). Invite people from a call, and be asked in: invitations and calls someone just
+started show as a toast with Join and Dismiss while pokket is open. Nothing is pushed to a phone
+that has pokket closed.
+
+A call goes on wherever you are in the app, with a bar that leads back to it, and when pokket is
+in the background or the screen is locked: iOS through its `audio` background mode, Android
+through a foreground service (`modules/pokket-call`) with an ongoing notification. The camera
+pauses while in the background. The microphone is asked for when you tap Join and the camera
+when you first switch it on; refuse the microphone and you still join, listening.
+
 ### 🕸️ Organisation Mesh
 
 Deployments that run an organisation mesh (an [ionscale](https://github.com/jsiebens/ionscale)
@@ -126,7 +141,9 @@ workflow does nothing, because semantic-release finds no new version.
    How it works: for every alias on the mesh, the node opens a reverse proxy on
    `127.0.0.1:<port>` that replays requests (and WebSocket upgrades) to the alias over the
    tailnet, with the alias' own Host header and TLS. Service clients are built against that
-   loopback address; everything else goes directly. WebRTC media (LiveKit) is not carried.
+   loopback address; everything else goes directly. WebRTC media (LiveKit) is not carried: a call
+   needs a direct connection to the media server, and the call page says so when the only way
+   to it is the mesh.
    The node keeps its identity in the app's files, so it rejoins by itself after the one-shot
    key from the login has been used.
 
