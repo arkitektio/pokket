@@ -17,19 +17,95 @@ export type Scalars = {
   Int: { input: number; output: number; }
   Float: { input: number; output: number; }
   /** Date with time (isoformat) */
-  DateTime: { input: any; output: any; }
+  DateTime: { input: string; output: string; }
+  _Any: { input: any; output: any; }
+};
+
+/** What a call is now also about */
+export type AddToCallInput = {
+  about: Array<StructureInput>;
+  call: Scalars['ID']['input'];
 };
 
 export type App = {
   __typename?: 'App';
-  id: Scalars['String']['output'];
+  id: Scalars['ID']['output'];
   identifier: Scalars['String']['output'];
+};
+
+export type Call = {
+  __typename?: 'Call';
+  /** The structures this call is about, oldest first: the last one is what it turned to most recently. */
+  about: Array<Structure>;
+  createdAt: Scalars['DateTime']['output'];
+  creator?: Maybe<User>;
+  id: Scalars['ID']['output'];
+  /** How many are in the call right now. */
+  participantCount: Scalars['Int']['output'];
+  /** Who is in the call right now. Empty when nobody is: a call is live while LiveKit holds its room. */
+  participants: Array<CallParticipant>;
+  /** The LiveKit room this call's participants join. */
+  roomName: Scalars['String']['output'];
+  title: Scalars['String']['output'];
+};
+
+/** A call starting in your organization, or changing what it is about */
+export type CallEvent = {
+  __typename?: 'CallEvent';
+  /** A call someone else just started, which you can join */
+  create?: Maybe<Call>;
+  /** A call that turned to something else; what it was about before is still in `about` */
+  update?: Maybe<Call>;
+};
+
+/** Filter for calls */
+export type CallFilter = {
+  AND?: InputMaybe<CallFilter>;
+  DISTINCT?: InputMaybe<Scalars['Boolean']['input']>;
+  NOT?: InputMaybe<CallFilter>;
+  OR?: InputMaybe<CallFilter>;
+  /** Calls about this structure. */
+  about?: InputMaybe<StructureInput>;
+  ids?: InputMaybe<Array<Scalars['ID']['input']>>;
+  /** Only calls whose LiveKit room is up (true) or down (false). */
+  live?: InputMaybe<Scalars['Boolean']['input']>;
+  search?: InputMaybe<Scalars['String']['input']>;
+};
+
+/** Someone asking someone else into a call */
+export type CallInvite = {
+  __typename?: 'CallInvite';
+  call: Call;
+  createdAt: Scalars['DateTime']['output'];
+  id: Scalars['ID']['output'];
+  invitee: User;
+  inviter: User;
+};
+
+/** An invitation to a call arriving, or going away */
+export type CallInviteEvent = {
+  __typename?: 'CallInviteEvent';
+  /** A new invitation for you */
+  create?: Maybe<CallInvite>;
+  /** An invitation that was dismissed or answered, here or on another device */
+  delete?: Maybe<Scalars['ID']['output']>;
+};
+
+export type CallOrder =
+  { createdAt: Ordering; };
+
+/** Someone in a live call, as LiveKit reports them */
+export type CallParticipant = {
+  __typename?: 'CallParticipant';
+  identity: Scalars['String']['output'];
+  joinedAt: Scalars['Int']['output'];
+  name: Scalars['String']['output'];
 };
 
 export type Client = {
   __typename?: 'Client';
   clientId: Scalars['String']['output'];
-  name: Scalars['String']['output'];
+  id: Scalars['ID']['output'];
   release?: Maybe<Release>;
 };
 
@@ -61,6 +137,17 @@ export type CollaborativeBroadcastFilter = {
   search?: InputMaybe<Scalars['String']['input']>;
 };
 
+/** The invitation to put away */
+export type DismissCallInviteInput = {
+  id: Scalars['ID']['input'];
+};
+
+/** The call to find or start */
+export type EnsureCallInput = {
+  about: Array<StructureInput>;
+  title?: InputMaybe<Scalars['String']['input']>;
+};
+
 export type EnsureCollaborativeBroadcastInput = {
   instanceId?: InputMaybe<Scalars['String']['input']>;
   title?: InputMaybe<Scalars['String']['input']>;
@@ -77,20 +164,57 @@ export type EnsureStreamInput = {
   title?: InputMaybe<Scalars['String']['input']>;
 };
 
+/** Who to ask into a call */
+export type InviteToCallInput = {
+  call: Scalars['ID']['input'];
+  /** The users to invite, by their lok id (the `sub` their token carries) */
+  users: Array<Scalars['ID']['input']>;
+};
+
 export type JoinBroadcastInput = {
   broadcast: Scalars['ID']['input'];
 };
 
+/** The call to join */
+export type JoinCallInput = {
+  call: Scalars['ID']['input'];
+};
+
 export type Mutation = {
   __typename?: 'Mutation';
+  /** Turn a call to these structures: they become what it is about last, and what it was about stays */
+  addToCall: Call;
+  /** Put an invitation away, on every device */
+  dismissCallInvite: Scalars['ID']['output'];
+  /** The live call about these structures, or a new one */
+  ensureCall: Call;
   /** Create a collaborative broadcast */
   ensureCollaborativeBroadcast: CollaborativeBroadcast;
   /** Create a solo broadcast */
   ensureSoloBroadcast: SoloBroadcast;
   /** Create a stream and return the token for it */
   ensureStream: Scalars['String']['output'];
+  /** Ask users into a call; their open apps ring */
+  inviteToCall: Call;
   /** Join a solo broadcast and return the token for it */
   joinBroadcast: Scalars['String']['output'];
+  /** Join a call and return the token for it */
+  joinCall: Scalars['String']['output'];
+};
+
+
+export type MutationAddToCallArgs = {
+  input: AddToCallInput;
+};
+
+
+export type MutationDismissCallInviteArgs = {
+  input: DismissCallInviteInput;
+};
+
+
+export type MutationEnsureCallArgs = {
+  input: EnsureCallInput;
 };
 
 
@@ -109,8 +233,18 @@ export type MutationEnsureStreamArgs = {
 };
 
 
+export type MutationInviteToCallArgs = {
+  input: InviteToCallInput;
+};
+
+
 export type MutationJoinBroadcastArgs = {
   input: JoinBroadcastInput;
+};
+
+
+export type MutationJoinCallArgs = {
+  input: JoinCallInput;
 };
 
 export type OffsetPaginationInput = {
@@ -118,18 +252,35 @@ export type OffsetPaginationInput = {
   offset?: Scalars['Int']['input'];
 };
 
+export enum Ordering {
+  Asc = 'ASC',
+  AscNullsFirst = 'ASC_NULLS_FIRST',
+  AscNullsLast = 'ASC_NULLS_LAST',
+  Desc = 'DESC',
+  DescNullsFirst = 'DESC_NULLS_FIRST',
+  DescNullsLast = 'DESC_NULLS_LAST'
+}
+
 export type Organization = {
   __typename?: 'Organization';
-  id: Scalars['String']['output'];
+  id: Scalars['ID']['output'];
   slug: Scalars['String']['output'];
 };
 
 export type Query = {
   __typename?: 'Query';
+  _entities: Array<Maybe<_Entity>>;
+  _service: _Service;
+  /** Get a call by ID */
+  call: Call;
+  /** The organization's calls; filter `live` for the ones in progress */
+  calls: Array<Call>;
   /** Get a collaborative broadcast by ID */
   collaborativeBroadcast: CollaborativeBroadcast;
   /** Get all collaborative broadcasts */
   collaborativeBroadcasts: Array<CollaborativeBroadcast>;
+  /** Your pending invitations to calls that are still live */
+  myCallInvites: Array<CallInvite>;
   /** Get a solo broadcast by ID */
   soloBroadcast: SoloBroadcast;
   /** Get all solo broadcasts */
@@ -138,6 +289,23 @@ export type Query = {
   stream: Stream;
   /** Get a stream */
   streams: Array<Stream>;
+};
+
+
+export type Query_EntitiesArgs = {
+  representations: Array<Scalars['_Any']['input']>;
+};
+
+
+export type QueryCallArgs = {
+  id: Scalars['ID']['input'];
+};
+
+
+export type QueryCallsArgs = {
+  filters?: InputMaybe<CallFilter>;
+  order?: InputMaybe<CallOrder>;
+  pagination?: InputMaybe<OffsetPaginationInput>;
 };
 
 
@@ -176,7 +344,7 @@ export type QueryStreamsArgs = {
 export type Release = {
   __typename?: 'Release';
   app: App;
-  id: Scalars['String']['output'];
+  id: Scalars['ID']['output'];
   version: Scalars['String']['output'];
 };
 
@@ -259,8 +427,25 @@ export type StreamerFilter = {
   search?: InputMaybe<Scalars['String']['input']>;
 };
 
+/** A reference to an object on another service */
+export type Structure = {
+  __typename?: 'Structure';
+  identifier: Scalars['String']['output'];
+  object: Scalars['Int']['output'];
+};
+
+/** A reference to an object on another service */
+export type StructureInput = {
+  identifier: Scalars['String']['input'];
+  object: Scalars['Int']['input'];
+};
+
 export type Subscription = {
   __typename?: 'Subscription';
+  /** Your invitations to calls as they arrive and go away */
+  callInvites: CallInviteEvent;
+  /** The calls others start in your organization as they start, and any call's new topics */
+  calls: CallEvent;
   /** Subscribe to stream events */
   streams: StreamEvent;
 };
@@ -273,13 +458,31 @@ export type SubscriptionStreamsArgs = {
 export type User = {
   __typename?: 'User';
   activeOrganization?: Maybe<Organization>;
+  id: Scalars['ID']['output'];
   preferredUsername: Scalars['String']['output'];
   sub: Scalars['String']['output'];
+};
+
+export type _Entity = App | Client | Organization | Release | User;
+
+export type _Service = {
+  __typename?: '_Service';
+  sdl: Scalars['String']['output'];
 };
 
 export type SoloBroadcastFragment = { __typename?: 'SoloBroadcast', id: string, title: string, streamer: { __typename?: 'Streamer', user: { __typename?: 'User', sub: string }, client: { __typename?: 'Client', clientId: string } } };
 
 export type CollaborativeBroadcastFragment = { __typename?: 'CollaborativeBroadcast', id: string, title: string, streamers: Array<{ __typename?: 'Streamer', user: { __typename?: 'User', sub: string }, client: { __typename?: 'Client', clientId: string } }> };
+
+export type CallParticipantFragment = { __typename?: 'CallParticipant', identity: string, name: string, joinedAt: number };
+
+export type CallStructureFragment = { __typename?: 'Structure', identifier: string, object: number };
+
+export type CallFragment = { __typename?: 'Call', id: string, title: string, roomName: string, createdAt: string, creator?: { __typename?: 'User', id: string, sub: string, preferredUsername: string } | null, about: Array<{ __typename?: 'Structure', identifier: string, object: number }>, participants: Array<{ __typename?: 'CallParticipant', identity: string, name: string, joinedAt: number }> };
+
+export type ListCallFragment = { __typename?: 'Call', id: string, title: string, roomName: string, createdAt: string, participantCount: number, creator?: { __typename?: 'User', id: string, sub: string, preferredUsername: string } | null, about: Array<{ __typename?: 'Structure', identifier: string, object: number }> };
+
+export type CallInviteFragment = { __typename?: 'CallInvite', id: string, createdAt: string, call: { __typename?: 'Call', id: string, title: string, roomName: string, createdAt: string, participantCount: number, creator?: { __typename?: 'User', id: string, sub: string, preferredUsername: string } | null, about: Array<{ __typename?: 'Structure', identifier: string, object: number }> }, inviter: { __typename?: 'User', id: string, sub: string, preferredUsername: string } };
 
 export type StreamFragment = { __typename?: 'Stream', id: string };
 
@@ -294,6 +497,34 @@ export type EnsureSoloBroadcastMutationVariables = Exact<{
 
 export type EnsureSoloBroadcastMutation = { __typename?: 'Mutation', ensureSoloBroadcast: { __typename?: 'SoloBroadcast', id: string, title: string, streamer: { __typename?: 'Streamer', user: { __typename?: 'User', sub: string }, client: { __typename?: 'Client', clientId: string } } } };
 
+export type EnsureCallMutationVariables = Exact<{
+  input: EnsureCallInput;
+}>;
+
+
+export type EnsureCallMutation = { __typename?: 'Mutation', ensureCall: { __typename?: 'Call', id: string, title: string, roomName: string, createdAt: string, creator?: { __typename?: 'User', id: string, sub: string, preferredUsername: string } | null, about: Array<{ __typename?: 'Structure', identifier: string, object: number }>, participants: Array<{ __typename?: 'CallParticipant', identity: string, name: string, joinedAt: number }> } };
+
+export type JoinCallMutationVariables = Exact<{
+  input: JoinCallInput;
+}>;
+
+
+export type JoinCallMutation = { __typename?: 'Mutation', joinCall: string };
+
+export type InviteToCallMutationVariables = Exact<{
+  input: InviteToCallInput;
+}>;
+
+
+export type InviteToCallMutation = { __typename?: 'Mutation', inviteToCall: { __typename?: 'Call', id: string } };
+
+export type DismissCallInviteMutationVariables = Exact<{
+  input: DismissCallInviteInput;
+}>;
+
+
+export type DismissCallInviteMutation = { __typename?: 'Mutation', dismissCallInvite: string };
+
 export type JoinBroadcastMutationVariables = Exact<{
   input: JoinBroadcastInput;
 }>;
@@ -307,6 +538,33 @@ export type EnsureStreamMutationVariables = Exact<{
 
 
 export type EnsureStreamMutation = { __typename?: 'Mutation', ensureStream: string };
+
+export type GetCallQueryVariables = Exact<{
+  id: Scalars['ID']['input'];
+}>;
+
+
+export type GetCallQuery = { __typename?: 'Query', call: { __typename?: 'Call', id: string, title: string, roomName: string, createdAt: string, creator?: { __typename?: 'User', id: string, sub: string, preferredUsername: string } | null, about: Array<{ __typename?: 'Structure', identifier: string, object: number }>, participants: Array<{ __typename?: 'CallParticipant', identity: string, name: string, joinedAt: number }> } };
+
+export type ListCallsQueryVariables = Exact<{
+  filter?: InputMaybe<CallFilter>;
+  pagination?: InputMaybe<OffsetPaginationInput>;
+}>;
+
+
+export type ListCallsQuery = { __typename?: 'Query', calls: Array<{ __typename?: 'Call', id: string, title: string, roomName: string, createdAt: string, participantCount: number, creator?: { __typename?: 'User', id: string, sub: string, preferredUsername: string } | null, about: Array<{ __typename?: 'Structure', identifier: string, object: number }> }> };
+
+export type CallParticipantsQueryVariables = Exact<{
+  id: Scalars['ID']['input'];
+}>;
+
+
+export type CallParticipantsQuery = { __typename?: 'Query', call: { __typename?: 'Call', id: string, participants: Array<{ __typename?: 'CallParticipant', identity: string, name: string, joinedAt: number }> } };
+
+export type MyCallInvitesQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type MyCallInvitesQuery = { __typename?: 'Query', myCallInvites: Array<{ __typename?: 'CallInvite', id: string, createdAt: string, call: { __typename?: 'Call', id: string, title: string, roomName: string, createdAt: string, participantCount: number, creator?: { __typename?: 'User', id: string, sub: string, preferredUsername: string } | null, about: Array<{ __typename?: 'Structure', identifier: string, object: number }> }, inviter: { __typename?: 'User', id: string, sub: string, preferredUsername: string } }> };
 
 export type GetCollaborativeBroadcastQueryVariables = Exact<{
   id: Scalars['ID']['input'];
@@ -384,6 +642,16 @@ export type ListStreamsQueryVariables = Exact<{
 
 export type ListStreamsQuery = { __typename?: 'Query', streams: Array<{ __typename?: 'Stream', id: string }> };
 
+export type WatchCallInvitesSubscriptionVariables = Exact<{ [key: string]: never; }>;
+
+
+export type WatchCallInvitesSubscription = { __typename?: 'Subscription', callInvites: { __typename?: 'CallInviteEvent', delete?: string | null, create?: { __typename?: 'CallInvite', id: string, createdAt: string, call: { __typename?: 'Call', id: string, title: string, roomName: string, createdAt: string, participantCount: number, creator?: { __typename?: 'User', id: string, sub: string, preferredUsername: string } | null, about: Array<{ __typename?: 'Structure', identifier: string, object: number }> }, inviter: { __typename?: 'User', id: string, sub: string, preferredUsername: string } } | null } };
+
+export type WatchCallsSubscriptionVariables = Exact<{ [key: string]: never; }>;
+
+
+export type WatchCallsSubscription = { __typename?: 'Subscription', calls: { __typename?: 'CallEvent', create?: { __typename?: 'Call', id: string, title: string, roomName: string, createdAt: string, participantCount: number, creator?: { __typename?: 'User', id: string, sub: string, preferredUsername: string } | null, about: Array<{ __typename?: 'Structure', identifier: string, object: number }> } | null, update?: { __typename?: 'Call', id: string, title: string, roomName: string, createdAt: string, participantCount: number, creator?: { __typename?: 'User', id: string, sub: string, preferredUsername: string } | null, about: Array<{ __typename?: 'Structure', identifier: string, object: number }> } | null } };
+
 export const StreamerFragmentDoc = gql`
     fragment Streamer on Streamer {
   user {
@@ -412,6 +680,70 @@ export const CollaborativeBroadcastFragmentDoc = gql`
   }
 }
     ${StreamerFragmentDoc}`;
+export const CallStructureFragmentDoc = gql`
+    fragment CallStructure on Structure {
+  identifier
+  object
+}
+    `;
+export const CallParticipantFragmentDoc = gql`
+    fragment CallParticipant on CallParticipant {
+  identity
+  name
+  joinedAt
+}
+    `;
+export const CallFragmentDoc = gql`
+    fragment Call on Call {
+  id
+  title
+  roomName
+  createdAt
+  creator {
+    id
+    sub
+    preferredUsername
+  }
+  about {
+    ...CallStructure
+  }
+  participants {
+    ...CallParticipant
+  }
+}
+    ${CallStructureFragmentDoc}
+${CallParticipantFragmentDoc}`;
+export const ListCallFragmentDoc = gql`
+    fragment ListCall on Call {
+  id
+  title
+  roomName
+  createdAt
+  creator {
+    id
+    sub
+    preferredUsername
+  }
+  about {
+    ...CallStructure
+  }
+  participantCount
+}
+    ${CallStructureFragmentDoc}`;
+export const CallInviteFragmentDoc = gql`
+    fragment CallInvite on CallInvite {
+  id
+  createdAt
+  call {
+    ...ListCall
+  }
+  inviter {
+    id
+    sub
+    preferredUsername
+  }
+}
+    ${ListCallFragmentDoc}`;
 export const StreamFragmentDoc = gql`
     fragment Stream on Stream {
   id
@@ -455,6 +787,134 @@ export function useEnsureSoloBroadcastMutation(baseOptions?: ApolloReactHooks.Mu
 export type EnsureSoloBroadcastMutationHookResult = ReturnType<typeof useEnsureSoloBroadcastMutation>;
 export type EnsureSoloBroadcastMutationResult = Apollo.MutationResult<EnsureSoloBroadcastMutation>;
 export type EnsureSoloBroadcastMutationOptions = Apollo.BaseMutationOptions<EnsureSoloBroadcastMutation, EnsureSoloBroadcastMutationVariables>;
+export const EnsureCallDocument = gql`
+    mutation EnsureCall($input: EnsureCallInput!) {
+  ensureCall(input: $input) {
+    ...Call
+  }
+}
+    ${CallFragmentDoc}`;
+export type EnsureCallMutationFn = Apollo.MutationFunction<EnsureCallMutation, EnsureCallMutationVariables>;
+
+/**
+ * __useEnsureCallMutation__
+ *
+ * To run a mutation, you first call `useEnsureCallMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useEnsureCallMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [ensureCallMutation, { data, loading, error }] = useEnsureCallMutation({
+ *   variables: {
+ *      input: // value for 'input'
+ *   },
+ * });
+ */
+export function useEnsureCallMutation(baseOptions?: ApolloReactHooks.MutationHookOptions<EnsureCallMutation, EnsureCallMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return ApolloReactHooks.useMutation<EnsureCallMutation, EnsureCallMutationVariables>(EnsureCallDocument, options);
+      }
+export type EnsureCallMutationHookResult = ReturnType<typeof useEnsureCallMutation>;
+export type EnsureCallMutationResult = Apollo.MutationResult<EnsureCallMutation>;
+export type EnsureCallMutationOptions = Apollo.BaseMutationOptions<EnsureCallMutation, EnsureCallMutationVariables>;
+export const JoinCallDocument = gql`
+    mutation JoinCall($input: JoinCallInput!) {
+  joinCall(input: $input)
+}
+    `;
+export type JoinCallMutationFn = Apollo.MutationFunction<JoinCallMutation, JoinCallMutationVariables>;
+
+/**
+ * __useJoinCallMutation__
+ *
+ * To run a mutation, you first call `useJoinCallMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useJoinCallMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [joinCallMutation, { data, loading, error }] = useJoinCallMutation({
+ *   variables: {
+ *      input: // value for 'input'
+ *   },
+ * });
+ */
+export function useJoinCallMutation(baseOptions?: ApolloReactHooks.MutationHookOptions<JoinCallMutation, JoinCallMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return ApolloReactHooks.useMutation<JoinCallMutation, JoinCallMutationVariables>(JoinCallDocument, options);
+      }
+export type JoinCallMutationHookResult = ReturnType<typeof useJoinCallMutation>;
+export type JoinCallMutationResult = Apollo.MutationResult<JoinCallMutation>;
+export type JoinCallMutationOptions = Apollo.BaseMutationOptions<JoinCallMutation, JoinCallMutationVariables>;
+export const InviteToCallDocument = gql`
+    mutation InviteToCall($input: InviteToCallInput!) {
+  inviteToCall(input: $input) {
+    id
+  }
+}
+    `;
+export type InviteToCallMutationFn = Apollo.MutationFunction<InviteToCallMutation, InviteToCallMutationVariables>;
+
+/**
+ * __useInviteToCallMutation__
+ *
+ * To run a mutation, you first call `useInviteToCallMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useInviteToCallMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [inviteToCallMutation, { data, loading, error }] = useInviteToCallMutation({
+ *   variables: {
+ *      input: // value for 'input'
+ *   },
+ * });
+ */
+export function useInviteToCallMutation(baseOptions?: ApolloReactHooks.MutationHookOptions<InviteToCallMutation, InviteToCallMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return ApolloReactHooks.useMutation<InviteToCallMutation, InviteToCallMutationVariables>(InviteToCallDocument, options);
+      }
+export type InviteToCallMutationHookResult = ReturnType<typeof useInviteToCallMutation>;
+export type InviteToCallMutationResult = Apollo.MutationResult<InviteToCallMutation>;
+export type InviteToCallMutationOptions = Apollo.BaseMutationOptions<InviteToCallMutation, InviteToCallMutationVariables>;
+export const DismissCallInviteDocument = gql`
+    mutation DismissCallInvite($input: DismissCallInviteInput!) {
+  dismissCallInvite(input: $input)
+}
+    `;
+export type DismissCallInviteMutationFn = Apollo.MutationFunction<DismissCallInviteMutation, DismissCallInviteMutationVariables>;
+
+/**
+ * __useDismissCallInviteMutation__
+ *
+ * To run a mutation, you first call `useDismissCallInviteMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useDismissCallInviteMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [dismissCallInviteMutation, { data, loading, error }] = useDismissCallInviteMutation({
+ *   variables: {
+ *      input: // value for 'input'
+ *   },
+ * });
+ */
+export function useDismissCallInviteMutation(baseOptions?: ApolloReactHooks.MutationHookOptions<DismissCallInviteMutation, DismissCallInviteMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return ApolloReactHooks.useMutation<DismissCallInviteMutation, DismissCallInviteMutationVariables>(DismissCallInviteDocument, options);
+      }
+export type DismissCallInviteMutationHookResult = ReturnType<typeof useDismissCallInviteMutation>;
+export type DismissCallInviteMutationResult = Apollo.MutationResult<DismissCallInviteMutation>;
+export type DismissCallInviteMutationOptions = Apollo.BaseMutationOptions<DismissCallInviteMutation, DismissCallInviteMutationVariables>;
 export const JoinBroadcastDocument = gql`
     mutation JoinBroadcast($input: JoinBroadcastInput!) {
   joinBroadcast(input: $input)
@@ -517,6 +977,149 @@ export function useEnsureStreamMutation(baseOptions?: ApolloReactHooks.MutationH
 export type EnsureStreamMutationHookResult = ReturnType<typeof useEnsureStreamMutation>;
 export type EnsureStreamMutationResult = Apollo.MutationResult<EnsureStreamMutation>;
 export type EnsureStreamMutationOptions = Apollo.BaseMutationOptions<EnsureStreamMutation, EnsureStreamMutationVariables>;
+export const GetCallDocument = gql`
+    query GetCall($id: ID!) {
+  call(id: $id) {
+    ...Call
+  }
+}
+    ${CallFragmentDoc}`;
+
+/**
+ * __useGetCallQuery__
+ *
+ * To run a query within a React component, call `useGetCallQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetCallQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetCallQuery({
+ *   variables: {
+ *      id: // value for 'id'
+ *   },
+ * });
+ */
+export function useGetCallQuery(baseOptions: ApolloReactHooks.QueryHookOptions<GetCallQuery, GetCallQueryVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return ApolloReactHooks.useQuery<GetCallQuery, GetCallQueryVariables>(GetCallDocument, options);
+      }
+export function useGetCallLazyQuery(baseOptions?: ApolloReactHooks.LazyQueryHookOptions<GetCallQuery, GetCallQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return ApolloReactHooks.useLazyQuery<GetCallQuery, GetCallQueryVariables>(GetCallDocument, options);
+        }
+export type GetCallQueryHookResult = ReturnType<typeof useGetCallQuery>;
+export type GetCallLazyQueryHookResult = ReturnType<typeof useGetCallLazyQuery>;
+export type GetCallQueryResult = Apollo.QueryResult<GetCallQuery, GetCallQueryVariables>;
+export const ListCallsDocument = gql`
+    query ListCalls($filter: CallFilter, $pagination: OffsetPaginationInput) {
+  calls(filters: $filter, pagination: $pagination, order: {createdAt: DESC}) {
+    ...ListCall
+  }
+}
+    ${ListCallFragmentDoc}`;
+
+/**
+ * __useListCallsQuery__
+ *
+ * To run a query within a React component, call `useListCallsQuery` and pass it any options that fit your needs.
+ * When your component renders, `useListCallsQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useListCallsQuery({
+ *   variables: {
+ *      filter: // value for 'filter'
+ *      pagination: // value for 'pagination'
+ *   },
+ * });
+ */
+export function useListCallsQuery(baseOptions?: ApolloReactHooks.QueryHookOptions<ListCallsQuery, ListCallsQueryVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return ApolloReactHooks.useQuery<ListCallsQuery, ListCallsQueryVariables>(ListCallsDocument, options);
+      }
+export function useListCallsLazyQuery(baseOptions?: ApolloReactHooks.LazyQueryHookOptions<ListCallsQuery, ListCallsQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return ApolloReactHooks.useLazyQuery<ListCallsQuery, ListCallsQueryVariables>(ListCallsDocument, options);
+        }
+export type ListCallsQueryHookResult = ReturnType<typeof useListCallsQuery>;
+export type ListCallsLazyQueryHookResult = ReturnType<typeof useListCallsLazyQuery>;
+export type ListCallsQueryResult = Apollo.QueryResult<ListCallsQuery, ListCallsQueryVariables>;
+export const CallParticipantsDocument = gql`
+    query CallParticipants($id: ID!) {
+  call(id: $id) {
+    id
+    participants {
+      ...CallParticipant
+    }
+  }
+}
+    ${CallParticipantFragmentDoc}`;
+
+/**
+ * __useCallParticipantsQuery__
+ *
+ * To run a query within a React component, call `useCallParticipantsQuery` and pass it any options that fit your needs.
+ * When your component renders, `useCallParticipantsQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useCallParticipantsQuery({
+ *   variables: {
+ *      id: // value for 'id'
+ *   },
+ * });
+ */
+export function useCallParticipantsQuery(baseOptions: ApolloReactHooks.QueryHookOptions<CallParticipantsQuery, CallParticipantsQueryVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return ApolloReactHooks.useQuery<CallParticipantsQuery, CallParticipantsQueryVariables>(CallParticipantsDocument, options);
+      }
+export function useCallParticipantsLazyQuery(baseOptions?: ApolloReactHooks.LazyQueryHookOptions<CallParticipantsQuery, CallParticipantsQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return ApolloReactHooks.useLazyQuery<CallParticipantsQuery, CallParticipantsQueryVariables>(CallParticipantsDocument, options);
+        }
+export type CallParticipantsQueryHookResult = ReturnType<typeof useCallParticipantsQuery>;
+export type CallParticipantsLazyQueryHookResult = ReturnType<typeof useCallParticipantsLazyQuery>;
+export type CallParticipantsQueryResult = Apollo.QueryResult<CallParticipantsQuery, CallParticipantsQueryVariables>;
+export const MyCallInvitesDocument = gql`
+    query MyCallInvites {
+  myCallInvites {
+    ...CallInvite
+  }
+}
+    ${CallInviteFragmentDoc}`;
+
+/**
+ * __useMyCallInvitesQuery__
+ *
+ * To run a query within a React component, call `useMyCallInvitesQuery` and pass it any options that fit your needs.
+ * When your component renders, `useMyCallInvitesQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useMyCallInvitesQuery({
+ *   variables: {
+ *   },
+ * });
+ */
+export function useMyCallInvitesQuery(baseOptions?: ApolloReactHooks.QueryHookOptions<MyCallInvitesQuery, MyCallInvitesQueryVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return ApolloReactHooks.useQuery<MyCallInvitesQuery, MyCallInvitesQueryVariables>(MyCallInvitesDocument, options);
+      }
+export function useMyCallInvitesLazyQuery(baseOptions?: ApolloReactHooks.LazyQueryHookOptions<MyCallInvitesQuery, MyCallInvitesQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return ApolloReactHooks.useLazyQuery<MyCallInvitesQuery, MyCallInvitesQueryVariables>(MyCallInvitesDocument, options);
+        }
+export type MyCallInvitesQueryHookResult = ReturnType<typeof useMyCallInvitesQuery>;
+export type MyCallInvitesLazyQueryHookResult = ReturnType<typeof useMyCallInvitesLazyQuery>;
+export type MyCallInvitesQueryResult = Apollo.QueryResult<MyCallInvitesQuery, MyCallInvitesQueryVariables>;
 export const GetCollaborativeBroadcastDocument = gql`
     query GetCollaborativeBroadcast($id: ID!) {
   collaborativeBroadcast(id: $id) {
@@ -885,3 +1488,69 @@ export function useListStreamsLazyQuery(baseOptions?: ApolloReactHooks.LazyQuery
 export type ListStreamsQueryHookResult = ReturnType<typeof useListStreamsQuery>;
 export type ListStreamsLazyQueryHookResult = ReturnType<typeof useListStreamsLazyQuery>;
 export type ListStreamsQueryResult = Apollo.QueryResult<ListStreamsQuery, ListStreamsQueryVariables>;
+export const WatchCallInvitesDocument = gql`
+    subscription WatchCallInvites {
+  callInvites {
+    create {
+      ...CallInvite
+    }
+    delete
+  }
+}
+    ${CallInviteFragmentDoc}`;
+
+/**
+ * __useWatchCallInvitesSubscription__
+ *
+ * To run a query within a React component, call `useWatchCallInvitesSubscription` and pass it any options that fit your needs.
+ * When your component renders, `useWatchCallInvitesSubscription` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the subscription, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useWatchCallInvitesSubscription({
+ *   variables: {
+ *   },
+ * });
+ */
+export function useWatchCallInvitesSubscription(baseOptions?: ApolloReactHooks.SubscriptionHookOptions<WatchCallInvitesSubscription, WatchCallInvitesSubscriptionVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return ApolloReactHooks.useSubscription<WatchCallInvitesSubscription, WatchCallInvitesSubscriptionVariables>(WatchCallInvitesDocument, options);
+      }
+export type WatchCallInvitesSubscriptionHookResult = ReturnType<typeof useWatchCallInvitesSubscription>;
+export type WatchCallInvitesSubscriptionResult = Apollo.SubscriptionResult<WatchCallInvitesSubscription>;
+export const WatchCallsDocument = gql`
+    subscription WatchCalls {
+  calls {
+    create {
+      ...ListCall
+    }
+    update {
+      ...ListCall
+    }
+  }
+}
+    ${ListCallFragmentDoc}`;
+
+/**
+ * __useWatchCallsSubscription__
+ *
+ * To run a query within a React component, call `useWatchCallsSubscription` and pass it any options that fit your needs.
+ * When your component renders, `useWatchCallsSubscription` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the subscription, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useWatchCallsSubscription({
+ *   variables: {
+ *   },
+ * });
+ */
+export function useWatchCallsSubscription(baseOptions?: ApolloReactHooks.SubscriptionHookOptions<WatchCallsSubscription, WatchCallsSubscriptionVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return ApolloReactHooks.useSubscription<WatchCallsSubscription, WatchCallsSubscriptionVariables>(WatchCallsDocument, options);
+      }
+export type WatchCallsSubscriptionHookResult = ReturnType<typeof useWatchCallsSubscription>;
+export type WatchCallsSubscriptionResult = Apollo.SubscriptionResult<WatchCallsSubscription>;

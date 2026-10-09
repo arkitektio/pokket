@@ -14,6 +14,58 @@
     },
     "types": [
       {
+        "kind": "INPUT_OBJECT",
+        "name": "AddToCallInput",
+        "description": "What a call is now also about",
+        "isOneOf": false,
+        "fields": null,
+        "inputFields": [
+          {
+            "name": "about",
+            "description": null,
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": null,
+                "kind": "LIST",
+                "ofType": {
+                  "name": null,
+                  "kind": "NON_NULL",
+                  "ofType": {
+                    "name": "StructureInput",
+                    "kind": "INPUT_OBJECT",
+                    "ofType": null
+                  }
+                }
+              }
+            },
+            "defaultValue": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "call",
+            "description": null,
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "ID",
+                "kind": "SCALAR",
+                "ofType": null
+              }
+            },
+            "defaultValue": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          }
+        ],
+        "interfaces": null,
+        "enumValues": null,
+        "possibleTypes": null
+      },
+      {
         "kind": "OBJECT",
         "name": "App",
         "description": null,
@@ -27,8 +79,8 @@
               "kind": "NON_NULL",
               "name": null,
               "ofType": {
+                "name": "ID",
                 "kind": "SCALAR",
-                "name": "String",
                 "ofType": null
               }
             },
@@ -43,8 +95,8 @@
               "kind": "NON_NULL",
               "name": null,
               "ofType": {
-                "kind": "SCALAR",
                 "name": "String",
+                "kind": "SCALAR",
                 "ofType": null
               }
             },
@@ -70,20 +122,492 @@
       },
       {
         "kind": "OBJECT",
-        "name": "Client",
+        "name": "Call",
         "description": null,
         "isOneOf": null,
         "fields": [
           {
-            "name": "clientId",
+            "name": "about",
+            "description": "The structures this call is about, oldest first: the last one is what it turned to most recently.",
+            "args": [],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": null,
+                "kind": "LIST",
+                "ofType": {
+                  "name": null,
+                  "kind": "NON_NULL",
+                  "ofType": {
+                    "name": "Structure",
+                    "kind": "OBJECT",
+                    "ofType": null
+                  }
+                }
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "createdAt",
             "description": null,
             "args": [],
             "type": {
               "kind": "NON_NULL",
               "name": null,
               "ofType": {
+                "name": "DateTime",
                 "kind": "SCALAR",
+                "ofType": null
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "creator",
+            "description": null,
+            "args": [],
+            "type": {
+              "kind": "OBJECT",
+              "name": "User",
+              "ofType": null
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "id",
+            "description": null,
+            "args": [],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "ID",
+                "kind": "SCALAR",
+                "ofType": null
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "participantCount",
+            "description": "How many are in the call right now.",
+            "args": [],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "Int",
+                "kind": "SCALAR",
+                "ofType": null
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "participants",
+            "description": "Who is in the call right now. Empty when nobody is: a call is live while LiveKit holds its room.",
+            "args": [],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": null,
+                "kind": "LIST",
+                "ofType": {
+                  "name": null,
+                  "kind": "NON_NULL",
+                  "ofType": {
+                    "name": "CallParticipant",
+                    "kind": "OBJECT",
+                    "ofType": null
+                  }
+                }
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "roomName",
+            "description": "The LiveKit room this call's participants join.",
+            "args": [],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
                 "name": "String",
+                "kind": "SCALAR",
+                "ofType": null
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "title",
+            "description": null,
+            "args": [],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "String",
+                "kind": "SCALAR",
+                "ofType": null
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          }
+        ],
+        "inputFields": null,
+        "interfaces": [],
+        "enumValues": null,
+        "possibleTypes": null
+      },
+      {
+        "kind": "OBJECT",
+        "name": "CallEvent",
+        "description": "A call starting in your organization, or changing what it is about",
+        "isOneOf": null,
+        "fields": [
+          {
+            "name": "create",
+            "description": "A call someone else just started, which you can join",
+            "args": [],
+            "type": {
+              "kind": "OBJECT",
+              "name": "Call",
+              "ofType": null
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "update",
+            "description": "A call that turned to something else; what it was about before is still in `about`",
+            "args": [],
+            "type": {
+              "kind": "OBJECT",
+              "name": "Call",
+              "ofType": null
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          }
+        ],
+        "inputFields": null,
+        "interfaces": [],
+        "enumValues": null,
+        "possibleTypes": null
+      },
+      {
+        "kind": "INPUT_OBJECT",
+        "name": "CallFilter",
+        "description": "Filter for calls",
+        "isOneOf": false,
+        "fields": null,
+        "inputFields": [
+          {
+            "name": "AND",
+            "description": null,
+            "type": {
+              "kind": "INPUT_OBJECT",
+              "name": "CallFilter",
+              "ofType": null
+            },
+            "defaultValue": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "DISTINCT",
+            "description": null,
+            "type": {
+              "kind": "SCALAR",
+              "name": "Boolean",
+              "ofType": null
+            },
+            "defaultValue": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "NOT",
+            "description": null,
+            "type": {
+              "kind": "INPUT_OBJECT",
+              "name": "CallFilter",
+              "ofType": null
+            },
+            "defaultValue": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "OR",
+            "description": null,
+            "type": {
+              "kind": "INPUT_OBJECT",
+              "name": "CallFilter",
+              "ofType": null
+            },
+            "defaultValue": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "about",
+            "description": "Calls about this structure.",
+            "type": {
+              "kind": "INPUT_OBJECT",
+              "name": "StructureInput",
+              "ofType": null
+            },
+            "defaultValue": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "ids",
+            "description": null,
+            "type": {
+              "kind": "LIST",
+              "name": null,
+              "ofType": {
+                "name": null,
+                "kind": "NON_NULL",
+                "ofType": {
+                  "name": "ID",
+                  "kind": "SCALAR",
+                  "ofType": null
+                }
+              }
+            },
+            "defaultValue": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "live",
+            "description": "Only calls whose LiveKit room is up (true) or down (false).",
+            "type": {
+              "kind": "SCALAR",
+              "name": "Boolean",
+              "ofType": null
+            },
+            "defaultValue": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "search",
+            "description": null,
+            "type": {
+              "kind": "SCALAR",
+              "name": "String",
+              "ofType": null
+            },
+            "defaultValue": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          }
+        ],
+        "interfaces": null,
+        "enumValues": null,
+        "possibleTypes": null
+      },
+      {
+        "kind": "OBJECT",
+        "name": "CallInvite",
+        "description": "Someone asking someone else into a call",
+        "isOneOf": null,
+        "fields": [
+          {
+            "name": "call",
+            "description": null,
+            "args": [],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "Call",
+                "kind": "OBJECT",
+                "ofType": null
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "createdAt",
+            "description": null,
+            "args": [],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "DateTime",
+                "kind": "SCALAR",
+                "ofType": null
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "id",
+            "description": null,
+            "args": [],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "ID",
+                "kind": "SCALAR",
+                "ofType": null
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "invitee",
+            "description": null,
+            "args": [],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "User",
+                "kind": "OBJECT",
+                "ofType": null
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "inviter",
+            "description": null,
+            "args": [],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "User",
+                "kind": "OBJECT",
+                "ofType": null
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          }
+        ],
+        "inputFields": null,
+        "interfaces": [],
+        "enumValues": null,
+        "possibleTypes": null
+      },
+      {
+        "kind": "OBJECT",
+        "name": "CallInviteEvent",
+        "description": "An invitation to a call arriving, or going away",
+        "isOneOf": null,
+        "fields": [
+          {
+            "name": "create",
+            "description": "A new invitation for you",
+            "args": [],
+            "type": {
+              "kind": "OBJECT",
+              "name": "CallInvite",
+              "ofType": null
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "delete",
+            "description": "An invitation that was dismissed or answered, here or on another device",
+            "args": [],
+            "type": {
+              "kind": "SCALAR",
+              "name": "ID",
+              "ofType": null
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          }
+        ],
+        "inputFields": null,
+        "interfaces": [],
+        "enumValues": null,
+        "possibleTypes": null
+      },
+      {
+        "kind": "INPUT_OBJECT",
+        "name": "CallOrder",
+        "description": null,
+        "isOneOf": true,
+        "fields": null,
+        "inputFields": [
+          {
+            "name": "createdAt",
+            "description": null,
+            "type": {
+              "kind": "ENUM",
+              "name": "Ordering",
+              "ofType": null
+            },
+            "defaultValue": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          }
+        ],
+        "interfaces": null,
+        "enumValues": null,
+        "possibleTypes": null
+      },
+      {
+        "kind": "OBJECT",
+        "name": "CallParticipant",
+        "description": "Someone in a live call, as LiveKit reports them",
+        "isOneOf": null,
+        "fields": [
+          {
+            "name": "identity",
+            "description": null,
+            "args": [],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "String",
+                "kind": "SCALAR",
+                "ofType": null
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "joinedAt",
+            "description": null,
+            "args": [],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "Int",
+                "kind": "SCALAR",
                 "ofType": null
               }
             },
@@ -98,8 +622,52 @@
               "kind": "NON_NULL",
               "name": null,
               "ofType": {
-                "kind": "SCALAR",
                 "name": "String",
+                "kind": "SCALAR",
+                "ofType": null
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          }
+        ],
+        "inputFields": null,
+        "interfaces": [],
+        "enumValues": null,
+        "possibleTypes": null
+      },
+      {
+        "kind": "OBJECT",
+        "name": "Client",
+        "description": null,
+        "isOneOf": null,
+        "fields": [
+          {
+            "name": "clientId",
+            "description": null,
+            "args": [],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "String",
+                "kind": "SCALAR",
+                "ofType": null
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "id",
+            "description": null,
+            "args": [],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "ID",
+                "kind": "SCALAR",
                 "ofType": null
               }
             },
@@ -138,14 +706,14 @@
               "kind": "NON_NULL",
               "name": null,
               "ofType": {
-                "kind": "LIST",
                 "name": null,
+                "kind": "LIST",
                 "ofType": {
-                  "kind": "NON_NULL",
                   "name": null,
+                  "kind": "NON_NULL",
                   "ofType": {
-                    "kind": "OBJECT",
                     "name": "Stream",
+                    "kind": "OBJECT",
                     "ofType": null
                   }
                 }
@@ -162,8 +730,8 @@
               "kind": "NON_NULL",
               "name": null,
               "ofType": {
-                "kind": "SCALAR",
                 "name": "DateTime",
+                "kind": "SCALAR",
                 "ofType": null
               }
             },
@@ -178,8 +746,8 @@
               "kind": "NON_NULL",
               "name": null,
               "ofType": {
-                "kind": "SCALAR",
                 "name": "ID",
+                "kind": "SCALAR",
                 "ofType": null
               }
             },
@@ -219,14 +787,14 @@
               "kind": "NON_NULL",
               "name": null,
               "ofType": {
-                "kind": "LIST",
                 "name": null,
+                "kind": "LIST",
                 "ofType": {
-                  "kind": "NON_NULL",
                   "name": null,
+                  "kind": "NON_NULL",
                   "ofType": {
-                    "kind": "OBJECT",
                     "name": "Streamer",
+                    "kind": "OBJECT",
                     "ofType": null
                   }
                 }
@@ -243,14 +811,14 @@
               "kind": "NON_NULL",
               "name": null,
               "ofType": {
-                "kind": "LIST",
                 "name": null,
+                "kind": "LIST",
                 "ofType": {
-                  "kind": "NON_NULL",
                   "name": null,
+                  "kind": "NON_NULL",
                   "ofType": {
-                    "kind": "OBJECT",
                     "name": "Stream",
+                    "kind": "OBJECT",
                     "ofType": null
                   }
                 }
@@ -267,8 +835,8 @@
               "kind": "NON_NULL",
               "name": null,
               "ofType": {
-                "kind": "SCALAR",
                 "name": "String",
+                "kind": "SCALAR",
                 "ofType": null
               }
             },
@@ -283,14 +851,14 @@
               "kind": "NON_NULL",
               "name": null,
               "ofType": {
-                "kind": "LIST",
                 "name": null,
+                "kind": "LIST",
                 "ofType": {
-                  "kind": "NON_NULL",
                   "name": null,
+                  "kind": "NON_NULL",
                   "ofType": {
-                    "kind": "OBJECT",
                     "name": "Stream",
+                    "kind": "OBJECT",
                     "ofType": null
                   }
                 }
@@ -367,11 +935,11 @@
               "kind": "LIST",
               "name": null,
               "ofType": {
-                "kind": "NON_NULL",
                 "name": null,
+                "kind": "NON_NULL",
                 "ofType": {
-                  "kind": "SCALAR",
                   "name": "ID",
+                  "kind": "SCALAR",
                   "ofType": null
                 }
               }
@@ -404,6 +972,82 @@
         "isOneOf": null,
         "fields": null,
         "inputFields": null,
+        "interfaces": null,
+        "enumValues": null,
+        "possibleTypes": null
+      },
+      {
+        "kind": "INPUT_OBJECT",
+        "name": "DismissCallInviteInput",
+        "description": "The invitation to put away",
+        "isOneOf": false,
+        "fields": null,
+        "inputFields": [
+          {
+            "name": "id",
+            "description": null,
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "ID",
+                "kind": "SCALAR",
+                "ofType": null
+              }
+            },
+            "defaultValue": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          }
+        ],
+        "interfaces": null,
+        "enumValues": null,
+        "possibleTypes": null
+      },
+      {
+        "kind": "INPUT_OBJECT",
+        "name": "EnsureCallInput",
+        "description": "The call to find or start",
+        "isOneOf": false,
+        "fields": null,
+        "inputFields": [
+          {
+            "name": "about",
+            "description": null,
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": null,
+                "kind": "LIST",
+                "ofType": {
+                  "name": null,
+                  "kind": "NON_NULL",
+                  "ofType": {
+                    "name": "StructureInput",
+                    "kind": "INPUT_OBJECT",
+                    "ofType": null
+                  }
+                }
+              }
+            },
+            "defaultValue": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "title",
+            "description": null,
+            "type": {
+              "kind": "SCALAR",
+              "name": "String",
+              "ofType": null
+            },
+            "defaultValue": "null",
+            "isDeprecated": false,
+            "deprecationReason": null
+          }
+        ],
         "interfaces": null,
         "enumValues": null,
         "possibleTypes": null
@@ -506,8 +1150,8 @@
               "kind": "NON_NULL",
               "name": null,
               "ofType": {
-                "kind": "ENUM",
                 "name": "StreamKind",
+                "kind": "ENUM",
                 "ofType": null
               }
             },
@@ -556,6 +1200,58 @@
       },
       {
         "kind": "INPUT_OBJECT",
+        "name": "InviteToCallInput",
+        "description": "Who to ask into a call",
+        "isOneOf": false,
+        "fields": null,
+        "inputFields": [
+          {
+            "name": "call",
+            "description": null,
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "ID",
+                "kind": "SCALAR",
+                "ofType": null
+              }
+            },
+            "defaultValue": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "users",
+            "description": "The users to invite, by their lok id (the `sub` their token carries)",
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": null,
+                "kind": "LIST",
+                "ofType": {
+                  "name": null,
+                  "kind": "NON_NULL",
+                  "ofType": {
+                    "name": "ID",
+                    "kind": "SCALAR",
+                    "ofType": null
+                  }
+                }
+              }
+            },
+            "defaultValue": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          }
+        ],
+        "interfaces": null,
+        "enumValues": null,
+        "possibleTypes": null
+      },
+      {
+        "kind": "INPUT_OBJECT",
         "name": "JoinBroadcastInput",
         "description": null,
         "isOneOf": false,
@@ -568,8 +1264,36 @@
               "kind": "NON_NULL",
               "name": null,
               "ofType": {
-                "kind": "SCALAR",
                 "name": "ID",
+                "kind": "SCALAR",
+                "ofType": null
+              }
+            },
+            "defaultValue": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          }
+        ],
+        "interfaces": null,
+        "enumValues": null,
+        "possibleTypes": null
+      },
+      {
+        "kind": "INPUT_OBJECT",
+        "name": "JoinCallInput",
+        "description": "The call to join",
+        "isOneOf": false,
+        "fields": null,
+        "inputFields": [
+          {
+            "name": "call",
+            "description": null,
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "ID",
+                "kind": "SCALAR",
                 "ofType": null
               }
             },
@@ -589,8 +1313,8 @@
         "isOneOf": null,
         "fields": [
           {
-            "name": "ensureCollaborativeBroadcast",
-            "description": "Create a collaborative broadcast",
+            "name": "addToCall",
+            "description": "Turn a call to these structures: they become what it is about last, and what it was about stays",
             "args": [
               {
                 "name": "input",
@@ -599,8 +1323,8 @@
                   "kind": "NON_NULL",
                   "name": null,
                   "ofType": {
+                    "name": "AddToCallInput",
                     "kind": "INPUT_OBJECT",
-                    "name": "EnsureCollaborativeBroadcastInput",
                     "ofType": null
                   }
                 },
@@ -613,8 +1337,107 @@
               "kind": "NON_NULL",
               "name": null,
               "ofType": {
+                "name": "Call",
                 "kind": "OBJECT",
+                "ofType": null
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "dismissCallInvite",
+            "description": "Put an invitation away, on every device",
+            "args": [
+              {
+                "name": "input",
+                "description": null,
+                "type": {
+                  "kind": "NON_NULL",
+                  "name": null,
+                  "ofType": {
+                    "name": "DismissCallInviteInput",
+                    "kind": "INPUT_OBJECT",
+                    "ofType": null
+                  }
+                },
+                "defaultValue": null,
+                "isDeprecated": false,
+                "deprecationReason": null
+              }
+            ],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "ID",
+                "kind": "SCALAR",
+                "ofType": null
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "ensureCall",
+            "description": "The live call about these structures, or a new one",
+            "args": [
+              {
+                "name": "input",
+                "description": null,
+                "type": {
+                  "kind": "NON_NULL",
+                  "name": null,
+                  "ofType": {
+                    "name": "EnsureCallInput",
+                    "kind": "INPUT_OBJECT",
+                    "ofType": null
+                  }
+                },
+                "defaultValue": null,
+                "isDeprecated": false,
+                "deprecationReason": null
+              }
+            ],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "Call",
+                "kind": "OBJECT",
+                "ofType": null
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "ensureCollaborativeBroadcast",
+            "description": "Create a collaborative broadcast",
+            "args": [
+              {
+                "name": "input",
+                "description": null,
+                "type": {
+                  "kind": "NON_NULL",
+                  "name": null,
+                  "ofType": {
+                    "name": "EnsureCollaborativeBroadcastInput",
+                    "kind": "INPUT_OBJECT",
+                    "ofType": null
+                  }
+                },
+                "defaultValue": null,
+                "isDeprecated": false,
+                "deprecationReason": null
+              }
+            ],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
                 "name": "CollaborativeBroadcast",
+                "kind": "OBJECT",
                 "ofType": null
               }
             },
@@ -632,8 +1455,8 @@
                   "kind": "NON_NULL",
                   "name": null,
                   "ofType": {
-                    "kind": "INPUT_OBJECT",
                     "name": "EnsureSoloBroadcastInput",
+                    "kind": "INPUT_OBJECT",
                     "ofType": null
                   }
                 },
@@ -646,8 +1469,8 @@
               "kind": "NON_NULL",
               "name": null,
               "ofType": {
-                "kind": "OBJECT",
                 "name": "SoloBroadcast",
+                "kind": "OBJECT",
                 "ofType": null
               }
             },
@@ -665,8 +1488,8 @@
                   "kind": "NON_NULL",
                   "name": null,
                   "ofType": {
-                    "kind": "INPUT_OBJECT",
                     "name": "EnsureStreamInput",
+                    "kind": "INPUT_OBJECT",
                     "ofType": null
                   }
                 },
@@ -679,8 +1502,41 @@
               "kind": "NON_NULL",
               "name": null,
               "ofType": {
-                "kind": "SCALAR",
                 "name": "String",
+                "kind": "SCALAR",
+                "ofType": null
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "inviteToCall",
+            "description": "Ask users into a call; their open apps ring",
+            "args": [
+              {
+                "name": "input",
+                "description": null,
+                "type": {
+                  "kind": "NON_NULL",
+                  "name": null,
+                  "ofType": {
+                    "name": "InviteToCallInput",
+                    "kind": "INPUT_OBJECT",
+                    "ofType": null
+                  }
+                },
+                "defaultValue": null,
+                "isDeprecated": false,
+                "deprecationReason": null
+              }
+            ],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "Call",
+                "kind": "OBJECT",
                 "ofType": null
               }
             },
@@ -698,8 +1554,8 @@
                   "kind": "NON_NULL",
                   "name": null,
                   "ofType": {
-                    "kind": "INPUT_OBJECT",
                     "name": "JoinBroadcastInput",
+                    "kind": "INPUT_OBJECT",
                     "ofType": null
                   }
                 },
@@ -712,8 +1568,41 @@
               "kind": "NON_NULL",
               "name": null,
               "ofType": {
-                "kind": "SCALAR",
                 "name": "String",
+                "kind": "SCALAR",
+                "ofType": null
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "joinCall",
+            "description": "Join a call and return the token for it",
+            "args": [
+              {
+                "name": "input",
+                "description": null,
+                "type": {
+                  "kind": "NON_NULL",
+                  "name": null,
+                  "ofType": {
+                    "name": "JoinCallInput",
+                    "kind": "INPUT_OBJECT",
+                    "ofType": null
+                  }
+                },
+                "defaultValue": null,
+                "isDeprecated": false,
+                "deprecationReason": null
+              }
+            ],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "String",
+                "kind": "SCALAR",
                 "ofType": null
               }
             },
@@ -752,8 +1641,8 @@
               "kind": "NON_NULL",
               "name": null,
               "ofType": {
-                "kind": "SCALAR",
                 "name": "Int",
+                "kind": "SCALAR",
                 "ofType": null
               }
             },
@@ -764,6 +1653,54 @@
         ],
         "interfaces": null,
         "enumValues": null,
+        "possibleTypes": null
+      },
+      {
+        "kind": "ENUM",
+        "name": "Ordering",
+        "description": null,
+        "isOneOf": null,
+        "fields": null,
+        "inputFields": null,
+        "interfaces": null,
+        "enumValues": [
+          {
+            "name": "ASC",
+            "description": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "ASC_NULLS_FIRST",
+            "description": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "ASC_NULLS_LAST",
+            "description": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "DESC",
+            "description": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "DESC_NULLS_FIRST",
+            "description": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "DESC_NULLS_LAST",
+            "description": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          }
+        ],
         "possibleTypes": null
       },
       {
@@ -780,8 +1717,8 @@
               "kind": "NON_NULL",
               "name": null,
               "ofType": {
+                "name": "ID",
                 "kind": "SCALAR",
-                "name": "String",
                 "ofType": null
               }
             },
@@ -796,8 +1733,8 @@
               "kind": "NON_NULL",
               "name": null,
               "ofType": {
-                "kind": "SCALAR",
                 "name": "String",
+                "kind": "SCALAR",
                 "ofType": null
               }
             },
@@ -817,8 +1754,69 @@
         "isOneOf": null,
         "fields": [
           {
-            "name": "collaborativeBroadcast",
-            "description": "Get a collaborative broadcast by ID",
+            "name": "_entities",
+            "description": null,
+            "args": [
+              {
+                "name": "representations",
+                "description": null,
+                "type": {
+                  "kind": "NON_NULL",
+                  "name": null,
+                  "ofType": {
+                    "name": null,
+                    "kind": "LIST",
+                    "ofType": {
+                      "name": null,
+                      "kind": "NON_NULL",
+                      "ofType": {
+                        "name": "_Any",
+                        "kind": "SCALAR",
+                        "ofType": null
+                      }
+                    }
+                  }
+                },
+                "defaultValue": null,
+                "isDeprecated": false,
+                "deprecationReason": null
+              }
+            ],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": null,
+                "kind": "LIST",
+                "ofType": {
+                  "name": "_Entity",
+                  "kind": "UNION",
+                  "ofType": null
+                }
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "_service",
+            "description": null,
+            "args": [],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "_Service",
+                "kind": "OBJECT",
+                "ofType": null
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "call",
+            "description": "Get a call by ID",
             "args": [
               {
                 "name": "id",
@@ -827,8 +1825,8 @@
                   "kind": "NON_NULL",
                   "name": null,
                   "ofType": {
-                    "kind": "SCALAR",
                     "name": "ID",
+                    "kind": "SCALAR",
                     "ofType": null
                   }
                 },
@@ -841,8 +1839,102 @@
               "kind": "NON_NULL",
               "name": null,
               "ofType": {
+                "name": "Call",
                 "kind": "OBJECT",
+                "ofType": null
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "calls",
+            "description": "The organization's calls; filter `live` for the ones in progress",
+            "args": [
+              {
+                "name": "filters",
+                "description": null,
+                "type": {
+                  "kind": "INPUT_OBJECT",
+                  "name": "CallFilter",
+                  "ofType": null
+                },
+                "defaultValue": null,
+                "isDeprecated": false,
+                "deprecationReason": null
+              },
+              {
+                "name": "order",
+                "description": null,
+                "type": {
+                  "kind": "INPUT_OBJECT",
+                  "name": "CallOrder",
+                  "ofType": null
+                },
+                "defaultValue": null,
+                "isDeprecated": false,
+                "deprecationReason": null
+              },
+              {
+                "name": "pagination",
+                "description": null,
+                "type": {
+                  "kind": "INPUT_OBJECT",
+                  "name": "OffsetPaginationInput",
+                  "ofType": null
+                },
+                "defaultValue": null,
+                "isDeprecated": false,
+                "deprecationReason": null
+              }
+            ],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": null,
+                "kind": "LIST",
+                "ofType": {
+                  "name": null,
+                  "kind": "NON_NULL",
+                  "ofType": {
+                    "name": "Call",
+                    "kind": "OBJECT",
+                    "ofType": null
+                  }
+                }
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "collaborativeBroadcast",
+            "description": "Get a collaborative broadcast by ID",
+            "args": [
+              {
+                "name": "id",
+                "description": null,
+                "type": {
+                  "kind": "NON_NULL",
+                  "name": null,
+                  "ofType": {
+                    "name": "ID",
+                    "kind": "SCALAR",
+                    "ofType": null
+                  }
+                },
+                "defaultValue": null,
+                "isDeprecated": false,
+                "deprecationReason": null
+              }
+            ],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
                 "name": "CollaborativeBroadcast",
+                "kind": "OBJECT",
                 "ofType": null
               }
             },
@@ -882,14 +1974,38 @@
               "kind": "NON_NULL",
               "name": null,
               "ofType": {
-                "kind": "LIST",
                 "name": null,
+                "kind": "LIST",
                 "ofType": {
-                  "kind": "NON_NULL",
                   "name": null,
+                  "kind": "NON_NULL",
                   "ofType": {
-                    "kind": "OBJECT",
                     "name": "CollaborativeBroadcast",
+                    "kind": "OBJECT",
+                    "ofType": null
+                  }
+                }
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "myCallInvites",
+            "description": "Your pending invitations to calls that are still live",
+            "args": [],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": null,
+                "kind": "LIST",
+                "ofType": {
+                  "name": null,
+                  "kind": "NON_NULL",
+                  "ofType": {
+                    "name": "CallInvite",
+                    "kind": "OBJECT",
                     "ofType": null
                   }
                 }
@@ -909,8 +2025,8 @@
                   "kind": "NON_NULL",
                   "name": null,
                   "ofType": {
-                    "kind": "SCALAR",
                     "name": "ID",
+                    "kind": "SCALAR",
                     "ofType": null
                   }
                 },
@@ -923,8 +2039,8 @@
               "kind": "NON_NULL",
               "name": null,
               "ofType": {
-                "kind": "OBJECT",
                 "name": "SoloBroadcast",
+                "kind": "OBJECT",
                 "ofType": null
               }
             },
@@ -964,14 +2080,14 @@
               "kind": "NON_NULL",
               "name": null,
               "ofType": {
-                "kind": "LIST",
                 "name": null,
+                "kind": "LIST",
                 "ofType": {
-                  "kind": "NON_NULL",
                   "name": null,
+                  "kind": "NON_NULL",
                   "ofType": {
-                    "kind": "OBJECT",
                     "name": "SoloBroadcast",
+                    "kind": "OBJECT",
                     "ofType": null
                   }
                 }
@@ -991,8 +2107,8 @@
                   "kind": "NON_NULL",
                   "name": null,
                   "ofType": {
-                    "kind": "SCALAR",
                     "name": "ID",
+                    "kind": "SCALAR",
                     "ofType": null
                   }
                 },
@@ -1005,8 +2121,8 @@
               "kind": "NON_NULL",
               "name": null,
               "ofType": {
-                "kind": "OBJECT",
                 "name": "Stream",
+                "kind": "OBJECT",
                 "ofType": null
               }
             },
@@ -1046,14 +2162,14 @@
               "kind": "NON_NULL",
               "name": null,
               "ofType": {
-                "kind": "LIST",
                 "name": null,
+                "kind": "LIST",
                 "ofType": {
-                  "kind": "NON_NULL",
                   "name": null,
+                  "kind": "NON_NULL",
                   "ofType": {
-                    "kind": "OBJECT",
                     "name": "Stream",
+                    "kind": "OBJECT",
                     "ofType": null
                   }
                 }
@@ -1082,8 +2198,8 @@
               "kind": "NON_NULL",
               "name": null,
               "ofType": {
-                "kind": "OBJECT",
                 "name": "App",
+                "kind": "OBJECT",
                 "ofType": null
               }
             },
@@ -1098,8 +2214,8 @@
               "kind": "NON_NULL",
               "name": null,
               "ofType": {
+                "name": "ID",
                 "kind": "SCALAR",
-                "name": "String",
                 "ofType": null
               }
             },
@@ -1114,8 +2230,8 @@
               "kind": "NON_NULL",
               "name": null,
               "ofType": {
-                "kind": "SCALAR",
                 "name": "String",
+                "kind": "SCALAR",
                 "ofType": null
               }
             },
@@ -1142,14 +2258,14 @@
               "kind": "NON_NULL",
               "name": null,
               "ofType": {
-                "kind": "LIST",
                 "name": null,
+                "kind": "LIST",
                 "ofType": {
-                  "kind": "NON_NULL",
                   "name": null,
+                  "kind": "NON_NULL",
                   "ofType": {
-                    "kind": "OBJECT",
                     "name": "Stream",
+                    "kind": "OBJECT",
                     "ofType": null
                   }
                 }
@@ -1166,8 +2282,8 @@
               "kind": "NON_NULL",
               "name": null,
               "ofType": {
-                "kind": "SCALAR",
                 "name": "DateTime",
+                "kind": "SCALAR",
                 "ofType": null
               }
             },
@@ -1182,8 +2298,8 @@
               "kind": "NON_NULL",
               "name": null,
               "ofType": {
-                "kind": "SCALAR",
                 "name": "ID",
+                "kind": "SCALAR",
                 "ofType": null
               }
             },
@@ -1198,8 +2314,8 @@
               "kind": "NON_NULL",
               "name": null,
               "ofType": {
-                "kind": "OBJECT",
                 "name": "Streamer",
+                "kind": "OBJECT",
                 "ofType": null
               }
             },
@@ -1214,8 +2330,8 @@
               "kind": "NON_NULL",
               "name": null,
               "ofType": {
-                "kind": "SCALAR",
                 "name": "String",
+                "kind": "SCALAR",
                 "ofType": null
               }
             },
@@ -1230,14 +2346,14 @@
               "kind": "NON_NULL",
               "name": null,
               "ofType": {
-                "kind": "LIST",
                 "name": null,
+                "kind": "LIST",
                 "ofType": {
-                  "kind": "NON_NULL",
                   "name": null,
+                  "kind": "NON_NULL",
                   "ofType": {
-                    "kind": "OBJECT",
                     "name": "Stream",
+                    "kind": "OBJECT",
                     "ofType": null
                   }
                 }
@@ -1314,11 +2430,11 @@
               "kind": "LIST",
               "name": null,
               "ofType": {
-                "kind": "NON_NULL",
                 "name": null,
+                "kind": "NON_NULL",
                 "ofType": {
-                  "kind": "SCALAR",
                   "name": "ID",
+                  "kind": "SCALAR",
                   "ofType": null
                 }
               }
@@ -1358,8 +2474,8 @@
               "kind": "NON_NULL",
               "name": null,
               "ofType": {
-                "kind": "SCALAR",
                 "name": "ID",
+                "kind": "SCALAR",
                 "ofType": null
               }
             },
@@ -1374,8 +2490,8 @@
               "kind": "NON_NULL",
               "name": null,
               "ofType": {
-                "kind": "ENUM",
                 "name": "StreamKind",
+                "kind": "ENUM",
                 "ofType": null
               }
             },
@@ -1390,8 +2506,8 @@
               "kind": "NON_NULL",
               "name": null,
               "ofType": {
-                "kind": "OBJECT",
                 "name": "Streamer",
+                "kind": "OBJECT",
                 "ofType": null
               }
             },
@@ -1406,8 +2522,8 @@
               "kind": "NON_NULL",
               "name": null,
               "ofType": {
-                "kind": "SCALAR",
                 "name": "String",
+                "kind": "SCALAR",
                 "ofType": null
               }
             },
@@ -1542,11 +2658,11 @@
               "kind": "LIST",
               "name": null,
               "ofType": {
-                "kind": "NON_NULL",
                 "name": null,
+                "kind": "NON_NULL",
                 "ofType": {
-                  "kind": "SCALAR",
                   "name": "ID",
+                  "kind": "SCALAR",
                   "ofType": null
                 }
               }
@@ -1610,8 +2726,8 @@
               "kind": "NON_NULL",
               "name": null,
               "ofType": {
-                "kind": "OBJECT",
                 "name": "Client",
+                "kind": "OBJECT",
                 "ofType": null
               }
             },
@@ -1651,14 +2767,14 @@
               "kind": "NON_NULL",
               "name": null,
               "ofType": {
-                "kind": "LIST",
                 "name": null,
+                "kind": "LIST",
                 "ofType": {
-                  "kind": "NON_NULL",
                   "name": null,
+                  "kind": "NON_NULL",
                   "ofType": {
-                    "kind": "OBJECT",
                     "name": "CollaborativeBroadcast",
+                    "kind": "OBJECT",
                     "ofType": null
                   }
                 }
@@ -1675,8 +2791,8 @@
               "kind": "NON_NULL",
               "name": null,
               "ofType": {
-                "kind": "SCALAR",
                 "name": "ID",
+                "kind": "SCALAR",
                 "ofType": null
               }
             },
@@ -1703,8 +2819,8 @@
               "kind": "NON_NULL",
               "name": null,
               "ofType": {
-                "kind": "OBJECT",
                 "name": "User",
+                "kind": "OBJECT",
                 "ofType": null
               }
             },
@@ -1779,11 +2895,11 @@
               "kind": "LIST",
               "name": null,
               "ofType": {
-                "kind": "NON_NULL",
                 "name": null,
+                "kind": "NON_NULL",
                 "ofType": {
-                  "kind": "SCALAR",
                   "name": "ID",
+                  "kind": "SCALAR",
                   "ofType": null
                 }
               }
@@ -1822,10 +2938,130 @@
       },
       {
         "kind": "OBJECT",
+        "name": "Structure",
+        "description": "A reference to an object on another service",
+        "isOneOf": null,
+        "fields": [
+          {
+            "name": "identifier",
+            "description": null,
+            "args": [],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "String",
+                "kind": "SCALAR",
+                "ofType": null
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "object",
+            "description": null,
+            "args": [],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "Int",
+                "kind": "SCALAR",
+                "ofType": null
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          }
+        ],
+        "inputFields": null,
+        "interfaces": [],
+        "enumValues": null,
+        "possibleTypes": null
+      },
+      {
+        "kind": "INPUT_OBJECT",
+        "name": "StructureInput",
+        "description": "A reference to an object on another service",
+        "isOneOf": false,
+        "fields": null,
+        "inputFields": [
+          {
+            "name": "identifier",
+            "description": null,
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "String",
+                "kind": "SCALAR",
+                "ofType": null
+              }
+            },
+            "defaultValue": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "object",
+            "description": null,
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "Int",
+                "kind": "SCALAR",
+                "ofType": null
+              }
+            },
+            "defaultValue": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          }
+        ],
+        "interfaces": null,
+        "enumValues": null,
+        "possibleTypes": null
+      },
+      {
+        "kind": "OBJECT",
         "name": "Subscription",
         "description": null,
         "isOneOf": null,
         "fields": [
+          {
+            "name": "callInvites",
+            "description": "Your invitations to calls as they arrive and go away",
+            "args": [],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "CallInviteEvent",
+                "kind": "OBJECT",
+                "ofType": null
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "calls",
+            "description": "The calls others start in your organization as they start, and any call's new topics",
+            "args": [],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "CallEvent",
+                "kind": "OBJECT",
+                "ofType": null
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
           {
             "name": "streams",
             "description": "Subscribe to stream events",
@@ -1847,8 +3083,8 @@
               "kind": "NON_NULL",
               "name": null,
               "ofType": {
-                "kind": "OBJECT",
                 "name": "StreamEvent",
+                "kind": "OBJECT",
                 "ofType": null
               }
             },
@@ -1880,6 +3116,22 @@
             "deprecationReason": null
           },
           {
+            "name": "id",
+            "description": null,
+            "args": [],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "ID",
+                "kind": "SCALAR",
+                "ofType": null
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
             "name": "preferredUsername",
             "description": null,
             "args": [],
@@ -1887,8 +3139,8 @@
               "kind": "NON_NULL",
               "name": null,
               "ofType": {
-                "kind": "SCALAR",
                 "name": "String",
+                "kind": "SCALAR",
                 "ofType": null
               }
             },
@@ -1903,8 +3155,84 @@
               "kind": "NON_NULL",
               "name": null,
               "ofType": {
-                "kind": "SCALAR",
                 "name": "String",
+                "kind": "SCALAR",
+                "ofType": null
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          }
+        ],
+        "inputFields": null,
+        "interfaces": [],
+        "enumValues": null,
+        "possibleTypes": null
+      },
+      {
+        "kind": "SCALAR",
+        "name": "_Any",
+        "description": null,
+        "isOneOf": null,
+        "fields": null,
+        "inputFields": null,
+        "interfaces": null,
+        "enumValues": null,
+        "possibleTypes": null
+      },
+      {
+        "kind": "UNION",
+        "name": "_Entity",
+        "description": null,
+        "isOneOf": null,
+        "fields": null,
+        "inputFields": null,
+        "interfaces": null,
+        "enumValues": null,
+        "possibleTypes": [
+          {
+            "kind": "OBJECT",
+            "name": "App",
+            "ofType": null
+          },
+          {
+            "kind": "OBJECT",
+            "name": "Client",
+            "ofType": null
+          },
+          {
+            "kind": "OBJECT",
+            "name": "Organization",
+            "ofType": null
+          },
+          {
+            "kind": "OBJECT",
+            "name": "Release",
+            "ofType": null
+          },
+          {
+            "kind": "OBJECT",
+            "name": "User",
+            "ofType": null
+          }
+        ]
+      },
+      {
+        "kind": "OBJECT",
+        "name": "_Service",
+        "description": null,
+        "isOneOf": null,
+        "fields": [
+          {
+            "name": "sdl",
+            "description": null,
+            "args": [],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "String",
+                "kind": "SCALAR",
                 "ofType": null
               }
             },
@@ -1931,8 +3259,8 @@
               "kind": "NON_NULL",
               "name": null,
               "ofType": {
-                "kind": "SCALAR",
                 "name": "String",
+                "kind": "SCALAR",
                 "ofType": null
               }
             },
@@ -1959,8 +3287,8 @@
               "kind": "NON_NULL",
               "name": null,
               "ofType": {
-                "kind": "SCALAR",
                 "name": "Boolean",
+                "kind": "SCALAR",
                 "ofType": null
               }
             },
@@ -1975,14 +3303,14 @@
               "kind": "NON_NULL",
               "name": null,
               "ofType": {
-                "kind": "LIST",
                 "name": null,
+                "kind": "LIST",
                 "ofType": {
-                  "kind": "NON_NULL",
                   "name": null,
+                  "kind": "NON_NULL",
                   "ofType": {
-                    "kind": "ENUM",
                     "name": "__DirectiveLocation",
+                    "kind": "ENUM",
                     "ofType": null
                   }
                 }
@@ -2012,18 +3340,46 @@
               "kind": "NON_NULL",
               "name": null,
               "ofType": {
-                "kind": "LIST",
                 "name": null,
+                "kind": "LIST",
                 "ofType": {
-                  "kind": "NON_NULL",
                   "name": null,
+                  "kind": "NON_NULL",
                   "ofType": {
-                    "kind": "OBJECT",
                     "name": "__InputValue",
+                    "kind": "OBJECT",
                     "ofType": null
                   }
                 }
               }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "isDeprecated",
+            "description": null,
+            "args": [],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "Boolean",
+                "kind": "SCALAR",
+                "ofType": null
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "deprecationReason",
+            "description": null,
+            "args": [],
+            "type": {
+              "kind": "SCALAR",
+              "name": "String",
+              "ofType": null
             },
             "isDeprecated": false,
             "deprecationReason": null
@@ -2156,6 +3512,12 @@
             "description": "Location adjacent to an input object field definition.",
             "isDeprecated": false,
             "deprecationReason": null
+          },
+          {
+            "name": "DIRECTIVE_DEFINITION",
+            "description": "Location adjacent to a directive definition.",
+            "isDeprecated": false,
+            "deprecationReason": null
           }
         ],
         "possibleTypes": null
@@ -2174,8 +3536,8 @@
               "kind": "NON_NULL",
               "name": null,
               "ofType": {
-                "kind": "SCALAR",
                 "name": "String",
+                "kind": "SCALAR",
                 "ofType": null
               }
             },
@@ -2202,8 +3564,8 @@
               "kind": "NON_NULL",
               "name": null,
               "ofType": {
-                "kind": "SCALAR",
                 "name": "Boolean",
+                "kind": "SCALAR",
                 "ofType": null
               }
             },
@@ -2242,8 +3604,8 @@
               "kind": "NON_NULL",
               "name": null,
               "ofType": {
-                "kind": "SCALAR",
                 "name": "String",
+                "kind": "SCALAR",
                 "ofType": null
               }
             },
@@ -2283,14 +3645,14 @@
               "kind": "NON_NULL",
               "name": null,
               "ofType": {
-                "kind": "LIST",
                 "name": null,
+                "kind": "LIST",
                 "ofType": {
-                  "kind": "NON_NULL",
                   "name": null,
+                  "kind": "NON_NULL",
                   "ofType": {
-                    "kind": "OBJECT",
                     "name": "__InputValue",
+                    "kind": "OBJECT",
                     "ofType": null
                   }
                 }
@@ -2307,8 +3669,8 @@
               "kind": "NON_NULL",
               "name": null,
               "ofType": {
-                "kind": "OBJECT",
                 "name": "__Type",
+                "kind": "OBJECT",
                 "ofType": null
               }
             },
@@ -2323,8 +3685,8 @@
               "kind": "NON_NULL",
               "name": null,
               "ofType": {
-                "kind": "SCALAR",
                 "name": "Boolean",
+                "kind": "SCALAR",
                 "ofType": null
               }
             },
@@ -2363,8 +3725,8 @@
               "kind": "NON_NULL",
               "name": null,
               "ofType": {
-                "kind": "SCALAR",
                 "name": "String",
+                "kind": "SCALAR",
                 "ofType": null
               }
             },
@@ -2391,8 +3753,8 @@
               "kind": "NON_NULL",
               "name": null,
               "ofType": {
-                "kind": "OBJECT",
                 "name": "__Type",
+                "kind": "OBJECT",
                 "ofType": null
               }
             },
@@ -2419,8 +3781,8 @@
               "kind": "NON_NULL",
               "name": null,
               "ofType": {
-                "kind": "SCALAR",
                 "name": "Boolean",
+                "kind": "SCALAR",
                 "ofType": null
               }
             },
@@ -2471,14 +3833,14 @@
               "kind": "NON_NULL",
               "name": null,
               "ofType": {
-                "kind": "LIST",
                 "name": null,
+                "kind": "LIST",
                 "ofType": {
-                  "kind": "NON_NULL",
                   "name": null,
+                  "kind": "NON_NULL",
                   "ofType": {
-                    "kind": "OBJECT",
                     "name": "__Type",
+                    "kind": "OBJECT",
                     "ofType": null
                   }
                 }
@@ -2495,8 +3857,8 @@
               "kind": "NON_NULL",
               "name": null,
               "ofType": {
-                "kind": "OBJECT",
                 "name": "__Type",
+                "kind": "OBJECT",
                 "ofType": null
               }
             },
@@ -2530,19 +3892,36 @@
           {
             "name": "directives",
             "description": "A list of all directives supported by this server.",
-            "args": [],
+            "args": [
+              {
+                "name": "includeDeprecated",
+                "description": null,
+                "type": {
+                  "kind": "NON_NULL",
+                  "name": null,
+                  "ofType": {
+                    "name": "Boolean",
+                    "kind": "SCALAR",
+                    "ofType": null
+                  }
+                },
+                "defaultValue": "false",
+                "isDeprecated": false,
+                "deprecationReason": null
+              }
+            ],
             "type": {
               "kind": "NON_NULL",
               "name": null,
               "ofType": {
-                "kind": "LIST",
                 "name": null,
+                "kind": "LIST",
                 "ofType": {
-                  "kind": "NON_NULL",
                   "name": null,
+                  "kind": "NON_NULL",
                   "ofType": {
-                    "kind": "OBJECT",
                     "name": "__Directive",
+                    "kind": "OBJECT",
                     "ofType": null
                   }
                 }
@@ -2571,8 +3950,8 @@
               "kind": "NON_NULL",
               "name": null,
               "ofType": {
-                "kind": "ENUM",
                 "name": "__TypeKind",
+                "kind": "ENUM",
                 "ofType": null
               }
             },
@@ -2636,11 +4015,11 @@
               "kind": "LIST",
               "name": null,
               "ofType": {
-                "kind": "NON_NULL",
                 "name": null,
+                "kind": "NON_NULL",
                 "ofType": {
-                  "kind": "OBJECT",
                   "name": "__Field",
+                  "kind": "OBJECT",
                   "ofType": null
                 }
               }
@@ -2656,11 +4035,11 @@
               "kind": "LIST",
               "name": null,
               "ofType": {
-                "kind": "NON_NULL",
                 "name": null,
+                "kind": "NON_NULL",
                 "ofType": {
-                  "kind": "OBJECT",
                   "name": "__Type",
+                  "kind": "OBJECT",
                   "ofType": null
                 }
               }
@@ -2676,11 +4055,11 @@
               "kind": "LIST",
               "name": null,
               "ofType": {
-                "kind": "NON_NULL",
                 "name": null,
+                "kind": "NON_NULL",
                 "ofType": {
-                  "kind": "OBJECT",
                   "name": "__Type",
+                  "kind": "OBJECT",
                   "ofType": null
                 }
               }
@@ -2709,11 +4088,11 @@
               "kind": "LIST",
               "name": null,
               "ofType": {
-                "kind": "NON_NULL",
                 "name": null,
+                "kind": "NON_NULL",
                 "ofType": {
-                  "kind": "OBJECT",
                   "name": "__EnumValue",
+                  "kind": "OBJECT",
                   "ofType": null
                 }
               }
@@ -2742,11 +4121,11 @@
               "kind": "LIST",
               "name": null,
               "ofType": {
-                "kind": "NON_NULL",
                 "name": null,
+                "kind": "NON_NULL",
                 "ofType": {
-                  "kind": "OBJECT",
                   "name": "__InputValue",
+                  "kind": "OBJECT",
                   "ofType": null
                 }
               }
@@ -2850,8 +4229,11 @@
         "name": "deprecated",
         "description": "Marks an element of a GraphQL schema as no longer supported.",
         "isRepeatable": false,
+        "isDeprecated": false,
+        "deprecationReason": null,
         "locations": [
           "ARGUMENT_DEFINITION",
+          "DIRECTIVE_DEFINITION",
           "ENUM_VALUE",
           "FIELD_DEFINITION",
           "INPUT_FIELD_DEFINITION"
@@ -2875,6 +4257,8 @@
         "name": "include",
         "description": "Directs the executor to include this field or fragment only when the `if` argument is true.",
         "isRepeatable": false,
+        "isDeprecated": false,
+        "deprecationReason": null,
         "locations": [
           "FIELD",
           "FRAGMENT_SPREAD",
@@ -2888,8 +4272,8 @@
               "kind": "NON_NULL",
               "name": null,
               "ofType": {
-                "kind": "SCALAR",
                 "name": "Boolean",
+                "kind": "SCALAR",
                 "ofType": null
               }
             },
@@ -2901,8 +4285,10 @@
       },
       {
         "name": "oneOf",
-        "description": "Indicates exactly one field must be supplied and this field must not be `null`.",
+        "description": null,
         "isRepeatable": false,
+        "isDeprecated": false,
+        "deprecationReason": null,
         "locations": [
           "INPUT_OBJECT"
         ],
@@ -2912,6 +4298,8 @@
         "name": "skip",
         "description": "Directs the executor to skip this field or fragment when the `if` argument is true.",
         "isRepeatable": false,
+        "isDeprecated": false,
+        "deprecationReason": null,
         "locations": [
           "FIELD",
           "FRAGMENT_SPREAD",
@@ -2925,8 +4313,8 @@
               "kind": "NON_NULL",
               "name": null,
               "ofType": {
-                "kind": "SCALAR",
                 "name": "Boolean",
+                "kind": "SCALAR",
                 "ofType": null
               }
             },
@@ -2940,6 +4328,8 @@
         "name": "specifiedBy",
         "description": "Exposes a URL that specifies the behavior of this scalar.",
         "isRepeatable": false,
+        "isDeprecated": false,
+        "deprecationReason": null,
         "locations": [
           "SCALAR"
         ],
@@ -2951,8 +4341,8 @@
               "kind": "NON_NULL",
               "name": null,
               "ofType": {
-                "kind": "SCALAR",
                 "name": "String",
+                "kind": "SCALAR",
                 "ofType": null
               }
             },

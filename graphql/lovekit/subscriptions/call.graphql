@@ -1,0 +1,19 @@
+subscription WatchCallInvites {
+  callInvites {
+    create {
+      ...CallInvite
+    }
+    delete
+  }
+}
+
+subscription WatchCalls {
+  calls {
+    create {
+      ...ListCall
+    }
+    update {
+      ...ListCall
+    }
+  }
+}

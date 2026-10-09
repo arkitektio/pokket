@@ -1,6 +1,6 @@
 overwrite: true
 schema:
-  "https://demo.arkitekt.live/lovekit/schema":
+  "http://jhnnsrs-lab/lovekit/schema":
     handleAsSDL: true
 documents: "graphql/lovekit/**/*.graphql"
 generates:
@@ -20,3 +20,6 @@ generates:
   lib/lovekit/graphql.schema.json:
     plugins:
       - "introspection"
+config:
+  scalars:
+    DateTime: string
