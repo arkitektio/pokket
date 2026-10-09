@@ -101,6 +101,14 @@ export const MODULE_CATALOG: ModuleDecl[] = [
     ],
   },
   {
+    key: "calls",
+    label: "Calls",
+    icon: "phone",
+    serviceKey: "lovekit",
+    route: "/calls",
+    navLinks: [{ label: "Calls", route: "/calls", home: true, keywords: ["call", "video", "meeting", "lovekit"] }],
+  },
+  {
     key: "lokate",
     label: "Lokate",
     icon: "map-pinned",

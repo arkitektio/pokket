@@ -5,6 +5,7 @@ import '@/lib/timeline/task';
 // Likewise the background backup of the timeline, which the OS starts on its schedule.
 import '@/lib/timeline/backgroundBackup';
 
+import { CallBar } from '@/components/calls/CallBar';
 import { DeepLinkGate } from '@/components/deeplink/DeepLinkGate';
 import { AlertDialogProvider } from '@/components/ui/alert-dialog';
 import { ProfileIdentitySync } from '@/components/profile/ProfileIdentitySync';
@@ -16,6 +17,7 @@ import { UpdatePrompt } from '@/lib/updates/UpdatePrompt';
 import { App } from '@/lib/app/App';
 import { useArkitektStore } from '@/lib/arkitekt/hooks';
 import { ErrorOverlay } from '@/lib/debug/ErrorOverlay';
+import { CallHost } from '@/lib/lovekit/call/CallHost';
 import { SELFTEST_ENABLED } from '@/lib/mesh/selftest';
 import { MeshSelfTestBoot } from '@/lib/mesh/selftestBoot';
 import { installGlobalErrorHandlers } from '@/lib/debug/globalHandlers';
@@ -121,6 +123,10 @@ export default function RootLayout() {
             <LokateBackup />
             {/* Offers a restart once a released update has downloaded. */}
             <UpdatePrompt />
+            {/* The call the member is in, wherever they are in the app: its
+                connection, and the bar that leads back to it. */}
+            <CallHost />
+            <CallBar />
             {SELFTEST_ENABLED && <MeshSelfTestBoot />}
             {/* lib/lok/funcs.tsx has always reported mutation failures with
                 `toast.error`, but nothing ever mounted the renderer, so every one

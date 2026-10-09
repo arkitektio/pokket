@@ -2,6 +2,7 @@ import * as React from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 
 import { Text } from '@/components/ui/text';
+import { useCallState } from '@/lib/lovekit/call/store';
 import { clearErrors, isFailure, LoggedError, useErrorLog } from './errorLog';
 
 /**
@@ -62,6 +63,9 @@ export const ErrorOverlay = ({ enabled = __DEV__ }: { enabled?: boolean }) => {
   const [open, setOpen] = React.useState(false);
   const [failuresOnly, setFailuresOnly] = React.useState(true);
 
+  // The call's bar stands at the bottom edge; the badge clears it.
+  const inCall = useCallState((state) => state.call !== null);
+
   const failures = React.useMemo(() => entries.filter(isFailure), [entries]);
   const shown = failuresOnly ? failures : entries;
 
@@ -74,7 +78,8 @@ export const ErrorOverlay = ({ enabled = __DEV__ }: { enabled?: boolean }) => {
     return (
       <Pressable
         onPress={() => setOpen(true)}
-        className={`absolute bottom-24 right-4 z-50 rounded-full px-3 py-2 ${
+        style={{ bottom: inCall ? 160 : 96 }}
+        className={`absolute right-4 z-50 rounded-full px-3 py-2 ${
           clean ? 'bg-secondary' : 'bg-destructive'
         }`}>
         <Text className="text-xs font-bold text-foreground">

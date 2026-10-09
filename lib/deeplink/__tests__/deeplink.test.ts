@@ -57,6 +57,8 @@ describe("incoming links", () => {
   it("reads a bare page as a portable link", () => {
     expect(parseIncomingLink("pokket://bank/transaction/5")).toEqual({ scope: null, digest: null, path: "/bank/transaction/5" });
     expect(parseIncomingLink("pokket:///mail?box=unread")).toEqual({ scope: null, digest: null, path: "/mail?box=unread" });
+    // A call, joining on arrival (lib/lovekit/call/links.ts).
+    expect(parseIncomingLink("pokket://calls/5?join=1")).toEqual({ scope: null, digest: null, path: "/calls/5?join=1" });
   });
 
   it("reads the arkitekt.live wrapper", () => {

@@ -30,6 +30,8 @@ export type CallState = {
   /** Hand over a token: the connection mounts and connects. */
   start: (call: ActiveCall, token: string, media?: CallMedia) => void;
   setRoom: (room: Room | null) => void;
+  /** The microphone was granted after joining without it. */
+  setMedia: (media: CallMedia) => void;
   connected: () => void;
   /**
    * The call is lost, and stays on screen as lost: the token goes, so the
@@ -59,6 +61,7 @@ export const callStore = createStore<CallState>((set, get) => ({
     set({ call, token, media, status: "connecting", error: null, room: null, joinedAt: null });
   },
   setRoom: (room) => set({ room }),
+  setMedia: (media) => set({ media }),
   connected: () => set({ status: "connected", joinedAt: Date.now() }),
   fail: (message) => {
     if (!get().call) return;

@@ -70,6 +70,8 @@ export default function PagesLayout() {
         <Stack.Screen name="tasks/index" options={page('Tasks')} />
         <Stack.Screen name="tasks/[id]" options={{ title: 'Task' }} />
         <Stack.Screen name="broadcasts" options={page('Broadcasts')} />
+        <Stack.Screen name="calls/index" options={page('Calls')} />
+        <Stack.Screen name="calls/[id]" options={{ title: 'Call' }} />
         <Stack.Screen name="lokate" options={page('Lokate')} />
         <Stack.Screen name="phone" options={page('Phone')} />
         <Stack.Screen name="solo-broadcast/start" options={{ title: 'Start Solo Broadcast' }} />
