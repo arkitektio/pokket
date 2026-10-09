@@ -1,0 +1,55 @@
+/**
+ * The objects a call can be about that pokket has a page for.
+ *
+ * Orkestrator asks its smart registry for an object's name and page; pokket
+ * has no registry, so the few it knows are this one table. It is read both
+ * ways: a call's topic to the page that shows it ("Talking about"), and the
+ * page on show to the object a call can be started about (`CallAboutButton`).
+ */
+type StructureKind = {
+  identifier: string;
+  name: string;
+  /** The detail page is this followed by the id. */
+  prefix: string;
+  /** A call can be started about it from its page. */
+  callable: boolean;
+};
+
+const KINDS: readonly StructureKind[] = [
+  { identifier: "@rekuest/task", name: "Task", prefix: "/tasks/", callable: true },
+  { identifier: "@bank/transaction", name: "Transaction", prefix: "/bank/transaction/", callable: true },
+  { identifier: "@kuvert/thread", name: "Thread", prefix: "/mail/thread/", callable: true },
+  { identifier: "@lovekit/solo_broadcast", name: "Broadcast", prefix: "/solo-broadcast/", callable: true },
+  { identifier: "@lovekit/call", name: "Call", prefix: "/calls/", callable: false },
+];
+
+export type CallStructure = { identifier: string; object: number };
+
+const kindOf = (identifier: string) => KINDS.find((kind) => kind.identifier === identifier);
+
+/** "Task 42"; for something pokket does not know, its identifier's last word. */
+export const structureLabel = ({ identifier, object }: CallStructure): string => {
+  const name = kindOf(identifier)?.name ?? identifier.split("/").pop() ?? identifier;
+  return `${name} ${object}`;
+};
+
+/** The page that shows it, when pokket has one. */
+export const structureRoute = ({ identifier, object }: CallStructure): string | null => {
+  const kind = kindOf(identifier);
+  return kind ? `${kind.prefix}${object}` : null;
+};
+
+/**
+ * The object the page at `pathname` shows, if a call can be about it: one of
+ * the pages above, with the whole-number id lovekit asks for.
+ */
+export const structureForRoute = (pathname: string): (CallStructure & { label: string }) | null => {
+  for (const kind of KINDS) {
+    if (!kind.callable || !pathname.startsWith(kind.prefix)) continue;
+    const rest = pathname.slice(kind.prefix.length);
+    if (!/^\d+$/.test(rest)) continue;
+    const structure = { identifier: kind.identifier, object: Number(rest) };
+    return { ...structure, label: structureLabel(structure) };
+  }
+  return null;
+};
