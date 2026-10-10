@@ -1,3 +1,11 @@
+# [1.13.0](https://github.com/arkitektio/pokket/compare/v1.12.0...v1.13.0) (2026-10-10)
+
+
+### Features
+
+* **deeplink:** open orkestrator:// links, with the desktop's paths ([3c98ac5](https://github.com/arkitektio/pokket/commit/3c98ac5f3175f62f0217cd97ada7a2ebdcbab92d))
+* the app is called Orkestrator (pokket edition) ([18f90c9](https://github.com/arkitektio/pokket/commit/18f90c9b17385940dab9e550ded6e77f9e381b88))
+
 # [1.12.0](https://github.com/arkitektio/pokket/compare/v1.11.0...v1.12.0) (2026-10-10)
 
 
