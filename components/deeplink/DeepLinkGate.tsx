@@ -35,7 +35,9 @@ const findHome = async (
       ? inSmartHome(profile, request.organization)
       : request.scope
         ? matchScope(request.scope, scope)
-        : (await scopeDigest(scope)) === request.digest;
+        : // A private link from a login that had not heard its hub names none.
+          (await scopeDigest(scope)) === request.digest ||
+          (scope.hub !== null && (await scopeDigest({ ...scope, hub: null })) === request.digest);
     if (matches) return profile.id === active?.id ? { kind: 'here' } : { kind: 'profile', profile };
   }
   return { kind: 'unknown' };

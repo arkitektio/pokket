@@ -19,9 +19,8 @@ export type ShareScope = {
   /** lok organization id; null on deployments with no organization concept. */
   org: string | null;
   /**
-   * lok hub id. Pokket's profiles do not record one, so its own links leave
-   * it out; it is read (and compared only when both sides name one) so that a
-   * link in orkestrator's shape still parses.
+   * lok hub id; null for a login that has not heard its own (an older lok, a
+   * login stored before pokket asked). Compared only when both sides name one.
    */
   hub: string | null;
 };
@@ -146,11 +145,11 @@ export const matchScope = (link: ShareScope, active: ShareScope): boolean => {
 
 /**
  * Is this kept login in a smartlink's organization? The slug decides, as the
- * profile last heard it. Pokket's profiles record no hub, and the hub is the
- * link's untrusted half anyway.
+ * profile last heard it; the hub is only compared when the login knows its
+ * own (it is the link's untrusted half, and an older login has none).
  */
 export const inSmartHome = (profile: StoredProfile, home: SmartHome): boolean =>
-  profile.label.organizationSlug === home.slug;
+  profile.label.organizationSlug === home.slug && (!profile.identity.hubId || profile.identity.hubId === home.hub);
 
 /**
  * The scope a kept login stands for. Read from its stored identity, so a
@@ -159,5 +158,5 @@ export const inSmartHome = (profile: StoredProfile, home: SmartHome): boolean =>
 export const profileScope = (profile: StoredProfile): ShareScope => ({
   baseUrl: profile.identity.baseUrl,
   org: profile.identity.organizationId,
-  hub: null,
+  hub: profile.identity.hubId ?? null,
 });

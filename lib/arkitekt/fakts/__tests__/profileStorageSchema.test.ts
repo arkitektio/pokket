@@ -63,6 +63,16 @@ describe("profile book", () => {
     expect(book.profiles[id].identity).toEqual(identity);
   });
 
+  it("keeps the hub it heard when a later answer names none", () => {
+    const identity = { baseUrl: endpoint.base_url, userId: "u1", organizationId: "o1" };
+    const pending = provisionalProfileId(endpoint.base_url);
+    const first = reidentifyProfile(withProfile(pending), pending, { ...identity, hubId: "3" });
+    // The hub is not part of the id: the logins already on a phone keep theirs.
+    expect(first.id).toBe(deriveProfileId(identity));
+    const again = reidentifyProfile(first.book, first.id, identity);
+    expect(again.book.profiles[again.id].identity.hubId).toBe("3");
+  });
+
   it("merges a repeat sign-in into the organization's row, keeping its mesh", () => {
     const identity = { baseUrl: endpoint.base_url, userId: "u1", organizationId: "o1" };
     const realId = deriveProfileId(identity);

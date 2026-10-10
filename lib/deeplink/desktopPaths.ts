@@ -56,7 +56,28 @@ export const fromDesktopPath = (path: string): string => {
   if (DESKTOP_ONLY.has(module)) {
     // Its front page (also `/rekuest/home`, as the desktop names it) has a stand-in; anything deeper does not.
     const front = segments.length === 1 || (segments.length === 2 && section === "home");
-    return front && HOMES[module] ? HOMES[module] : notHere(path);
+    return front && HOMES[module] ? withQuery(HOMES[module]) : notHere(path);
   }
   return path;
+};
+
+/**
+ * The desktop's path for a phone page, for a link either app should open
+ * (`universalLink.ts`); null for a page only the phone has. The reverse of
+ * `fromDesktopPath`, which reads such a link back here.
+ */
+export const toDesktopPath = (path: string): string | null => {
+  const [pathname, query] = path.split(/\?(.*)/s);
+  const withQuery = (to: string) => (query ? `${to}?${query}` : to);
+  const [module, section] = pathname.split("/").filter(Boolean);
+  if (!module) return null;
+
+  for (const { desktop, phone } of desktopPrefixes()) {
+    if (pathname.startsWith(phone) && /^\d+$/.test(pathname.slice(phone.length))) {
+      return withQuery(desktop + pathname.slice(phone.length));
+    }
+  }
+  if (module in SHARED) return !section || SHARED[module].includes(section) ? path : null;
+  const home = Object.keys(HOMES).find((service) => HOMES[service] === pathname.replace(/\/+$/, ""));
+  return home ? withQuery(`/${home}`) : null;
 };

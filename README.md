@@ -16,6 +16,12 @@ page (`orkestrator://smart/<org>/<hub>/<identifier>/<id>`, what an organization'
 over for `https://<frontend>/smartlink/…`): it opens in the login that is in that organization, asks
 before switching to it, and offers a sign-in when the phone has none.
 
+The share button hands out the same links the desktop copies, served by the organization's front
+door: a smartlink for an object (a task, a thread, a dataset) and
+`https://<frontend>/deeplink/<org>/orkestrator/open?…` for a page both apps have, so the link opens
+in whichever app the person who gets it has. A page only the phone has, and a login whose
+deployment names no front door, keep the `arkitekt.live/deeplink?pokket=…` form.
+
 ## Features
 
 ### 🔗 Arkitekt Connection

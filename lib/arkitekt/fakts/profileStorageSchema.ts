@@ -53,6 +53,13 @@ export const ProfileIdentitySchema = z.object({
   userId: z.string().nullable(),
   /** lok organization id; null until then, or on deployments without organizations. */
   organizationId: z.string().nullable(),
+  /**
+   * lok hub id, from `mycontext.hub`. Nullish: a client bound to no hub and a
+   * lok that does not say both answer nothing, and every login stored before
+   * this was read has none. Not part of the profile's id (the desktop's is):
+   * the logins already on a phone keep theirs.
+   */
+  hubId: z.string().nullish(),
 });
 
 export type ProfileIdentity = z.infer<typeof ProfileIdentitySchema>;
@@ -246,14 +253,16 @@ export const reidentifyProfile = (
   const profile = book.profiles[id];
   if (!profile) return { book, id };
   const nextId = deriveProfileId(identity);
+  // A missing hub is "not answered", never "no hub any more".
+  const hubId = (known?: StoredProfile) => identity.hubId ?? known?.identity.hubId;
   if (nextId === id) {
-    return { book: patchProfile(book, id, (p) => ({ ...p, identity })), id };
+    return { book: patchProfile(book, id, (p) => ({ ...p, identity: { ...identity, hubId: hubId(p) } })), id };
   }
   const existing = book.profiles[nextId];
   const merged: StoredProfile = {
     ...profile,
     id: nextId,
-    identity,
+    identity: { ...identity, hubId: hubId(profile) ?? hubId(existing) },
     label: { ...existing?.label, ...profile.label },
     mesh: profile.mesh ?? existing?.mesh,
   };

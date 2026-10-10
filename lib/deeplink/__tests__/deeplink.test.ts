@@ -1,8 +1,10 @@
 import { describe, expect, it } from "@jest/globals";
-import { fromDesktopPath } from "../desktopPaths";
+import { fromDesktopPath, toDesktopPath } from "../desktopPaths";
+import { orgLinkFor, shareLinkFor, smartLinkFor } from "../universalLink";
+import { StoredProfile } from "../../arkitekt/fakts/profileStorageSchema";
 import { parseIncomingLink } from "../incoming";
 import { parseSmartPath } from "../smartLink";
-import { decodeShareRequest, encodeOpaqueScope, encodeShareScope, matchScope, normalizeLinkPath } from "../shareScope";
+import { decodeShareRequest, encodeOpaqueScope, encodeShareScope, inSmartHome, matchScope, normalizeLinkPath } from "../shareScope";
 
 const scope = { baseUrl: "https://Go.Arkitekt.live/", org: "7", hub: null };
 
@@ -202,5 +204,62 @@ describe("the auth relay's callback", () => {
     expect(parseIncomingLink("orkestrator://kuvert/auth/callback?error=access_denied")?.path).toBe(
       "/not-here?path=%2Fkuvert%2Fauth%2Fcallback",
     );
+  });
+});
+
+describe("links shared through the organization's front door", () => {
+  const host = { frontendUrl: "https://go.arkitekt.live/", slug: "my-lab", hub: "3", user: "8" };
+  const profile = (over: { hubId?: string | null; slug?: string; frontend?: string | null } = {}) =>
+    ({
+      id: "p",
+      session: { endpoint: { base_url: "https://go.arkitekt.live/lok/f/", frontend_url: over.frontend === undefined ? "https://go.arkitekt.live" : over.frontend } },
+      identity: { baseUrl: "https://go.arkitekt.live/lok/f/", userId: "8", organizationId: "7", hubId: over.hubId === undefined ? "3" : over.hubId },
+      label: { organizationSlug: "slug" in over ? over.slug : "my-lab" },
+    }) as unknown as StoredProfile;
+
+  it("name an object as itself, and are read back as the same page", () => {
+    const link = smartLinkFor(host, { identifier: "@rekuest/task", id: "5" });
+    expect(link).toBe("https://go.arkitekt.live/smartlink/my-lab/3/%40rekuest%2Ftask/5?user_id=8");
+    // What kontrol hands over for it.
+    const handed = link.replace("https://go.arkitekt.live/smartlink/", "orkestrator://smart/");
+    expect(parseIncomingLink(handed)).toEqual({ scope: null, digest: null, organization: { slug: "my-lab", hub: "3" }, path: "/tasks/5" });
+  });
+
+  it("name a page the desktop's way, and are read back the phone's", () => {
+    expect(toDesktopPath("/tasks")).toBe("/rekuest");
+    expect(toDesktopPath("/mail?box=unread")).toBe("/kuvert?box=unread");
+    expect(toDesktopPath("/mikro/arraydatasets")).toBe("/mikro/arraydatasets");
+    expect(toDesktopPath("/bank?view=spending")).toBe("/bank?view=spending");
+    expect(toDesktopPath("/tasks/5")).toBe("/rekuest/tasks/5");
+    expect(toDesktopPath("/settings")).toBeNull();
+    expect(toDesktopPath("/")).toBeNull();
+
+    const link = orgLinkFor(host, "/mail?box=unread", { baseUrl: "https://go.arkitekt.live/lok/f", org: "7", hub: "3" })!;
+    expect(link.startsWith("https://go.arkitekt.live/deeplink/my-lab/orkestrator/open?to=")).toBe(true);
+    expect(link.endsWith("&user_id=8")).toBe(true);
+    const handed = link.replace("https://go.arkitekt.live/deeplink/my-lab/orkestrator/", "orkestrator://");
+    expect(parseIncomingLink(handed)).toEqual({
+      scope: { baseUrl: "https://go.arkitekt.live/lok/f", org: "7", hub: "3" },
+      digest: null,
+      path: "/mail?box=unread",
+    });
+  });
+
+  it("are what the share button hands out, when the login can be linked that way", () => {
+    expect(shareLinkFor("/tasks/5", profile())).toBe("https://go.arkitekt.live/smartlink/my-lab/3/%40rekuest%2Ftask/5?user_id=8");
+    expect(shareLinkFor("/tasks", profile())).toContain("/deeplink/my-lab/orkestrator/open?");
+    // A page only the phone has, and a login kontrol cannot serve, keep the app's own form.
+    expect(shareLinkFor("/settings", profile())).toContain("https://arkitekt.live/deeplink?pokket=");
+    expect(shareLinkFor("/tasks/5", profile({ hubId: null }))).toContain("https://arkitekt.live/deeplink?pokket=");
+    expect(shareLinkFor("/tasks/5", profile({ slug: undefined }))).toContain("https://arkitekt.live/deeplink?pokket=");
+    expect(shareLinkFor("/tasks/5", profile({ frontend: null }))).toContain("https://arkitekt.live/deeplink?pokket=");
+    expect(shareLinkFor("/tasks/5", null)).toBe("https://arkitekt.live/deeplink?pokket=%2Ftasks%2F5");
+  });
+
+  it("belong to a login by slug, and by hub once the login knows its own", () => {
+    expect(inSmartHome(profile(), { slug: "my-lab", hub: "3" })).toBe(true);
+    expect(inSmartHome(profile(), { slug: "my-lab", hub: "4" })).toBe(false);
+    expect(inSmartHome(profile({ hubId: null }), { slug: "my-lab", hub: "4" })).toBe(true);
+    expect(inSmartHome(profile(), { slug: "other", hub: "3" })).toBe(false);
   });
 });
