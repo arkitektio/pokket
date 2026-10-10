@@ -1,0 +1,516 @@
+# An action's ports, their widgets, validators and effects: orkestrator's
+# `graphql/rekuest-next/fragments/ports.graphql`, without the props of custom
+# (blok) widgets, which pokket draws by their fallback.
+
+fragment StringAssignWidget on StringAssignWidget {
+  __typename
+  kind
+  followValue
+  placeholder
+  asParagraph
+}
+
+fragment SliderAssignWidget on SliderAssignWidget {
+  __typename
+  kind
+  followValue
+  min
+  max
+  step
+}
+
+fragment StateChoiceAssignWidget on StateChoiceAssignWidget {
+  __typename
+  kind
+  followValue
+  statePath
+  stateCall {
+    ...PortCall
+  }
+  stateAccessors {
+    optionKey
+    path
+    call {
+      ...PortCall
+    }
+  }
+  dependency
+  dependencies
+}
+
+fragment ProxyWidget on ProxyWidget {
+  __typename
+  kind
+  followValue
+  targetPort
+  targetAction
+  targetDependency
+}
+
+fragment FilterPort on ArgPort {
+  __typename
+  kind
+  key
+  identifier
+  widget {
+    ... on SearchAssignWidget {
+      query
+    }
+  }
+  description
+  nullable
+}
+
+fragment SearchAssignWidget on SearchAssignWidget {
+  __typename
+  kind
+  followValue
+  query
+  ward
+  filters {
+    ...FilterPort
+  }
+  dependencies
+}
+
+# Custom widgets name a component from the UI catalog (`component`) and bind
+# its props like a blok node. `fallback` is the widget to use when the catalog
+# does not know the component; it cannot recurse into another custom widget,
+# so it is selected as the non-custom variants only.
+fragment CustomAssignWidget on CustomAssignWidget {
+  __typename
+  kind
+  followValue
+  component
+  dependencies
+  fallback {
+    __typename
+    kind
+    ...StringAssignWidget
+    ...SearchAssignWidget
+    ...SliderAssignWidget
+    ...ChoiceAssignWidget
+    ...ProxyWidget
+    ...StateChoiceAssignWidget
+  }
+}
+
+# Choices live on the port (`ArgPort.choices` / `ReturnPort.choices`); the
+# widget only says how to present them.
+fragment ChoiceAssignWidget on ChoiceAssignWidget {
+  __typename
+  kind
+  followValue
+  placeholder
+}
+
+# Child ports (list items, dict values, union variants, model fields) carry
+# the same effects, validators and defaults as top-level ports; the client
+# renders and validates them at every depth. Fragments cannot recurse, so the
+# tree is selected three levels deep; the deepest level keeps enough to render
+# a leaf widget.
+fragment ArgChildPortDeep on ArgPort {
+  __typename
+  kind
+  key
+  label
+  identifier
+  referenceUnit
+  proposedUnits
+  dimension
+  choices {
+    value
+    label
+    description
+  }
+  widget {
+    ...AssignWidget
+  }
+  description
+  nullable
+  default
+  children {
+    __typename
+    kind
+    key
+    identifier
+    nullable
+    widget {
+      ...AssignWidget
+    }
+  }
+}
+
+fragment ArgChildPortNested on ArgPort {
+  __typename
+  kind
+  key
+  label
+  identifier
+  referenceUnit
+  proposedUnits
+  dimension
+  children {
+    ...ArgChildPortDeep
+  }
+  choices {
+    value
+    label
+    description
+  }
+  widget {
+    ...AssignWidget
+  }
+  effects {
+    ...PortEffect
+  }
+  validators {
+    ...Validator
+  }
+  description
+  nullable
+  default
+}
+
+fragment ArgChildPort on ArgPort {
+  __typename
+  kind
+  key
+  label
+  identifier
+  referenceUnit
+  proposedUnits
+  dimension
+  children {
+    ...ArgChildPortNested
+  }
+  widget {
+    ...AssignWidget
+  }
+  effects {
+    ...PortEffect
+  }
+  validators {
+    ...Validator
+  }
+  choices {
+    value
+    label
+    description
+  }
+  nullable
+  description
+  default
+}
+
+fragment ReturnChildPortDeep on ReturnPort {
+  __typename
+  kind
+  key
+  label
+  identifier
+  referenceUnit
+  proposedUnits
+  dimension
+  choices {
+    value
+    label
+    description
+  }
+  widget {
+    ...ReturnWidget
+  }
+  description
+  nullable
+  children {
+    __typename
+    kind
+    key
+    identifier
+    nullable
+    widget {
+      ...ReturnWidget
+    }
+  }
+}
+
+fragment ReturnChildPortNested on ReturnPort {
+  __typename
+  kind
+  key
+  label
+  identifier
+  referenceUnit
+  proposedUnits
+  dimension
+  children {
+    ...ReturnChildPortDeep
+  }
+  choices {
+    value
+    label
+    description
+  }
+  widget {
+    ...ReturnWidget
+  }
+  effects {
+    ...PortEffect
+  }
+  description
+  nullable
+}
+
+fragment ReturnChildPort on ReturnPort {
+  __typename
+  kind
+  key
+  label
+  identifier
+  referenceUnit
+  proposedUnits
+  dimension
+  children {
+    ...ReturnChildPortNested
+  }
+  widget {
+    ...ReturnWidget
+  }
+  effects {
+    ...PortEffect
+  }
+  choices {
+    value
+    label
+    description
+  }
+  nullable
+  description
+}
+
+fragment BaseEffect on Effect {
+  __typename
+  kind
+  dependencies
+  source
+  call {
+    ...PortCall
+  }
+}
+
+fragment CustomEffect on CustomEffect {
+  ...BaseEffect
+  __typename
+  kind
+}
+
+fragment MessageEffect on MessageEffect {
+  ...BaseEffect
+  __typename
+  kind
+  message
+}
+
+fragment HideEffect on HideEffect {
+  ...BaseEffect
+  __typename
+  fade
+}
+
+fragment PortEffect on Effect {
+  ...CustomEffect
+  ...MessageEffect
+  ...HideEffect
+}
+
+fragment AssignWidget on AssignWidget {
+  __typename
+  kind
+  ...StringAssignWidget
+  ...SearchAssignWidget
+  ...SliderAssignWidget
+  ...ChoiceAssignWidget
+  ...ProxyWidget
+  ...CustomAssignWidget
+  ...StateChoiceAssignWidget
+}
+
+fragment Validator on Validator {
+  call {
+    ...PortCall
+  }
+  dependencies
+  label
+  errorMessage
+  source
+}
+
+fragment ArgPort on ArgPort {
+  __typename
+  key
+  label
+  nullable
+  description
+  effects {
+    ...PortEffect
+  }
+  widget {
+    ...AssignWidget
+  }
+  kind
+  identifier
+  referenceUnit
+  proposedUnits
+  dimension
+  children {
+    ...ArgChildPort
+  }
+  choices {
+    value
+    label
+    description
+  }
+  default
+  nullable
+  validators {
+    ...Validator
+  }
+  requires {
+    key
+    operator
+    value
+  }
+}
+
+fragment ReturnPort on ReturnPort {
+  __typename
+  key
+  label
+  nullable
+  description
+  effects {
+    ...PortEffect
+  }
+  widget {
+    ...ReturnWidget
+  }
+  kind
+  identifier
+  referenceUnit
+  proposedUnits
+  dimension
+  children {
+    ...ReturnChildPort
+  }
+  choices {
+    value
+    label
+    description
+  }
+  nullable
+  provides {
+    key
+    operator
+    value
+  }
+}
+
+
+fragment CustomReturnWidget on CustomReturnWidget {
+  __typename
+  kind
+  component
+}
+
+fragment ChoiceReturnWidget on ChoiceReturnWidget {
+  __typename
+  kind
+}
+
+fragment ReturnWidget on ReturnWidget {
+  __typename
+  kind
+  ...CustomReturnWidget
+  ...ChoiceReturnWidget
+}
+
+fragment PortGroup on PortGroup {
+  key
+  title
+  description
+  effects {
+    ...PortEffect
+  }
+  ports
+}
+
+fragment Ports on Action {
+  args {
+    ...ArgPort
+  }
+  returns {
+    ...ReturnPort
+  }
+  portGroups {
+    ...PortGroup
+  }
+}
+
+# --- Port calls -------------------------------------------------------------
+# `call` is a blok UtilCall. GraphQL fragments cannot recurse, so nesting is
+# selected to a fixed depth: a top-level call, whose arguments may hold one
+# nested call, whose arguments may hold one more (leaf) call. Deeper payloads
+# are rejected by the client's parser rather than silently truncated.
+
+fragment PortCallLeafArgument on ActionArgument {
+  key
+  valueLiteral
+  valuePath
+}
+
+fragment PortCallLeaf on UtilCall {
+  operation
+  arguments {
+    ...PortCallLeafArgument
+  }
+}
+
+fragment PortCallInnerArgument on ActionArgument {
+  ...PortCallLeafArgument
+  utilCall {
+    ...PortCallLeaf
+  }
+  valueList {
+    ...PortCallLeafArgument
+  }
+  valueDict {
+    ...PortCallLeafArgument
+  }
+}
+
+fragment PortCallInner on UtilCall {
+  operation
+  arguments {
+    ...PortCallInnerArgument
+  }
+}
+
+fragment PortCallArgument on ActionArgument {
+  ...PortCallLeafArgument
+  utilCall {
+    ...PortCallInner
+  }
+  valueList {
+    ...PortCallInnerArgument
+  }
+  valueDict {
+    ...PortCallInnerArgument
+  }
+}
+
+fragment PortCall on UtilCall {
+  operation
+  arguments {
+    ...PortCallArgument
+  }
+}

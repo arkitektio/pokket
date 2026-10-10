@@ -139,11 +139,10 @@ fragment ReplyerAction on Action {
   name
   description
   args {
-    key
-    kind
-    identifier
-    nullable
-    default
+    ...ArgPort
+  }
+  portGroups {
+    ...PortGroup
   }
   latestTask {
     id

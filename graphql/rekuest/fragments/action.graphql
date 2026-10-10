@@ -1,0 +1,64 @@
+# An action in a list: what it is, and whether anything can run it right now.
+fragment ListAction on Action {
+  id
+  name
+  description
+  hash
+  kind
+  app {
+    identifier
+  }
+  implementations {
+    id
+    agent {
+      id
+      name
+      connected
+    }
+  }
+}
+
+# Everything the assign form needs: the ports with their widgets, how they are
+# grouped, and the arguments of the last run to start from.
+fragment AssignAction on Action {
+  id
+  name
+  description
+  hash
+  kind
+  app {
+    identifier
+  }
+  ...Ports
+  latestTask {
+    id
+    args
+  }
+}
+
+# An action offered for the object on show: enough to tell whether it can run
+# on that alone or needs its form.
+fragment ObjectAction on Action {
+  id
+  name
+  description
+  args {
+    key
+    kind
+    identifier
+    nullable
+    default
+  }
+}
+
+# Who can run an action: one implementation per agent that offers it.
+fragment ProvidingImplementation on Implementation {
+  id
+  interface
+  agent {
+    id
+    name
+    active
+    connected
+  }
+}

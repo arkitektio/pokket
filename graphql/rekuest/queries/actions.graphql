@@ -1,0 +1,43 @@
+query Actions($filters: ActionFilter, $pagination: OffsetPaginationInput, $ordering: [ActionOrder!]) {
+  actions(filters: $filters, pagination: $pagination, ordering: $ordering) {
+    ...ListAction
+  }
+}
+
+query AssignAction($id: ID!) {
+  action(id: $id) {
+    ...AssignAction
+  }
+}
+
+# The actions whose first argument is an object of this kind: what can be run
+# on the page on show. Orkestrator's `PrimaryActions`.
+query ActionsFor($identifier: String!, $search: String) {
+  actions(
+    filters: {
+      demands: [{ kind: ARGS, matches: [{ at: 0, kind: STRUCTURE, identifier: $identifier }] }]
+      search: $search
+    }
+    pagination: { limit: 30 }
+  ) {
+    ...ObjectAction
+  }
+}
+
+# Connected agents first, as orkestrator's "Run on" lists them.
+query ActionImplementations($hash: ActionHash!) {
+  implementations(filters: { actionHash: $hash }, ordering: [{ active: DESC }], pagination: { limit: 30 }) {
+    ...ProvidingImplementation
+  }
+}
+
+query ActionSearch($search: String!, $limit: Int!) {
+  actions(filters: { search: $search }, pagination: { limit: $limit }) {
+    id
+    name
+    description
+    app {
+      identifier
+    }
+  }
+}
