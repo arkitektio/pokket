@@ -1,3 +1,10 @@
+## [1.15.4](https://github.com/arkitektio/pokket/compare/v1.15.3...v1.15.4) (2026-10-10)
+
+
+### Bug Fixes
+
+* **deeplink:** no private link on the share button ([5d5262d](https://github.com/arkitektio/pokket/commit/5d5262df7fc59d49346bacadc8c91d6425cb87e9))
+
 ## [1.15.3](https://github.com/arkitektio/pokket/compare/v1.15.2...v1.15.3) (2026-10-10)
 
 
