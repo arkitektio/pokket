@@ -1,15 +1,37 @@
 import { router } from "expo-router";
+import { pathOf, queryOf, routeOf } from "./modules/catalog";
+
+/** One spelling per route (params sorted), so two can be compared. */
+const spelled = (route: string) => routeOf(pathOf(route), queryOf(route));
+
+let onShow: string | null = null;
+
+/** Told by the page view on every navigation: the route it shows now. */
+export const setPageOnShow = (route: string) => {
+  onShow = spelled(route);
+};
 
 /**
- * Show a module page in the page view, as the rail does in orkestrator: it
- * replaces what the tab shows (from the root of its stack), rather than
- * piling pages on a back stack. Details — a thread, a transaction — are
- * pushed over a page instead, with a way back.
+ * Show a module page in the page view: the sidebar, search and links between
+ * pages. It is a step in the page view's history, like a detail pushed over a
+ * page, so back returns to where one came from. Choosing the page already on
+ * show does nothing.
  *
- * Both act on the navigator that has focus, so both must run from inside the
- * app frame. From a screen over it (search) use `afterReturningToApp`.
+ * Acts on the navigator that has focus, as `showDetail` and `replacePage` do,
+ * so all three must run from inside the app frame. From a screen over it
+ * (search) use `afterReturningToApp`.
  */
 export const showPage = (route: string) => {
+  if (spelled(route) === onShow) return;
+  router.push(route as never);
+};
+
+/**
+ * Leave the page on show for good and show another from the root of the
+ * stack: the page left behind is gone (a deleted room), so back must not
+ * return to it.
+ */
+export const replacePage = (route: string) => {
   // Only unwind when something is pushed: each action is its own render.
   if (router.canDismiss()) router.dismissAll();
   router.replace(route as never);

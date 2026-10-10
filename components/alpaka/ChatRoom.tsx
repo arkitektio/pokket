@@ -22,7 +22,7 @@ import {
 } from '@/lib/alpaka/chat/pendingMessages';
 import type { ReplyerController } from '@/lib/alpaka/chat/useReplyer';
 import { useMeQuery } from '@/lib/lok/api/graphql';
-import { showPage } from '@/lib/navigation';
+import { replacePage } from '@/lib/navigation';
 import { useTabTitle } from '@/lib/tabs/TabsProvider';
 import { useThemeColors } from '@/lib/theme/BrandProvider';
 import * as Crypto from 'expo-crypto';
@@ -223,7 +223,7 @@ export function ChatRoom({ id, replyer }: { id: string; replyer: ReplyerControll
         onClose={() => setInfo(false)}
         onDeleted={() => {
           setInfo(false);
-          showPage('/alpaka');
+          replacePage('/alpaka');
         }}
       />
       <ActionSheet visible={!!held && heldOptions.length > 0} options={heldOptions} onClose={() => setHeld(null)} />
