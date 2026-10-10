@@ -33,3 +33,12 @@ mutation ResumeTask($task: ID!) {
     isDone
   }
 }
+
+mutation Assign($input: AssignInput!) {
+  assign(input: $input) {
+    id
+    reference
+    isDone
+    latestEventKind
+  }
+}

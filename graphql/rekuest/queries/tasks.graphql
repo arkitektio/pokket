@@ -9,3 +9,19 @@ query DetailTask($id: ID!) {
     ...DetailTask
   }
 }
+
+# The actions that can answer in a chat room: they take a message and return
+# one. `latestTask.args` is what the replyer was last run with, which is what
+# pokket runs it with again.
+query ReplyerActions {
+  actions(
+    filters: {
+      demands: [
+        { kind: ARGS, matches: [{ kind: STRUCTURE, identifier: "@alpaka/message" }] }
+        { kind: RETURNS, matches: [{ kind: STRUCTURE, identifier: "@alpaka/message" }] }
+      ]
+    }
+  ) {
+    ...ReplyerAction
+  }
+}
