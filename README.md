@@ -40,6 +40,33 @@ through a foreground service (`modules/pokket-call`) with an ongoing notificatio
 pauses while in the background. The microphone is asked for when you tap Join and the camera
 when you first switch it on; refuse the microphone and you still join, listening.
 
+### 🔬 Mikro
+
+The organisation's microscopy data, read-only: **Mikro** opens on the newest datasets and lenses,
+pinned and top-level folders and recent files, and has a list and a page for datasets, lenses,
+folders, files, scenes, tables, charts and annotations. Search finds datasets, lenses, folders and
+files. The paths are orkestrator's (`/mikro/arraydatasets/12`), so a link shared from either opens
+in the other.
+
+There is no viewer: orkestrator renders scenes with WebGPU, which a phone app cannot. What pokket
+shows is a scene's last snapshot, where one has been taken (many datasets have none, and show a
+glyph). Pictures and file downloads come straight from the datalayer by a presigned URL that pokket
+signs itself (`lib/datalayer/presign.ts`), also through the mesh. A file's **Download** fetches it
+whole and hands it to the share sheet.
+
+### 💬 Chat
+
+Chat rooms from `alpaka`. **Chat** starts a room from the first message and lists recent ones; a
+room shows messages live, a reply growing as it is written. Replies come from a *replyer*: a
+`rekuest` action that takes a message and returns one. The chip over the composer picks which
+replyer answers in a room (or none), each message you send runs it, and a pill shows its progress
+with a way to stop it. Long-press a message to have it answered again or to share its text.
+
+Pokket has no form for a replyer's other arguments: it runs a replyer with the arguments of its
+last run, and one that needs arguments it has never been given has to be run once from orkestrator.
+Things attached to messages (tasks, datasets, threads) show as chips that open their page;
+attaching from the phone is not there yet. Without `rekuest` a room is a plain message board.
+
 ### 🕸️ Organisation Mesh
 
 Deployments that run an organisation mesh (an [ionscale](https://github.com/jsiebens/ionscale)
@@ -173,7 +200,19 @@ workflow does nothing, because semantic-release finds no new version.
    `pokket://mesh-selftest?...` link; open it in the dev build (same network) and it joins,
    fetches and holds a WebSocket through the mesh, and reports the result in your terminal.
 
-4. **Tests**
+4. **GraphQL code**
+
+   Each service's hooks are generated from `graphql/<service>/` against the schema in its
+   `<service>.yml`: `pnpm rekuest`, `pnpm lovekit`, `pnpm kuvert` and so on. Mikro and alpaka have
+   no script on purpose: `package.json`'s scripts are part of the native fingerprint, so adding one
+   makes the next release need new binaries. Run them as
+
+   ```bash
+   pnpm exec graphql-codegen --config ./mikro.yml
+   pnpm exec graphql-codegen --config ./alpaka.yml
+   ```
+
+5. **Tests**
 
    ```bash
    pnpm test                                   # jest: fakts client, lib/mesh
