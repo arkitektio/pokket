@@ -6,6 +6,7 @@ import { bankServiceDefinition } from "../bank/service";
 import { kuvertServiceDefinition } from "../kuvert/service";
 import { lokateServiceDefinition } from "../lokate/service";
 import { livekitServiceDefinition } from "../livekit/service";
+import { datalayerServiceDefinition } from "../datalayer/service";
 import { lokServiceBuilder } from "../lok/service";
 import { lovekitServiceDefinition } from "../lovekit/service";
 import { mesh } from "../mesh/integration";
@@ -81,6 +82,7 @@ export const App = buildArkitekt({
     kuvert: kuvertServiceDefinition,
     bank: bankServiceDefinition,
     lokate: lokateServiceDefinition,
+    datalayer: datalayerServiceDefinition,
 
   },
   selfServiceBuilder: lokServiceBuilder,
@@ -101,5 +103,6 @@ export const Guard = {
   Kuvert: App.buildServiceGuard("kuvert"),
   Bank: App.buildServiceGuard("bank"),
   Lokate: App.buildServiceGuard("lokate"),
+  Datalayer: App.buildServiceGuard("datalayer"),
 };
 
