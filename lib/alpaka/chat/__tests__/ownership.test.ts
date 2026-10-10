@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 import { byCreation, isOwnMessage } from "../ownership";
-import { parseChoices, withChoice } from "../replyerChoice";
+import { choiceFor, parseChoices, withChoice } from "../replyerChoice";
 
 const me = { id: "7", username: "ada" };
 
@@ -38,20 +38,24 @@ describe("message order", () => {
 
 describe("remembered replyers", () => {
   it("keeps one choice per room, the latest", () => {
-    expect(withChoice(withChoice({}, "1", "a"), "1", "b")).toEqual({ "1": "b" });
+    const choices = withChoice(withChoice([], "1", "a"), "1", "b");
+    expect(choices).toEqual([["1", "b"]]);
+    expect(choiceFor(choices, "1")).toBe("b");
+    expect(choiceFor(choices, "2")).toBeNull();
   });
-  it("lets go of the rooms used longest ago", () => {
-    let choices = {};
-    for (let i = 0; i < 205; i++) choices = withChoice(choices, String(i), "a");
-    choices = withChoice(choices, "5", "b");
-    expect(Object.keys(choices)).toHaveLength(200);
-    expect(choices).not.toHaveProperty("4");
-    expect(choices).toHaveProperty("204", "a");
+  it("lets go of the rooms used longest ago, whatever their ids", () => {
+    let choices = withChoice([], "900", "first");
+    for (let i = 0; i < 199; i++) choices = withChoice(choices, String(i), "a");
+    choices = withChoice(choices, "900", "again");
+    choices = withChoice(choices, "500", "a");
+    expect(choices).toHaveLength(200);
+    expect(choiceFor(choices, "0")).toBeNull();
+    expect(choiceFor(choices, "900")).toBe("again");
   });
-  it("reads nothing from what is not a map of strings", () => {
-    expect(parseChoices(null)).toEqual({});
-    expect(parseChoices("nope")).toEqual({});
-    expect(parseChoices("[1]")).toEqual({});
-    expect(parseChoices('{"1":"a","2":3}')).toEqual({ "1": "a" });
+  it("reads pairs, and the map an earlier version stored", () => {
+    expect(parseChoices(null)).toEqual([]);
+    expect(parseChoices("nope")).toEqual([]);
+    expect(parseChoices('[["1","a"],["2",3],"x"]')).toEqual([["1", "a"]]);
+    expect(parseChoices('{"1":"a","2":3}')).toEqual([["1", "a"]]);
   });
 });

@@ -71,6 +71,8 @@ export default function PagesLayout() {
         <Stack.Screen name="bank/transaction/[id]" options={{ title: 'Transaction' }} />
         <Stack.Screen name="tasks/index" options={page('Tasks')} />
         <Stack.Screen name="tasks/[id]" options={{ title: 'Task' }} />
+        <Stack.Screen name="actions/index" options={page('Actions')} />
+        <Stack.Screen name="actions/[id]" options={{ title: 'Action' }} />
         <Stack.Screen name="broadcasts" options={page('Broadcasts')} />
         <Stack.Screen name="calls/index" options={page('Calls')} />
         <Stack.Screen name="calls/[id]" options={{ title: 'Call' }} />

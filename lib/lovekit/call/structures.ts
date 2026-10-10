@@ -17,6 +17,7 @@ type StructureKind = {
 
 const KINDS: readonly StructureKind[] = [
   { identifier: "@rekuest/task", name: "Task", prefix: "/tasks/", callable: true },
+  { identifier: "@rekuest/action", name: "Action", prefix: "/actions/", callable: false },
   { identifier: "@bank/transaction", name: "Transaction", prefix: "/bank/transaction/", callable: true },
   { identifier: "@kuvert/thread", name: "Thread", prefix: "/mail/thread/", callable: true },
   { identifier: "@lovekit/solo_broadcast", name: "Broadcast", prefix: "/solo-broadcast/", callable: true },

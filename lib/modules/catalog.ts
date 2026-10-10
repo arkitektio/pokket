@@ -80,7 +80,17 @@ export const MODULE_CATALOG: ModuleDecl[] = [
     icon: "list-checks",
     serviceKey: "rekuest",
     route: "/tasks",
-    navLinks: [{ label: "Tasks", route: "/tasks", home: true, keywords: ["rekuest", "jobs", "assignations"] }],
+    navLinks: [
+      { label: "Tasks", route: "/tasks", home: true, keywords: ["rekuest", "jobs", "assignations"] },
+      {
+        label: "Actions",
+        route: "/actions",
+        group: "Run",
+        icon: "play",
+        description: "What the organization's apps can do",
+        keywords: ["rekuest", "run", "assign", "functions", "start"],
+      },
+    ],
   },
   {
     key: "broadcasts",

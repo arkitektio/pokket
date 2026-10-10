@@ -4,9 +4,11 @@ import { useBankPaletteSearchQuery } from '@/lib/bank/api/graphql';
 import { formatDay, formatIban, formatMoney } from '@/lib/bank/format';
 import { useKuvertPaletteSearchQuery } from '@/lib/kuvert/api/graphql';
 import { useMikroSearchQuery } from '@/lib/mikro/api/graphql';
+import { useActionSearchQuery } from '@/lib/rekuest/api/graphql';
+import { actionRoute } from '@/lib/rekuest/assign/runOrAsk';
 import { describeArrayDataset, describeFile, describeFolder, describeLens } from '@/components/mikro/rows';
 import { ActivityIndicator, View } from 'react-native';
-import { CreditCard, Mail, Receipt, Store, Tag } from 'lucide-react-native';
+import { CreditCard, Mail, Play, Receipt, Store, Tag } from 'lucide-react-native';
 import { useThemeColors } from '@/lib/theme/BrandProvider';
 import { SearchItem, SearchRow, SearchSectionHeader } from './SearchRow';
 
@@ -152,6 +154,28 @@ function MikroHits({ term, onPick }: Props) {
   return <Group title="Mikro" items={items} loading={loading} />;
 }
 
+/** Actions to run: rekuest ranks them by name, then by meaning. */
+function ActionHits({ term, onPick }: Props) {
+  const { data, loading } = useActionSearchQuery({
+    variables: { search: term, limit: PER_TYPE_LIMIT },
+    fetchPolicy: 'cache-first',
+  });
+  const items = (data?.actions ?? []).map((action) =>
+    toItem(
+      {
+        identifier: '@rekuest/action',
+        id: action.id,
+        label: action.name,
+        description: action.description || action.app.identifier,
+        route: actionRoute(action.id),
+      },
+      Play,
+      onPick,
+    ),
+  );
+  return <Group title="Actions" items={items} loading={loading} />;
+}
+
 /**
  * The server-side searches — orkestrator's `ApplicableEntitySearch`: each
  * inside its service's guard, so no query runs without its client, and the
@@ -170,6 +194,9 @@ export function EntitySearch(props: Props) {
       <Guard.Mikro>
         <MikroHits {...props} />
       </Guard.Mikro>
+      <Guard.Rekuest>
+        <ActionHits {...props} />
+      </Guard.Rekuest>
     </View>
   );
 }
