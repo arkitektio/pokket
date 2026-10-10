@@ -3,6 +3,8 @@ import { Guard } from '@/lib/app/App';
 import { useBankPaletteSearchQuery } from '@/lib/bank/api/graphql';
 import { formatDay, formatIban, formatMoney } from '@/lib/bank/format';
 import { useKuvertPaletteSearchQuery } from '@/lib/kuvert/api/graphql';
+import { useMikroSearchQuery } from '@/lib/mikro/api/graphql';
+import { describeArrayDataset, describeFile, describeFolder, describeLens } from '@/components/mikro/rows';
 import { ActivityIndicator, View } from 'react-native';
 import { CreditCard, Mail, Receipt, Store, Tag } from 'lucide-react-native';
 import { useThemeColors } from '@/lib/theme/BrandProvider';
@@ -133,6 +135,23 @@ function BankHits({ term, onPick }: Props) {
   return <Group title="Finances" items={items} loading={loading} />;
 }
 
+/** Mikro hits, in orkestrator's order: datasets, lenses, folders, files. */
+function MikroHits({ term, onPick }: Props) {
+  const { data, loading } = useMikroSearchQuery({
+    variables: { search: term, limit: PER_TYPE_LIMIT },
+    fetchPolicy: 'cache-first',
+  });
+  const hit = (identifier: string, id: string, row: { href: string; icon: SearchItem['icon']; title: string; detail?: string }) =>
+    toItem({ identifier, id, label: row.title, description: row.detail, route: row.href }, row.icon, onPick);
+  const items: SearchItem[] = [
+    ...(data?.arrayDatasets ?? []).map((d) => hit('@mikro/arraydataset', d.id, describeArrayDataset(d))),
+    ...(data?.lenses ?? []).map((l) => hit('@mikro/lens', l.id, describeLens(l))),
+    ...(data?.folders ?? []).map((f) => hit('@mikro/folder', f.id, describeFolder(f))),
+    ...(data?.files ?? []).map((f) => hit('@mikro/file', f.id, describeFile(f))),
+  ];
+  return <Group title="Mikro" items={items} loading={loading} />;
+}
+
 /**
  * The server-side searches — orkestrator's `ApplicableEntitySearch`: each
  * inside its service's guard, so no query runs without its client, and the
@@ -148,6 +167,9 @@ export function EntitySearch(props: Props) {
       <Guard.Bank>
         <BankHits {...props} />
       </Guard.Bank>
+      <Guard.Mikro>
+        <MikroHits {...props} />
+      </Guard.Mikro>
     </View>
   );
 }
