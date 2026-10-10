@@ -74,6 +74,23 @@ export default function PagesLayout() {
         <Stack.Screen name="broadcasts" options={page('Broadcasts')} />
         <Stack.Screen name="calls/index" options={page('Calls')} />
         <Stack.Screen name="calls/[id]" options={{ title: 'Call' }} />
+        <Stack.Screen name="mikro/index" options={page('Mikro')} />
+        <Stack.Screen name="mikro/arraydatasets/index" options={page('Datasets')} />
+        <Stack.Screen name="mikro/arraydatasets/[id]" options={{ title: 'Dataset' }} />
+        <Stack.Screen name="mikro/lenses/index" options={page('Lenses')} />
+        <Stack.Screen name="mikro/lenses/[id]" options={{ title: 'Lens' }} />
+        <Stack.Screen name="mikro/folders/index" options={page('Folders')} />
+        <Stack.Screen name="mikro/folders/[id]" options={{ title: 'Folder' }} />
+        <Stack.Screen name="mikro/files/index" options={page('Files')} />
+        <Stack.Screen name="mikro/files/[id]" options={{ title: 'File' }} />
+        <Stack.Screen name="mikro/scenes/index" options={page('Scenes')} />
+        <Stack.Screen name="mikro/scenes/[id]" options={{ title: 'Scene' }} />
+        <Stack.Screen name="mikro/tabledatasets/index" options={page('Tables')} />
+        <Stack.Screen name="mikro/tabledatasets/[id]" options={{ title: 'Table' }} />
+        <Stack.Screen name="mikro/charts/index" options={page('Charts')} />
+        <Stack.Screen name="mikro/charts/[id]" options={{ title: 'Chart' }} />
+        <Stack.Screen name="mikro/annotations/index" options={page('Annotations')} />
+        <Stack.Screen name="mikro/annotations/[id]" options={{ title: 'Annotation' }} />
         <Stack.Screen name="lokate" options={page('Lokate')} />
         <Stack.Screen name="phone" options={page('Phone')} />
         <Stack.Screen name="solo-broadcast/start" options={{ title: 'Start Solo Broadcast' }} />

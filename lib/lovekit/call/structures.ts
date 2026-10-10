@@ -21,6 +21,14 @@ const KINDS: readonly StructureKind[] = [
   { identifier: "@kuvert/thread", name: "Thread", prefix: "/mail/thread/", callable: true },
   { identifier: "@lovekit/solo_broadcast", name: "Broadcast", prefix: "/solo-broadcast/", callable: true },
   { identifier: "@lovekit/call", name: "Call", prefix: "/calls/", callable: false },
+  { identifier: "@mikro/arraydataset", name: "Dataset", prefix: "/mikro/arraydatasets/", callable: true },
+  { identifier: "@mikro/lens", name: "Lens", prefix: "/mikro/lenses/", callable: true },
+  { identifier: "@mikro/folder", name: "Folder", prefix: "/mikro/folders/", callable: true },
+  { identifier: "@mikro/file", name: "File", prefix: "/mikro/files/", callable: true },
+  { identifier: "@mikro/scene", name: "Scene", prefix: "/mikro/scenes/", callable: true },
+  { identifier: "@mikro/tabledataset", name: "Table", prefix: "/mikro/tabledatasets/", callable: true },
+  { identifier: "@mikro/chart", name: "Chart", prefix: "/mikro/charts/", callable: true },
+  { identifier: "@mikro/annotation", name: "Annotation", prefix: "/mikro/annotations/", callable: true },
 ];
 
 export type CallStructure = { identifier: string; object: number };

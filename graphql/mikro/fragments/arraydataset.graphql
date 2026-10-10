@@ -28,12 +28,9 @@ fragment DetailArrayDataset on ArrayDataset {
   lenses(sliced: true) {
     ...ListLens
   }
+  # The edges back into what it was computed from; empty when it was acquired.
   derivedFrom {
     id
     kind
-    output {
-      id
-      name
-    }
   }
 }

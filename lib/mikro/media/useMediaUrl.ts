@@ -15,19 +15,19 @@ export const useMediaUrl = (media: { key: string } | null | undefined): string |
   const client = useMikroClient();
   const datalayer = useDatalayer();
   const key = media?.key;
-  const [url, setUrl] = React.useState<string | null>(null);
+  // Kept with the object it is for, so a tile reused for another picture never shows the last one.
+  const [signed, setSigned] = React.useState<{ key: string; url: string } | null>(null);
 
   React.useEffect(() => {
-    setUrl(null);
     if (!key || !datalayer) return;
     let live = true;
     mediaUrl({ key }, client, datalayer)
-      .then((signed) => live && setUrl(signed))
+      .then((url) => live && setSigned({ key, url }))
       .catch((e) => console.warn("[mikro] could not sign a media url", e));
     return () => {
       live = false;
     };
   }, [key, client, datalayer]);
 
-  return url;
+  return signed && signed.key === key && datalayer ? signed.url : null;
 };
