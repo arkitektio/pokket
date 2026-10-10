@@ -5,29 +5,16 @@ import { scopeDigest } from "./digest";
 import { encodeOpaqueScope, encodeShareScope, profileScope, ShareScope } from "./shareScope";
 
 /**
- * A link to a page of this app that works from anywhere — orkestrator's
- * universal link, under pokket's own parameter.
- *
- * `arkitekt.live/deeplink` hands the path to the installed app
- * (`pokket://…`), so the same URL can go in a chat or an email. Pages here
- * show one organization's things, so a link is SCOPED by default: see
- * `shareScope.ts` and the gate that receives it.
+ * The private form of a link: `arkitekt.live/deeplink` hands the path to the
+ * installed app, with the deployment and organization hashed away, so it can
+ * be pasted somewhere public. Only an app already signed in to the
+ * organization can follow it (`shareScope.ts`, and the gate that receives it).
  */
-export const UNIVERSAL_LINK_BASE = "https://arkitekt.live/deeplink";
-export const UNIVERSAL_LINK_PARAM = "pokket";
-export const APP_SCHEME = "pokket";
+const PRIVATE_LINK_BASE = "https://arkitekt.live/deeplink";
+const PRIVATE_LINK_PARAM = "pokket";
 
-const wrap = (path: string): string => `${UNIVERSAL_LINK_BASE}?${UNIVERSAL_LINK_PARAM}=${encodeURIComponent(path)}`;
-
-/** A portable link: no scope, opens in whatever organization the app is on. */
-export const universalLinkFor = (route: string): string => wrap(route);
-
-/** A link to a page as it exists in ONE organization. */
-export const scopedLinkFor = (route: string, scope: ShareScope): string => wrap(encodeShareScope(scope, route));
-
-/** The same, with the deployment and organization hashed away. */
 export const privateLinkFor = async (route: string, scope: ShareScope): Promise<string> =>
-  wrap(encodeOpaqueScope(await scopeDigest(scope), route));
+  `${PRIVATE_LINK_BASE}?${PRIVATE_LINK_PARAM}=${encodeURIComponent(encodeOpaqueScope(await scopeDigest(scope), route))}`;
 
 /**
  * Where an organization's links are served: kontrol, the deployment's own
@@ -52,15 +39,18 @@ const DESKTOP_APP = "orkestrator";
 const SHARER_PARAM = "user_id";
 
 /**
- * Where a login's links are served, or null when they cannot be: the
- * deployment names no front door, the organization has no slug, or the login
- * has not heard its slug or hub yet.
+ * Where a login's links are served. Throws, saying which, when they cannot
+ * be: the deployment names no front door, the organization has no slug, or
+ * the login has not heard its hub.
  */
-export const profileLinkHost = (profile: StoredProfile): LinkHost | null => {
+export const profileLinkHost = (profile: StoredProfile): LinkHost => {
   const frontendUrl = profile.session.endpoint.frontend_url;
   const slug = profile.label.organizationSlug;
   const hub = profile.identity.hubId;
-  return frontendUrl && slug && hub ? { frontendUrl, slug, hub, user: profile.identity.userId } : null;
+  if (!frontendUrl) throw new Error("this deployment names no front door for links");
+  if (!slug) throw new Error("this organization has no slug to link by");
+  if (!hub) throw new Error("this login has not heard its hub yet; reconnect and try again");
+  return { frontendUrl, slug, hub, user: profile.identity.userId };
 };
 
 const origin = (host: LinkHost) => host.frontendUrl.replace(/\/+$/, "");
@@ -96,21 +86,17 @@ export const orgLinkFor = (host: LinkHost, route: string, scope: ShareScope): st
 };
 
 /**
- * The link to share for a page. Through the organization's front door when
- * it has one: an object is named as itself (a smartlink), a page both apps
- * have by the desktop's path, and either opens in the desktop app too. A
- * page only the phone has, or a login whose links kontrol cannot serve,
- * keeps the arkitekt.live form that opens this app.
+ * The link to share for a page, always through the organization's front
+ * door: an object is named as itself (a smartlink), a page by the desktop's
+ * path, and either opens in the desktop app too. There is no other form to
+ * fall back to: what cannot be linked this way throws, saying why.
  */
 export const shareLinkFor = (route: string, profile: StoredProfile | null): string => {
-  if (!profile) return universalLinkFor(route);
-  const scope = profileScope(profile);
+  if (!profile) throw new Error("sign in to an organization first");
   const host = profileLinkHost(profile);
-  if (host) {
-    const object = objectForRoute(route.split("?")[0]);
-    if (object) return smartLinkFor(host, { identifier: object.identifier, id: String(object.object) });
-    const link = orgLinkFor(host, route, scope);
-    if (link) return link;
-  }
-  return scopedLinkFor(route, scope);
+  const object = objectForRoute(route.split("?")[0]);
+  if (object) return smartLinkFor(host, { identifier: object.identifier, id: String(object.object) });
+  const link = orgLinkFor(host, route, profileScope(profile));
+  if (!link) throw new Error("this page exists only on the phone");
+  return link;
 };

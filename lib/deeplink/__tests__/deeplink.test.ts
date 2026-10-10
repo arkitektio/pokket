@@ -248,12 +248,14 @@ describe("links shared through the organization's front door", () => {
   it("are what the share button hands out, when the login can be linked that way", () => {
     expect(shareLinkFor("/tasks/5", profile())).toBe("https://go.arkitekt.live/smartlink/my-lab/3/%40rekuest%2Ftask/5?user_id=8");
     expect(shareLinkFor("/tasks", profile())).toContain("/deeplink/my-lab/orkestrator/open?");
-    // A page only the phone has, and a login kontrol cannot serve, keep the app's own form.
-    expect(shareLinkFor("/settings", profile())).toContain("https://arkitekt.live/deeplink?pokket=");
-    expect(shareLinkFor("/tasks/5", profile({ hubId: null }))).toContain("https://arkitekt.live/deeplink?pokket=");
-    expect(shareLinkFor("/tasks/5", profile({ slug: undefined }))).toContain("https://arkitekt.live/deeplink?pokket=");
-    expect(shareLinkFor("/tasks/5", profile({ frontend: null }))).toContain("https://arkitekt.live/deeplink?pokket=");
-    expect(shareLinkFor("/tasks/5", null)).toBe("https://arkitekt.live/deeplink?pokket=%2Ftasks%2F5");
+  });
+
+  it("are the only form: what cannot be linked that way says why", () => {
+    expect(() => shareLinkFor("/settings", profile())).toThrow("only on the phone");
+    expect(() => shareLinkFor("/tasks/5", profile({ hubId: null }))).toThrow("hub");
+    expect(() => shareLinkFor("/tasks/5", profile({ slug: undefined }))).toThrow("slug");
+    expect(() => shareLinkFor("/tasks/5", profile({ frontend: null }))).toThrow("front door");
+    expect(() => shareLinkFor("/tasks/5", null)).toThrow("sign in");
   });
 
   it("belong to a login by slug, and by hub once the login knows its own", () => {

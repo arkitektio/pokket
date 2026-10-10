@@ -27,7 +27,10 @@ export const useShareLink = (route: string) => {
   return React.useMemo(() => {
     const scope = active ? profileScope(active) : null;
     const attempt = (work: () => Promise<void>) => {
-      work().catch((error: Error) => toast.error(`Could not share the link: ${error.message}`));
+      // Building the link can throw before there is a promise to catch.
+      Promise.resolve()
+        .then(work)
+        .catch((error: Error) => toast.error(`Could not share the link: ${error.message}`));
     };
     return {
       share: () => attempt(() => hand(shareLinkFor(route, active), "Link copied")),
