@@ -1,0 +1,39 @@
+fragment ListArrayDataset on ArrayDataset {
+  id
+  name
+  description
+  axisNames
+  shape
+  multiscale
+  spec
+  # The newest picture of the scene this dataset nominates; null until
+  # something nominates one, so a tile must stand without it.
+  latestSnapshot {
+    ...SceneSnapshot
+  }
+  fullLens {
+    id
+  }
+}
+
+fragment DetailArrayDataset on ArrayDataset {
+  ...ListArrayDataset
+  folder {
+    id
+    name
+  }
+  scenes {
+    ...ListScene
+  }
+  lenses(sliced: true) {
+    ...ListLens
+  }
+  derivedFrom {
+    id
+    kind
+    output {
+      id
+      name
+    }
+  }
+}

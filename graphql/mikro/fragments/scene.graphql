@@ -1,0 +1,23 @@
+fragment ListScene on Scene {
+  id
+  name
+  latestSnapshot {
+    ...SceneSnapshot
+  }
+}
+
+# Deliberately not orkestrator's `Scene`: its layers are the viewer's business.
+fragment DetailScene on Scene {
+  ...ListScene
+  preferredView
+  backgroundColor
+  worldCoordinateSystem {
+    id
+    name
+  }
+  layers {
+    id
+    name
+    kind
+  }
+}

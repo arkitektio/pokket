@@ -1,0 +1,89 @@
+fragment Axis on Axis {
+  id
+  order
+  name
+  type
+  unit
+  longName
+}
+
+fragment ListTableDataset on TableDataset {
+  id
+  name
+  description
+  axisNames
+}
+
+fragment DetailTableDataset on TableDataset {
+  ...ListTableDataset
+  columns {
+    id
+    name
+    longName
+    dtype
+    role
+    unit
+    order
+  }
+}
+
+fragment ListChart on Chart {
+  id
+  name
+  description
+  createdAt
+  axis {
+    ...Axis
+  }
+}
+
+fragment DetailChart on Chart {
+  ...ListChart
+  worldCoordinateSystem {
+    id
+    name
+  }
+  layers {
+    __typename
+    id
+    name
+  }
+}
+
+# No `vectors`: a row says what kind of shape this is, the path is unreadable
+# without the scene that gives it scale.
+fragment ListAnnotation on Annotation {
+  id
+  name
+  kind
+  coordinates {
+    name
+    value
+  }
+  collection {
+    id
+    name
+    scene {
+      id
+      name
+    }
+  }
+}
+
+fragment DetailAnnotation on Annotation {
+  ...ListAnnotation
+  description
+  strokeColor
+  fillColor
+  filled
+  intrinsicBbox {
+    min
+    max
+  }
+  collection {
+    description
+    scene {
+      ...ListScene
+    }
+  }
+}

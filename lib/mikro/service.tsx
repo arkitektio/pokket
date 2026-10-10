@@ -6,7 +6,7 @@ export const mikroServiceDefinition: ServiceDefinition = {
   builder: createGraphQLServiceBuilder(mikroResult.possibleTypes),
   
   name: "Mikro",
-  description: "Mikro is a service for managing microservices.",
+  description: "Mikro holds the organization's microscopy data.",
   key: "mikro",
   service: "live.arkitekt.mikro",
   optional: true,

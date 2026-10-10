@@ -1,0 +1,5 @@
+mutation RequestGeneralMediaAccess($input: RequestGeneralMediaAccessInput!) {
+  requestGeneralMediaAccess(input: $input) {
+    ...GeneralMediaAccessGrant
+  }
+}

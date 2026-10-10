@@ -1,0 +1,34 @@
+# The home page in one round trip. The limits are the page's, so they are
+# written here and not passed in.
+query MikroHome {
+  lenses(filters: { sliced: true }, pagination: { limit: 12 }, ordering: [{ createdAt: DESC }]) {
+    ...ListLens
+  }
+  arrayDatasets(filters: { notDerived: true }, pagination: { limit: 12 }, ordering: [{ createdAt: DESC }]) {
+    ...ListArrayDataset
+  }
+  pinned: folders(filters: { pinned: true }, pagination: { limit: 12 }) {
+    ...ListFolder
+  }
+  folders(filters: { parentless: true }, pagination: { limit: 8 }, ordering: [{ createdAt: DESC }]) {
+    ...ListFolder
+  }
+  files(pagination: { limit: 8 }, ordering: [{ createdAt: DESC }]) {
+    ...ListFile
+  }
+}
+
+query MikroSearch($search: String!, $limit: Int!) {
+  arrayDatasets(filters: { search: $search }, pagination: { limit: $limit }) {
+    ...ListArrayDataset
+  }
+  lenses(filters: { search: $search, sliced: true }, pagination: { limit: $limit }) {
+    ...ListLens
+  }
+  folders(filters: { search: $search }, pagination: { limit: $limit }) {
+    ...ListFolder
+  }
+  files(filters: { search: $search }, pagination: { limit: $limit }) {
+    ...ListFile
+  }
+}

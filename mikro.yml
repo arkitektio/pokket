@@ -1,11 +1,13 @@
 overwrite: true
-schema: "https://go.arkitekt.live/mikro/graphql"
-documents: "graphql/mikro-next/**/*.graphql"
+schema:
+  "http://jhnnsrs-lab/mikro/schema":
+    handleAsSDL: true
+documents: "graphql/mikro/**/*.graphql"
 generates:
-  src/lib/mikro/api/fragments.ts:
+  lib/mikro/api/fragments.ts:
     plugins:
       - "fragment-matcher"
-  src/lib/mikro/api/graphql.ts:
+  lib/mikro/api/graphql.ts:
     plugins:
       - "typescript"
       - "typescript-operations"
@@ -13,8 +15,12 @@ generates:
     config:
       withHooks: true
       reactApolloVersion: 3
-      apolloReactHooksImportFrom: "@site/src/lib/mikro/funcs"
+      apolloReactHooksImportFrom: "@/lib/mikro/funcs"
 
-  src/lib/mikro/graphql.schema.json:
+  lib/mikro/graphql.schema.json:
     plugins:
       - "introspection"
+config:
+  scalars:
+    DateTime: string
+    ByteCount: number

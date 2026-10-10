@@ -1,0 +1,47 @@
+query GetArrayDatasets($filters: ArrayDatasetFilter, $pagination: OffsetPaginationInput, $ordering: [ArrayDatasetOrder!]) {
+  arrayDatasets(filters: $filters, pagination: $pagination, ordering: $ordering) {
+    ...ListArrayDataset
+  }
+}
+
+query GetLenses($filters: LensFilter, $pagination: OffsetPaginationInput, $ordering: [LensOrder!]) {
+  lenses(filters: $filters, pagination: $pagination, ordering: $ordering) {
+    ...ListLens
+  }
+}
+
+query GetFolders($filters: FolderFilter, $pagination: OffsetPaginationInput, $ordering: [FolderOrder!]) {
+  folders(filters: $filters, pagination: $pagination, ordering: $ordering) {
+    ...ListFolder
+  }
+}
+
+query GetFiles($filters: FileFilter, $pagination: OffsetPaginationInput, $ordering: [FileOrder!]) {
+  files(filters: $filters, pagination: $pagination, ordering: $ordering) {
+    ...ListFile
+  }
+}
+
+query GetScenes($filters: SceneFilter, $pagination: OffsetPaginationInput, $ordering: [SceneOrder!]) {
+  scenes(filters: $filters, pagination: $pagination, ordering: $ordering) {
+    ...ListScene
+  }
+}
+
+query GetTableDatasets($filters: TableDatasetFilter, $pagination: OffsetPaginationInput, $ordering: [TableDatasetOrder!]) {
+  tableDatasets(filters: $filters, pagination: $pagination, ordering: $ordering) {
+    ...ListTableDataset
+  }
+}
+
+query GetCharts($filters: ChartFilter, $pagination: OffsetPaginationInput, $ordering: [ChartOrder!]) {
+  charts(filters: $filters, pagination: $pagination, ordering: $ordering) {
+    ...ListChart
+  }
+}
+
+query GetAnnotations($filters: AnnotationFilter, $pagination: OffsetPaginationInput, $ordering: [AnnotationOrder!]) {
+  annotations(filters: $filters, pagination: $pagination, ordering: $ordering) {
+    ...ListAnnotation
+  }
+}

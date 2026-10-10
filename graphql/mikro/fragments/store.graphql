@@ -1,0 +1,37 @@
+# A pre-rendered picture of a scene: the only picture of mikro data a phone
+# can show. `store` names the object; the url is signed on the client.
+fragment SceneSnapshot on SceneSnapshot {
+  id
+  name
+  createdAt
+  store {
+    ...MediaStore
+  }
+}
+
+fragment MediaStore on MediaStore {
+  id
+  key
+  bucket
+}
+
+# One grant for every media object, as orkestrator uses it.
+fragment GeneralMediaAccessGrant on GeneralMediaAccessGrant {
+  accessKey
+  secretKey
+  sessionToken
+  expiresIn
+  region
+  bucket
+}
+
+# A file's own grant: only for the one object, asked for when downloading.
+fragment BigFileAccessGrant on BigFileAccessGrant {
+  accessKey
+  secretKey
+  sessionToken
+  expiresIn
+  path
+  key
+  bucket
+}

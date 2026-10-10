@@ -1,0 +1,109 @@
+fragment DimSlice on Slice {
+  axis
+  start
+  stop
+  step
+}
+
+fragment LensWindow on Window {
+  axis
+  min
+  max
+}
+
+fragment LensCore on Lens {
+  __typename
+  id
+  name
+  kind
+  createdAt
+  coordinateSystem {
+    id
+    name
+  }
+  defaultScene {
+    ...ListScene
+  }
+}
+
+# What the lens selects over, per kind.
+fragment LensSubject on Lens {
+  __typename
+  ... on ArrayLens {
+    shape
+    axisNames
+    slices {
+      ...DimSlice
+    }
+    dataset {
+      id
+      name
+      axisNames
+      shape
+    }
+  }
+  ... on TableLens {
+    windows {
+      ...LensWindow
+    }
+    tableDataset {
+      id
+      name
+    }
+  }
+  ... on SparseLens {
+    windows {
+      ...LensWindow
+    }
+    sparseDataset {
+      id
+      name
+    }
+  }
+  ... on MeshLens {
+    windows {
+      ...LensWindow
+    }
+    meshCollection {
+      id
+      version
+    }
+  }
+  ... on NetworkLens {
+    windows {
+      ...LensWindow
+    }
+    networkCollection {
+      id
+      version
+    }
+  }
+  ... on AnnotationLens {
+    windows {
+      ...LensWindow
+    }
+    annotationCollection {
+      id
+      name
+    }
+  }
+}
+
+fragment ListLens on Lens {
+  ...LensCore
+  ...LensSubject
+  ... on ArrayLens {
+    latestSnapshot {
+      ...SceneSnapshot
+    }
+  }
+}
+
+fragment DetailLens on Lens {
+  ...ListLens
+  ... on ArrayLens {
+    scenes {
+      ...ListScene
+    }
+  }
+}

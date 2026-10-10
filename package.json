@@ -13,6 +13,7 @@
     "lovekit": "graphql-codegen --config ./lovekit.yml",
     "lok": "graphql-codegen --config ./lok.yml",
     "kuvert": "graphql-codegen --config ./kuvert.yml",
+    "mikro": "graphql-codegen --config ./mikro.yml",
     "bank": "graphql-codegen --config ./bank.yml",
     "lokate": "graphql-codegen --config ./lokate.yml",
     "ios": "expo run:ios",

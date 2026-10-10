@@ -1,0 +1,30 @@
+fragment ListFile on File {
+  id
+  name
+  size
+  contentType
+}
+
+fragment DetailFile on File {
+  ...ListFile
+  folder {
+    id
+    name
+  }
+  # What a converter made of this file.
+  derivedContainers {
+    id
+    seriesIdentifier
+    container {
+      __typename
+      ... on ArrayDataset {
+        id
+        name
+      }
+      ... on TableDataset {
+        id
+        name
+      }
+    }
+  }
+}

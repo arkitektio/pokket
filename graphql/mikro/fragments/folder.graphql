@@ -1,0 +1,16 @@
+fragment ListFolder on Folder {
+  id
+  name
+  description
+  isDefault
+}
+
+fragment DetailFolder on Folder {
+  ...ListFolder
+  pinned
+  createdAt
+  tags
+  parent {
+    ...ListFolder
+  }
+}

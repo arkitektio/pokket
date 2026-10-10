@@ -1,0 +1,73 @@
+query GetArrayDataset($id: ID!) {
+  arrayDataset(id: $id) {
+    ...DetailArrayDataset
+  }
+}
+
+query GetLens($id: ID!) {
+  lens(id: $id) {
+    ...DetailLens
+  }
+}
+
+query GetFolder($id: ID!) {
+  folder(id: $id) {
+    ...DetailFolder
+  }
+}
+
+# What a folder holds, as one mixed list. Mesh and annotation collections come
+# back as a bare typename and are left out: they have no page here.
+query Children($id: ID!, $pagination: ChildrenPaginationInput, $filters: FolderChildrenFilter) {
+  children(parent: $id, pagination: $pagination, filters: $filters) {
+    __typename
+    ...ListFile
+    ...ListFolder
+    ...ListArrayDataset
+    ...ListTableDataset
+  }
+}
+
+query GetFile($id: ID!) {
+  file(id: $id) {
+    ...DetailFile
+  }
+}
+
+# Asked only when downloading: the grant is minted per request.
+query GetFileAccess($id: ID!) {
+  file(id: $id) {
+    id
+    name
+    store {
+      id
+      accessGrant {
+        ...BigFileAccessGrant
+      }
+    }
+  }
+}
+
+query GetScene($id: ID!) {
+  scene(id: $id) {
+    ...DetailScene
+  }
+}
+
+query GetTableDataset($id: ID!) {
+  tableDataset(id: $id) {
+    ...DetailTableDataset
+  }
+}
+
+query GetChart($id: ID!) {
+  chart(id: $id) {
+    ...DetailChart
+  }
+}
+
+query GetAnnotation($id: ID!) {
+  annotation(id: $id) {
+    ...DetailAnnotation
+  }
+}
