@@ -1,3 +1,22 @@
+# [1.11.0](https://github.com/arkitektio/pokket/compare/v1.10.0...v1.11.0) (2026-10-10)
+
+
+### Bug Fixes
+
+* **mikro:** codegen config, hook wrappers and the current schema ([36b0896](https://github.com/arkitektio/pokket/commit/36b08967b05826c3ded3b16b63ab897bcdf1b93c))
+
+
+### Features
+
+* **alpaka:** chat home, the room and its replyers ([31c78f8](https://github.com/arkitektio/pokket/commit/31c78f8189dd113b63941a0d0e1bd6568dec3ed1))
+* **alpaka:** service, documents and chat logic ([21b5e00](https://github.com/arkitektio/pokket/commit/21b5e008c4f9098f37cfca3e724270624fd9dcd5))
+* **datalayer:** the datalayer service and presigned media urls ([f40a4a9](https://github.com/arkitektio/pokket/commit/f40a4a929c54ec01f838637f53d05cab0e321569))
+* **mikro:** folders and files ([4b11dd2](https://github.com/arkitektio/pokket/commit/4b11dd2643522accfb17ad203fc6ec08c6b9547e))
+* **mikro:** home, array datasets and lenses ([67a90f4](https://github.com/arkitektio/pokket/commit/67a90f470b04cb1afa77de4af5ef78e5b2a589e7))
+* **mikro:** scenes, tables, charts and annotations ([09cf17d](https://github.com/arkitektio/pokket/commit/09cf17d6b45983afee44902181b94c50e9839875))
+* **rekuest:** replyer actions and assign ([48ad31e](https://github.com/arkitektio/pokket/commit/48ad31e964499067f4a228b0038308fadc223a8d))
+* **search:** mikro results ([31ff58e](https://github.com/arkitektio/pokket/commit/31ff58e94d3978c0e0736b804fcacf66134b9752))
+
 # [1.10.0](https://github.com/arkitektio/pokket/compare/v1.9.0...v1.10.0) (2026-10-09)
 
 
