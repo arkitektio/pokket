@@ -3,3 +3,13 @@ query MyContext {
     ...Context
   }
 }
+
+# On its own, not in the Context fragment: a lok that does not know the field
+# fails this query and nothing else.
+query MyHub {
+  mycontext {
+    hub {
+      id
+    }
+  }
+}

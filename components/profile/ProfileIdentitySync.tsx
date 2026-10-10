@@ -1,26 +1,7 @@
 import { App } from '@/lib/app/App';
-import { useSelfService } from '@/lib/arkitekt/hooks';
-import { useMyBrandQuery, useMyContextQuery } from '@/lib/lok/api/graphql';
+import { useMyBrandQuery, useMyContextQuery, useMyHubQuery } from '@/lib/lok/api/graphql';
 import { resolveBrand } from '@/lib/theme/BrandProvider';
-import { ApolloClient, gql, useQuery } from '@apollo/client';
 import * as React from 'react';
-
-/**
- * The hub this login was approved into, which its share links name
- * (`lib/deeplink/universalLink.ts`). Asked on its own rather than in
- * `MyContext`: a lok that does not know the field fails this query and
- * nothing else, and the login simply has no hub.
- */
-const MY_HUB = gql`
-  query MyHub {
-    mycontext {
-      hub {
-        id
-      }
-    }
-  }
-`;
-type MyHubQuery = { mycontext: { hub: { id: string } | null } };
 
 /**
  * Tells the profile book who the live login is — orkestrator's
@@ -37,10 +18,9 @@ function Sync({ profileId }: { profileId: string }) {
   const baseUrl = App.useActiveProfile()?.identity.baseUrl;
   const { data: context } = useMyContextQuery({ errorPolicy: 'all' });
   const { data: brandData } = useMyBrandQuery({ errorPolicy: 'all' });
-  const { data: hubData } = useQuery<MyHubQuery>(MY_HUB, {
-    client: useSelfService().client as ApolloClient<object>,
-    errorPolicy: 'all',
-  });
+  // The hub its share links name (`lib/deeplink/universalLink.ts`). Its own
+  // query: a lok that does not know the field fails this one and nothing else.
+  const { data: hubData } = useMyHubQuery({ errorPolicy: 'all' });
   const hubId = hubData?.mycontext?.hub?.id;
 
   const organization = context?.mycontext?.organization;

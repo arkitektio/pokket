@@ -16,23 +16,19 @@ export type Scalars = {
   Boolean: { input: boolean; output: boolean; }
   Int: { input: number; output: number; }
   Float: { input: number; output: number; }
+  /** Date (isoformat) */
+  Date: { input: any; output: any; }
   /** Date with time (isoformat) */
   DateTime: { input: string; output: string; }
   _Any: { input: any; output: any; }
 };
 
-/** One read of your data. */
-export type AccessLogEntry = {
-  __typename?: 'AccessLogEntry';
-  at: Scalars['DateTime']['output'];
-  /** The reading token's OAuth client. */
-  clientId?: Maybe<Scalars['String']['output']>;
-  /** The reading token's client_device claim. */
-  deviceId?: Maybe<Scalars['String']['output']>;
-  id: Scalars['ID']['output'];
-  operation: Scalars['String']['output'];
-  range: Scalars['String']['output'];
-  rows: Scalars['Int']['output'];
+/** A lat/lon rectangle, e.g. a map viewport. */
+export type BoxInput = {
+  east: Scalars['Float']['input'];
+  north: Scalars['Float']['input'];
+  south: Scalars['Float']['input'];
+  west: Scalars['Float']['input'];
 };
 
 /** One page of everything the user has, from all their devices, in change order. */
@@ -47,9 +43,76 @@ export type ChangeSet = {
   visits: Array<Visit>;
 };
 
+/** One calendar day of the timeline, across all your devices. */
+export type Day = {
+  __typename?: 'Day';
+  date: Scalars['Date']['output'];
+  /** Meters travelled, summed over the day's trips. */
+  distance: Scalars['Float']['output'];
+  end: Scalars['DateTime']['output'];
+  pointCount: Scalars['Int']['output'];
+  /** Midnight, in the requested time zone. */
+  start: Scalars['DateTime']['output'];
+  /** Trips overlapping the day, oldest first. */
+  trips: Array<Trip>;
+  /** Visits overlapping the day, oldest first. */
+  visits: Array<Visit>;
+};
+
 export type DeletedInput = {
   clientId: Scalars['ID']['input'];
   deletedAt: Scalars['DateTime']['input'];
+};
+
+/** One of your phones (an install): the token's client_device. */
+export type Device = {
+  __typename?: 'Device';
+  /** The client_device claim it uploads with. */
+  deviceId: Scalars['String']['output'];
+  firstSeenAt: Scalars['DateTime']['output'];
+  id: Scalars['ID']['output'];
+  /** When this device last wrote anything. */
+  lastUploadAt?: Maybe<Scalars['DateTime']['output']>;
+  /** How many points it has uploaded. */
+  pointCount: Scalars['Int']['output'];
+  /** The `from` of its last replaceSegments. */
+  segmentsFrom?: Maybe<Scalars['DateTime']['output']>;
+};
+
+/**
+ * One phone (install) of a user: the ``client_device`` claim of its token.
+ *
+ * Keyed by user as well, so two accounts on one phone never share rows. A reinstall that
+ * is issued a new device id is a new ``Device``; its old one's history stays readable
+ * through ``changes``.
+ */
+export type DeviceFilter = {
+  AND?: InputMaybe<DeviceFilter>;
+  DISTINCT?: InputMaybe<Scalars['Boolean']['input']>;
+  NOT?: InputMaybe<DeviceFilter>;
+  OR?: InputMaybe<DeviceFilter>;
+  ids?: InputMaybe<Array<Scalars['ID']['input']>>;
+};
+
+export type DeviceOrder =
+  { firstSeenAt: Ordering; lastUploadAt?: never; }
+  |  { firstSeenAt?: never; lastUploadAt: Ordering; };
+
+/** The width of a stats bucket. */
+export enum Granularity {
+  Day = 'DAY',
+  Month = 'MONTH',
+  Week = 'WEEK'
+}
+
+/** Trips of one mode within a stats bucket. */
+export type ModeStat = {
+  __typename?: 'ModeStat';
+  /** Meters. */
+  distance: Scalars['Float']['output'];
+  mode: TripMode;
+  seconds: Scalars['Float']['output'];
+  trips: Scalars['Int']['output'];
 };
 
 export type Mutation = {
@@ -58,8 +121,6 @@ export type Mutation = {
   deleteServerCopy: Scalars['Int']['output'];
   /** In one transaction, make this device's visits and trips starting at or after `from` exactly the ones sent. */
   replaceSegments: ReplaceResult;
-  /** Keep your points and segments this many days (null: forever). Older ones are deleted now and on every later upload. */
-  setRetention: Retention;
   /** Merge places and tombstones, last write wins on updatedAt; newer server copies come back in `stale`. */
   syncPlaces: PlaceSyncResult;
   /** Store points (at most 1000 per call). Safe to repeat: a point already stored counts as a duplicate. */
@@ -79,11 +140,6 @@ export type MutationReplaceSegmentsArgs = {
 };
 
 
-export type MutationSetRetentionArgs = {
-  days?: InputMaybe<Scalars['Int']['input']>;
-};
-
-
 export type MutationSyncPlacesArgs = {
   deleted: Array<DeletedInput>;
   places: Array<PlaceInput>;
@@ -94,16 +150,63 @@ export type MutationUploadPointsArgs = {
   points: Array<PointInput>;
 };
 
-/** A named place, shared by all of a user's phones. A tombstone has deletedAt set and nothing else but its key. */
+/** Within `radius` meters of a point. */
+export type NearInput = {
+  lat: Scalars['Float']['input'];
+  lon: Scalars['Float']['input'];
+  radius: Scalars['Float']['input'];
+};
+
+export type OffsetPaginationInput = {
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  offset?: Scalars['Int']['input'];
+};
+
+export enum Ordering {
+  Asc = 'ASC',
+  AscNullsFirst = 'ASC_NULLS_FIRST',
+  AscNullsLast = 'ASC_NULLS_LAST',
+  Desc = 'DESC',
+  DescNullsFirst = 'DESC_NULLS_FIRST',
+  DescNullsLast = 'DESC_NULLS_LAST'
+}
+
+/** A named place, shared by all of your phones. */
 export type Place = {
   __typename?: 'Place';
   clientId: Scalars['ID']['output'];
+  /** Set on a tombstone (only ever seen in syncPlaces' `stale`). */
   deletedAt?: Maybe<Scalars['DateTime']['output']>;
+  id: Scalars['ID']['output'];
+  /** When the latest visit to it ended. */
+  lastVisitAt?: Maybe<Scalars['DateTime']['output']>;
   lat?: Maybe<Scalars['Float']['output']>;
   lon?: Maybe<Scalars['Float']['output']>;
   name?: Maybe<Scalars['String']['output']>;
+  /** Meters. */
   radius?: Maybe<Scalars['Float']['output']>;
+  /** The phone's edit time; last write wins on it. */
   updatedAt: Scalars['DateTime']['output'];
+  /** How many visits were matched to it. */
+  visitCount: Scalars['Int']['output'];
+};
+
+/**
+ * A named place, shared by all of a user's phones (so keyed by user, not device).
+ *
+ * Last write wins on ``updated_at``. A deleted place stays as a tombstone (``deleted_at``
+ * set) so another phone's older copy is not uploaded again. A tombstone can arrive for a
+ * place the server never saw, so everything but the key and the stamps is nullable.
+ */
+export type PlaceFilter = {
+  AND?: InputMaybe<PlaceFilter>;
+  DISTINCT?: InputMaybe<Scalars['Boolean']['input']>;
+  NOT?: InputMaybe<PlaceFilter>;
+  OR?: InputMaybe<PlaceFilter>;
+  ids?: InputMaybe<Array<Scalars['ID']['input']>>;
+  inBox?: InputMaybe<BoxInput>;
+  near?: InputMaybe<NearInput>;
+  search?: InputMaybe<Scalars['String']['input']>;
 };
 
 export type PlaceInput = {
@@ -113,6 +216,22 @@ export type PlaceInput = {
   name: Scalars['String']['input'];
   radius: Scalars['Float']['input'];
   updatedAt: Scalars['DateTime']['input'];
+};
+
+export type PlaceOrder =
+  { name: Ordering; updatedAt?: never; }
+  |  { name?: never; updatedAt: Ordering; };
+
+/** Time spent at one place. */
+export type PlaceStat = {
+  __typename?: 'PlaceStat';
+  firstVisitAt: Scalars['DateTime']['output'];
+  lastVisitAt: Scalars['DateTime']['output'];
+  /** None if the place was deleted. */
+  place?: Maybe<Place>;
+  placeClientId: Scalars['ID']['output'];
+  seconds: Scalars['Float']['output'];
+  visitCount: Scalars['Int']['output'];
 };
 
 export type PlaceSyncResult = {
@@ -125,16 +244,36 @@ export type PlaceSyncResult = {
 /** One location fix. */
 export type Point = {
   __typename?: 'Point';
+  /** Horizontal accuracy, meters. */
   acc?: Maybe<Scalars['Float']['output']>;
+  /** Altitude, meters. */
   alt?: Maybe<Scalars['Float']['output']>;
   clientId: Scalars['ID']['output'];
-  /** The device (token client_device) that recorded it. */
+  device: Device;
+  /** The client_device of the device that recorded it. */
   deviceId: Scalars['ID']['output'];
+  /** Degrees from north. */
   heading?: Maybe<Scalars['Float']['output']>;
+  id: Scalars['ID']['output'];
   lat: Scalars['Float']['output'];
   lon: Scalars['Float']['output'];
+  /** Meters per second. */
   speed?: Maybe<Scalars['Float']['output']>;
   ts: Scalars['DateTime']['output'];
+};
+
+/** One location fix. Partitioned by month of ``ts`` (see the module docstring). */
+export type PointFilter = {
+  AND?: InputMaybe<PointFilter>;
+  DISTINCT?: InputMaybe<Scalars['Boolean']['input']>;
+  NOT?: InputMaybe<PointFilter>;
+  OR?: InputMaybe<PointFilter>;
+  devices?: InputMaybe<Array<Scalars['ID']['input']>>;
+  inBox?: InputMaybe<BoxInput>;
+  maxAccuracy?: InputMaybe<Scalars['Float']['input']>;
+  near?: InputMaybe<NearInput>;
+  since?: InputMaybe<Scalars['DateTime']['input']>;
+  until?: InputMaybe<Scalars['DateTime']['input']>;
 };
 
 export type PointInput = {
@@ -148,29 +287,167 @@ export type PointInput = {
   ts: Scalars['DateTime']['input'];
 };
 
+export type PointOrder =
+  { ts: Ordering; };
+
 export type Query = {
   __typename?: 'Query';
+  _entities: Array<Maybe<_Entity>>;
   _service: _Service;
-  /** Every read of your data, newest first. */
-  accessLog: Array<AccessLogEntry>;
-  /** Everything of the user's, from all their devices, changed after `cursor`, oldest first (limit at most 1000). Page until hasMore is false; used to restore. */
+  /** Everything of yours, from all your devices, changed after `cursor`, oldest first (limit at most 1000). Page until hasMore is false; used to restore. */
   changes: ChangeSet;
-  /** How long the server keeps your points and segments. */
-  retention: Retention;
+  /** One calendar day (in `timezone`, IANA name): its visits and trips in order, and totals. */
+  day: Day;
+  /** A device by id. */
+  device: Device;
+  /** Your phones (installs) that have backed up here. */
+  devices: Array<Device>;
+  /** A place by id. */
+  place: Place;
+  /** Time spent per place, most first. */
+  placeStats: Array<PlaceStat>;
+  /** Your named places (paginated, filterable by name, box or distance). */
+  places: Array<Place>;
+  /** A point by id. */
+  point: Point;
+  /** Location fixes (paginated, filterable by time, device, box or distance). */
+  points: Array<Point>;
+  /** How many points match (the same filters as `points`). */
+  pointsCount: Scalars['Int']['output'];
+  /** Your path between `since` and `until`, one GeoJSON line per device. */
+  route: Array<Track>;
+  /** Points, visits, trips and distance per day, week or month. */
+  stats: Array<StatsBucket>;
   /** The calling device's watermarks. */
   syncState: SyncState;
+  /** A trip by id. */
+  trip: Trip;
+  /** Movements between visits (paginated, filterable by time, device, mode or distance). */
+  trips: Array<Trip>;
+  /** How many trips match (the same filters as `trips`). */
+  tripsCount: Scalars['Int']['output'];
+  /** A visit by id. */
+  visit: Visit;
+  /** Stays (paginated, filterable by time, device, place, box or distance). */
+  visits: Array<Visit>;
+  /** How many visits match (the same filters as `visits`). */
+  visitsCount: Scalars['Int']['output'];
 };
 
 
-export type QueryAccessLogArgs = {
-  limit?: InputMaybe<Scalars['Int']['input']>;
-  offset?: InputMaybe<Scalars['Int']['input']>;
+export type Query_EntitiesArgs = {
+  representations: Array<Scalars['_Any']['input']>;
 };
 
 
 export type QueryChangesArgs = {
   cursor?: InputMaybe<Scalars['String']['input']>;
   limit?: InputMaybe<Scalars['Int']['input']>;
+};
+
+
+export type QueryDayArgs = {
+  date: Scalars['Date']['input'];
+  timezone?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryDeviceArgs = {
+  id: Scalars['ID']['input'];
+};
+
+
+export type QueryDevicesArgs = {
+  filters?: InputMaybe<DeviceFilter>;
+  ordering?: Array<DeviceOrder>;
+  pagination?: InputMaybe<OffsetPaginationInput>;
+};
+
+
+export type QueryPlaceArgs = {
+  id: Scalars['ID']['input'];
+};
+
+
+export type QueryPlaceStatsArgs = {
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  since?: InputMaybe<Scalars['DateTime']['input']>;
+  until?: InputMaybe<Scalars['DateTime']['input']>;
+};
+
+
+export type QueryPlacesArgs = {
+  filters?: InputMaybe<PlaceFilter>;
+  ordering?: Array<PlaceOrder>;
+  pagination?: InputMaybe<OffsetPaginationInput>;
+};
+
+
+export type QueryPointArgs = {
+  id: Scalars['ID']['input'];
+};
+
+
+export type QueryPointsArgs = {
+  filters?: InputMaybe<PointFilter>;
+  ordering?: Array<PointOrder>;
+  pagination?: InputMaybe<OffsetPaginationInput>;
+};
+
+
+export type QueryPointsCountArgs = {
+  filters?: InputMaybe<PointFilter>;
+};
+
+
+export type QueryRouteArgs = {
+  devices?: InputMaybe<Array<Scalars['ID']['input']>>;
+  maxAccuracy?: InputMaybe<Scalars['Float']['input']>;
+  simplify?: InputMaybe<Scalars['Float']['input']>;
+  since: Scalars['DateTime']['input'];
+  until: Scalars['DateTime']['input'];
+};
+
+
+export type QueryStatsArgs = {
+  granularity?: InputMaybe<Granularity>;
+  since: Scalars['DateTime']['input'];
+  timezone?: InputMaybe<Scalars['String']['input']>;
+  until: Scalars['DateTime']['input'];
+};
+
+
+export type QueryTripArgs = {
+  id: Scalars['ID']['input'];
+};
+
+
+export type QueryTripsArgs = {
+  filters?: InputMaybe<TripFilter>;
+  ordering?: Array<TripOrder>;
+  pagination?: InputMaybe<OffsetPaginationInput>;
+};
+
+
+export type QueryTripsCountArgs = {
+  filters?: InputMaybe<TripFilter>;
+};
+
+
+export type QueryVisitArgs = {
+  id: Scalars['ID']['input'];
+};
+
+
+export type QueryVisitsArgs = {
+  filters?: InputMaybe<VisitFilter>;
+  ordering?: Array<VisitOrder>;
+  pagination?: InputMaybe<OffsetPaginationInput>;
+};
+
+
+export type QueryVisitsCountArgs = {
+  filters?: InputMaybe<VisitFilter>;
 };
 
 export type ReplaceResult = {
@@ -181,11 +458,16 @@ export type ReplaceResult = {
   visits: Scalars['Int']['output'];
 };
 
-/** How long the server keeps your points and segments. */
-export type Retention = {
-  __typename?: 'Retention';
-  /** Null: forever. */
-  days?: Maybe<Scalars['Int']['output']>;
+/** Totals for one day, week or month. */
+export type StatsBucket = {
+  __typename?: 'StatsBucket';
+  byMode: Array<ModeStat>;
+  /** Meters, over all trips. */
+  distance: Scalars['Float']['output'];
+  pointCount: Scalars['Int']['output'];
+  start: Scalars['DateTime']['output'];
+  tripCount: Scalars['Int']['output'];
+  visitCount: Scalars['Int']['output'];
 };
 
 /** The calling device's watermarks. */
@@ -197,17 +479,52 @@ export type SyncState = {
   segmentsFrom?: Maybe<Scalars['DateTime']['output']>;
 };
 
+/** One device's points over a time range, joined into a line. */
+export type Track = {
+  __typename?: 'Track';
+  device: Device;
+  /** Geodesic length of the (unsimplified) line, meters. */
+  distance: Scalars['Float']['output'];
+  end: Scalars['DateTime']['output'];
+  /** A GeoJSON LineString (coordinates are [lon, lat]). */
+  geojson: Scalars['String']['output'];
+  pointCount: Scalars['Int']['output'];
+  start: Scalars['DateTime']['output'];
+};
+
 /** A movement between two visits. */
 export type Trip = {
   __typename?: 'Trip';
   clientId: Scalars['ID']['output'];
+  device: Device;
+  /** The client_device of the device that recorded it. */
   deviceId: Scalars['ID']['output'];
+  /** Meters. */
   distance: Scalars['Float']['output'];
+  /** How long it took, seconds. */
+  duration: Scalars['Float']['output'];
   end: Scalars['DateTime']['output'];
+  /** The clientId of the visit it left. */
   fromVisit?: Maybe<Scalars['ID']['output']>;
+  id: Scalars['ID']['output'];
+  /** How it was travelled. */
   mode: TripMode;
   start: Scalars['DateTime']['output'];
+  /** The clientId of the visit it arrived at. */
   toVisit?: Maybe<Scalars['ID']['output']>;
+};
+
+/** A movement between two visits, as the phone segmented it. */
+export type TripFilter = {
+  AND?: InputMaybe<TripFilter>;
+  DISTINCT?: InputMaybe<Scalars['Boolean']['input']>;
+  NOT?: InputMaybe<TripFilter>;
+  OR?: InputMaybe<TripFilter>;
+  devices?: InputMaybe<Array<Scalars['ID']['input']>>;
+  minDistance?: InputMaybe<Scalars['Float']['input']>;
+  modes?: InputMaybe<Array<TripMode>>;
+  since?: InputMaybe<Scalars['DateTime']['input']>;
+  until?: InputMaybe<Scalars['DateTime']['input']>;
 };
 
 export type TripInput = {
@@ -228,6 +545,10 @@ export enum TripMode {
   Walk = 'WALK'
 }
 
+export type TripOrder =
+  { distance: Ordering; start?: never; }
+  |  { distance?: never; start: Ordering; };
+
 export type UploadResult = {
   __typename?: 'UploadResult';
   accepted: Scalars['Int']['output'];
@@ -238,14 +559,39 @@ export type UploadResult = {
 export type Visit = {
   __typename?: 'Visit';
   clientId: Scalars['ID']['output'];
+  device: Device;
+  /** The client_device of the device that recorded it. */
   deviceId: Scalars['ID']['output'];
+  /** How long it lasted, seconds. */
+  duration: Scalars['Float']['output'];
   end: Scalars['DateTime']['output'];
+  id: Scalars['ID']['output'];
   lat: Scalars['Float']['output'];
   lon: Scalars['Float']['output'];
+  /** The place it was matched to (none if deleted or unmatched). */
+  place?: Maybe<Place>;
+  /** The clientId of the place it was matched to. */
   placeClientId?: Maybe<Scalars['ID']['output']>;
   pointCount: Scalars['Int']['output'];
+  /** Meters. */
   radius: Scalars['Float']['output'];
   start: Scalars['DateTime']['output'];
+};
+
+/** A stay at one spot, as the phone segmented it. */
+export type VisitFilter = {
+  AND?: InputMaybe<VisitFilter>;
+  DISTINCT?: InputMaybe<Scalars['Boolean']['input']>;
+  NOT?: InputMaybe<VisitFilter>;
+  OR?: InputMaybe<VisitFilter>;
+  devices?: InputMaybe<Array<Scalars['ID']['input']>>;
+  hasPlace?: InputMaybe<Scalars['Boolean']['input']>;
+  inBox?: InputMaybe<BoxInput>;
+  minDuration?: InputMaybe<Scalars['Float']['input']>;
+  near?: InputMaybe<NearInput>;
+  places?: InputMaybe<Array<Scalars['ID']['input']>>;
+  since?: InputMaybe<Scalars['DateTime']['input']>;
+  until?: InputMaybe<Scalars['DateTime']['input']>;
 };
 
 export type VisitInput = {
@@ -258,6 +604,12 @@ export type VisitInput = {
   radius: Scalars['Float']['input'];
   start: Scalars['DateTime']['input'];
 };
+
+export type VisitOrder =
+  { end: Ordering; start?: never; }
+  |  { end?: never; start: Ordering; };
+
+export type _Entity = Device | Place | Point | Trip | Visit;
 
 export type _Service = {
   __typename?: '_Service';
