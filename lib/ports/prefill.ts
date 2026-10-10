@@ -77,3 +77,20 @@ export const withRestingValues = (ports: readonly PortablePort[], values: Record
   }
   return out;
 };
+
+/**
+ * A value as the object it names, when it names one by a whole-number id:
+ * what a page can be opened for. Rekuest hands structures over as
+ * `{ __identifier, object }`, or as a bare id next to the port's identifier.
+ */
+export const structureRef = (
+  value: unknown,
+  port?: { kind: PortKind; identifier?: string | null } | null,
+): { identifier: string; object: number } | null => {
+  const wrapped = isRecord(value) ? value : null;
+  const identifier =
+    (typeof wrapped?.__identifier === "string" && wrapped.__identifier) || (port?.kind === PortKind.Structure ? port.identifier : null);
+  const id = wrapped ? wrapped.object : value;
+  if (!identifier || (typeof id !== "string" && typeof id !== "number") || !/^\d+$/.test(String(id))) return null;
+  return { identifier, object: Number(id) };
+};

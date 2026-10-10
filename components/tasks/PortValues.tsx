@@ -1,6 +1,9 @@
 import { Text } from '@/components/ui/text';
+import { structureLabel, structureRoute } from '@/lib/lovekit/call/structures';
+import { showDetail } from '@/lib/navigation';
+import { structureRef } from '@/lib/ports/prefill';
 import { PortKind } from '@/lib/rekuest/api/graphql';
-import { View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 type Port = { key: string; label?: string | null; kind: PortKind; identifier?: string | null };
 
@@ -22,31 +25,49 @@ export const formatValue = (value: unknown, port?: Port): string => {
   return json.length > MAX_JSON ? `${json.slice(0, MAX_JSON)}…` : json;
 };
 
+/** The value: a link when it names an object pokket has a page for, else as text. */
+function RowValue({ row }: { row: { text: string; value?: unknown; port?: Port } }) {
+  const structure = structureRef(row.value, row.port);
+  const route = structure ? structureRoute(structure) : null;
+  if (structure && route) {
+    return (
+      <Pressable onPress={() => showDetail(route)} hitSlop={4} className="self-start active:opacity-60">
+        <Text className="text-sm font-medium text-primary underline">{structureLabel(structure)}</Text>
+      </Pressable>
+    );
+  }
+  return (
+    <Text selectable className="font-mono text-sm text-card-foreground">
+      {row.text}
+    </Text>
+  );
+}
+
 /**
  * Values labelled by the action's ports, as orkestrator's args and result
  * sections: a dict is matched by key, a list (returns) by position. Values no
  * port names still show, under their key.
  */
 export function PortValues({ ports, values }: { ports: readonly Port[]; values: unknown }) {
-  const rows: { key: string; label: string; hint?: string | null; text: string }[] = [];
+  const rows: { key: string; label: string; hint?: string | null; text: string; value?: unknown; port?: Port }[] = [];
 
   if (Array.isArray(values)) {
     values.forEach((value, i) => {
       const port = ports[i];
-      rows.push({ key: port?.key ?? String(i), label: port?.label || port?.key || `#${i + 1}`, hint: port?.identifier, text: formatValue(value, port) });
+      rows.push({ key: port?.key ?? String(i), label: port?.label || port?.key || `#${i + 1}`, hint: port?.identifier, text: formatValue(value, port), value, port });
     });
   } else if (values && typeof values === 'object') {
     const record = values as Record<string, unknown>;
     const known = new Set<string>();
     ports.forEach((port) => {
       known.add(port.key);
-      rows.push({ key: port.key, label: port.label || port.key, hint: port.identifier, text: formatValue(record[port.key], port) });
+      rows.push({ key: port.key, label: port.label || port.key, hint: port.identifier, text: formatValue(record[port.key], port), value: record[port.key], port });
     });
     Object.keys(record)
       .filter((k) => !known.has(k))
       .forEach((k) => rows.push({ key: k, label: k, text: formatValue(record[k]) }));
   } else if (values !== null && values !== undefined) {
-    rows.push({ key: 'value', label: ports[0]?.label || ports[0]?.key || 'Value', text: formatValue(values, ports[0]) });
+    rows.push({ key: 'value', label: ports[0]?.label || ports[0]?.key || 'Value', text: formatValue(values, ports[0]), value: values, port: ports[0] });
   }
 
   if (rows.length === 0) return <Text className="text-sm text-muted-foreground">None</Text>;
@@ -59,9 +80,7 @@ export function PortValues({ ports, values }: { ports: readonly Port[]; values: 
             <Text className="text-xs font-medium text-muted-foreground">{row.label}</Text>
             {row.hint ? <Text className="text-[10px] text-muted-foreground/70">{row.hint}</Text> : null}
           </View>
-          <Text selectable className="font-mono text-sm text-card-foreground">
-            {row.text}
-          </Text>
+          <RowValue row={row} />
         </View>
       ))}
     </View>

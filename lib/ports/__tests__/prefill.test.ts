@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 import { PortKind } from "../kinds";
-import { fitArgs, prefill, withRestingValues } from "../prefill";
+import { fitArgs, prefill, structureRef, withRestingValues } from "../prefill";
 import type { PortablePort } from "../types";
 
 const image: PortablePort = { key: "image", kind: PortKind.Structure, identifier: "@mikro/arraydataset" };
@@ -54,5 +54,21 @@ describe("resting values", () => {
     expect(withRestingValues([flag], { flag: true })).toEqual({ flag: true });
     expect(withRestingValues([{ ...flag, default: true }], {})).toEqual({});
     expect(withRestingValues([{ ...flag, nullable: true }], {})).toEqual({});
+  });
+});
+
+describe("the object a value names", () => {
+  it("is read from a structure in either spelling", () => {
+    const dataset = { identifier: "@mikro/arraydataset", object: 7 };
+    expect(structureRef({ __identifier: "@mikro/arraydataset", object: "7" })).toEqual(dataset);
+    expect(structureRef("7", image)).toEqual(dataset);
+    expect(structureRef(7, image)).toEqual(dataset);
+  });
+  it("is nothing without an identifier or a whole-number id", () => {
+    expect(structureRef("7", sigma)).toBeNull();
+    expect(structureRef("7")).toBeNull();
+    expect(structureRef("abc", image)).toBeNull();
+    expect(structureRef({ __identifier: "@mikro/file", object: "a-b" })).toBeNull();
+    expect(structureRef(null, image)).toBeNull();
   });
 });

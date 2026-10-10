@@ -6,6 +6,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { useAlertDialog } from '@/components/ui/alert-dialog';
 import { Text } from '@/components/ui/text';
 import { Guard } from '@/lib/app/App';
+import { showDetail } from '@/lib/navigation';
+import { actionRoute } from '@/lib/rekuest/assign/runOrAsk';
 import {
   DetailTaskFragment,
   useCancelTaskMutation,
@@ -29,7 +31,7 @@ import { useChildTaskStream, useTaskStream } from '@/lib/rekuest/useTaskStream';
 import { useTabTitle } from '@/lib/tabs/TabsProvider';
 import { useThemeColors } from '@/lib/theme/BrandProvider';
 import { Link, useLocalSearchParams } from 'expo-router';
-import { Ban, CornerLeftUp, LucideIcon, OctagonX, Pause, Play } from 'lucide-react-native';
+import { Ban, CornerLeftUp, LucideIcon, OctagonX, Pause, Play, RotateCw } from 'lucide-react-native';
 import * as React from 'react';
 import { Pressable, RefreshControl, ScrollView, View } from 'react-native';
 
@@ -111,7 +113,15 @@ function TaskActions({ task }: { task: DetailTaskFragment }) {
     ),
   ].filter(Boolean);
 
-  if (buttons.length === 0) return null;
+  // Always there: the same action, starting from this task's inputs.
+  buttons.push(
+    <ActionButton
+      key="again"
+      label="Run again"
+      icon={RotateCw}
+      onPress={() => showDetail(actionRoute(task.action.id, { task: task.id }))}
+    />,
+  );
   return <View className="flex-row gap-2 px-4 pb-4">{buttons}</View>;
 }
 
