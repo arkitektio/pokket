@@ -62,10 +62,30 @@ room shows messages live, a reply growing as it is written. Replies come from a 
 replyer answers in a room (or none), each message you send runs it, and a pill shows its progress
 with a way to stop it. Long-press a message to have it answered again or to share its text.
 
-Pokket has no form for a replyer's other arguments: it runs a replyer with the arguments of its
-last run, and one that needs arguments it has never been given has to be run once from orkestrator.
-Things attached to messages (tasks, datasets, threads) show as chips that open their page;
-attaching from the phone is not there yet. Without `rekuest` a room is a plain message board.
+A replyer's other arguments (which model, what tone) are its settings: the replyer sheet opens
+them as a form, and what you save there is used for every message from this phone. Things attached
+to messages (tasks, datasets, threads) show as chips that open their page; attaching from the phone
+is not there yet. Without `rekuest` a room is a plain message board.
+
+### ▶️ Actions
+
+What the organisation's apps can do, to run from the phone. **Actions** (under Tasks, and in
+search) lists and searches them; an action opens as a form of its arguments, drawn from the ports
+and widgets its app declared, the way orkestrator draws them: text and numbers, switches, choices,
+sliders, dates, searches (also ones that depend on another field), lists and nested models, with
+the app's own validation and show/hide rules. **Run** assigns it and opens the task, which is
+followed live. "Run on" picks the agent; left alone, rekuest picks one.
+
+A form starts from what you last ran the action with on this phone, else from its last run. On a
+page that shows an object (a dataset, a file, a task, a mail thread) the play button in the header
+lists the actions that take such an object: one that needs nothing else runs at once, another
+opens its form with the object filled in. A task has **Run again**, which reopens the form with
+that task's inputs.
+
+Not every kind of argument can be edited here yet: dictionaries, unions, quantities with units,
+choices read from an agent's live state and files show as "Set this from orkestrator". Such an
+action still runs from pokket when that argument is optional or has a value from an earlier run.
+The engine behind the form (`lib/ports`) is orkestrator's, ported with its tests.
 
 ### 🕸️ Organisation Mesh
 
