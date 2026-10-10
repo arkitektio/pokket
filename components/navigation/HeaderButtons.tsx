@@ -57,22 +57,19 @@ export function SearchButton() {
 }
 
 /**
- * Share the page on show as a link that opens it in pokket — orkestrator's
- * share button. A tap shares the link scoped to this organization; a long
- * press shares the private form, which names neither server nor organization.
+ * Share the page on show as a link through the organization's front door —
+ * orkestrator's share button.
  */
 export function ShareButton() {
   const colors = useThemeColors();
   const route = activeTab(useTabs()).route;
-  const { share, sharePrivate } = useShareLink(route);
+  const { share } = useShareLink(route);
   return (
     <Pressable
       onPress={share}
-      onLongPress={sharePrivate}
       hitSlop={10}
       accessibilityRole="button"
       accessibilityLabel="Share a link to this page"
-      accessibilityHint="Long press for a private link"
       className="ml-3 active:opacity-70"
     >
       <Share2 size={20} color={colors.foreground} />

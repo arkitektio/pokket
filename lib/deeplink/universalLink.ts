@@ -1,20 +1,7 @@
 import { StoredProfile } from "../arkitekt/fakts/profileStorageSchema";
 import { objectForRoute } from "../lovekit/call/structures";
 import { toDesktopPath } from "./desktopPaths";
-import { scopeDigest } from "./digest";
-import { encodeOpaqueScope, encodeShareScope, profileScope, ShareScope } from "./shareScope";
-
-/**
- * The private form of a link: `arkitekt.live/deeplink` hands the path to the
- * installed app, with the deployment and organization hashed away, so it can
- * be pasted somewhere public. Only an app already signed in to the
- * organization can follow it (`shareScope.ts`, and the gate that receives it).
- */
-const PRIVATE_LINK_BASE = "https://arkitekt.live/deeplink";
-const PRIVATE_LINK_PARAM = "pokket";
-
-export const privateLinkFor = async (route: string, scope: ShareScope): Promise<string> =>
-  `${PRIVATE_LINK_BASE}?${PRIVATE_LINK_PARAM}=${encodeURIComponent(encodeOpaqueScope(await scopeDigest(scope), route))}`;
+import { encodeShareScope, profileScope, ShareScope } from "./shareScope";
 
 /**
  * Where an organization's links are served: kontrol, the deployment's own
