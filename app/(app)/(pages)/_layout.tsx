@@ -74,6 +74,8 @@ export default function PagesLayout() {
         <Stack.Screen name="broadcasts" options={page('Broadcasts')} />
         <Stack.Screen name="calls/index" options={page('Calls')} />
         <Stack.Screen name="calls/[id]" options={{ title: 'Call' }} />
+        <Stack.Screen name="alpaka/index" options={page('Chat')} />
+        <Stack.Screen name="alpaka/rooms/[id]" options={{ title: 'Chat' }} />
         <Stack.Screen name="mikro/index" options={page('Mikro')} />
         <Stack.Screen name="mikro/arraydatasets/index" options={page('Datasets')} />
         <Stack.Screen name="mikro/arraydatasets/[id]" options={{ title: 'Dataset' }} />

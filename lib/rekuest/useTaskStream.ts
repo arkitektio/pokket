@@ -34,11 +34,17 @@ const debounced = (run: () => void) => {
 type Stream = { users: number; stop: () => void };
 const streams = new WeakMap<Client, Stream>();
 
+export type TaskStreamChange = NonNullable<WatchTasksSubscription["tasks"]>;
+type Listener = (change: TaskStreamChange) => void;
+/** Who else wants each change as it arrives, e.g. the chat's replyer pills. */
+const listeners = new WeakMap<Client, Set<Listener>>();
+
 const openStream = (client: Client): (() => void) => {
   const refetchLists = debounced(() => void client.refetchQueries({ include: [ListTasksDocument] }));
   const subscription = client.subscribe<WatchTasksSubscription>({ query: WatchTasksDocument }).subscribe({
     next: ({ data }) => {
       const change = data?.tasks;
+      if (change) listeners.get(client)?.forEach((listener) => listener(change));
       if (change?.event) writeTaskEventToCache(client, change.event);
       // A finished task leaves the "Running" view and joins "Finished".
       if (change?.create || isTerminalKind(change?.event?.kind)) refetchLists();
@@ -74,6 +80,29 @@ export const useTaskStream = () => {
         s.stop();
         streams.delete(client);
       }
+    };
+  }, [client]);
+};
+
+/**
+ * The same stream, change by change: for following one task from the moment
+ * it is assigned, before any query knows it. Holds the stream open like
+ * `useTaskStream`.
+ */
+export const useTaskStreamListener = (listener: (change: TaskStreamChange) => void) => {
+  const client = useRekuestClient();
+  useTaskStream();
+  const latest = React.useRef(listener);
+  React.useEffect(() => {
+    latest.current = listener;
+  });
+  React.useEffect(() => {
+    const own: Listener = (change) => latest.current(change);
+    const set = listeners.get(client) ?? new Set<Listener>();
+    listeners.set(client, set);
+    set.add(own);
+    return () => {
+      set.delete(own);
     };
   }, [client]);
 };

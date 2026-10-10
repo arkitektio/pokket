@@ -29,6 +29,7 @@ const KINDS: readonly StructureKind[] = [
   { identifier: "@mikro/tabledataset", name: "Table", prefix: "/mikro/tabledatasets/", callable: true },
   { identifier: "@mikro/chart", name: "Chart", prefix: "/mikro/charts/", callable: true },
   { identifier: "@mikro/annotation", name: "Annotation", prefix: "/mikro/annotations/", callable: true },
+  { identifier: "@alpaka/room", name: "Chat", prefix: "/alpaka/rooms/", callable: false },
 ];
 
 export type CallStructure = { identifier: string; object: number };

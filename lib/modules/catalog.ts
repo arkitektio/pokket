@@ -109,6 +109,14 @@ export const MODULE_CATALOG: ModuleDecl[] = [
     navLinks: [{ label: "Calls", route: "/calls", home: true, keywords: ["call", "video", "meeting", "lovekit"] }],
   },
   {
+    key: "chat",
+    label: "Chat",
+    icon: "message-circle",
+    serviceKey: "alpaka",
+    route: "/alpaka",
+    navLinks: [{ label: "Chat", route: "/alpaka", home: true, keywords: ["alpaka", "assistant", "llm", "ai", "rooms", "messages"] }],
+  },
+  {
     key: "mikro",
     label: "Mikro",
     icon: "microscope",
