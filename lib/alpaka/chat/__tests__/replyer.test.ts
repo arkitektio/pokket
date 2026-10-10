@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@jest/globals";
-import { chooseReplyer, messageKey, missingArgs, NO_REPLYER, Replyer, replyerArgs, replyerBlocker } from "../replyer";
+import { chooseReplyer, hasSettings, messageKey, missingArgs, NO_REPLYER, Replyer, replyerArgs, replyerBlocker } from "../replyer";
 
 const message = { key: "message", kind: "STRUCTURE", identifier: "@alpaka/message", nullable: false };
 const model = { key: "model", kind: "STRUCTURE", identifier: "@alpaka/llmmodel", nullable: false };
@@ -45,6 +45,26 @@ describe("a replyer", () => {
     expect(replyerArgs(changed, "7")).toEqual({ message: { __identifier: "@alpaka/message", object: "7" } });
   });
 
+  it("runs with the settings saved on this phone before those of its last run", () => {
+    const ran = replyer({ latestTask: { args: { model: { object: 3 } } } });
+    const saved = { model: { object: 9 }, system: "Be brief" };
+    expect(replyerBlocker(replyer(), saved)).toBeNull();
+    expect(replyerArgs(ran, "42", saved)).toEqual({
+      model: { object: 9 },
+      system: "Be brief",
+      message: { __identifier: "@alpaka/message", object: "42" },
+    });
+  });
+
+  it("says what it needs set", () => {
+    expect(replyerBlocker(replyer())).toBe("Needs settings: model.");
+  });
+
+  it("has settings when it takes more than the message", () => {
+    expect(hasSettings(replyer())).toBe(true);
+    expect(hasSettings(replyer({ args: [message] }))).toBe(false);
+  });
+
   it("is refused when it takes no message", () => {
     expect(replyerBlocker(replyer({ args: [model] }))).toBe("It does not take a message.");
   });
@@ -63,6 +83,9 @@ describe("choosing a room's replyer", () => {
   });
   it("falls back when the chosen one is gone", () => {
     expect(chooseReplyer([ready], "zzz")?.id).toBe("b");
+  });
+  it("judges what can run by the blocker it is given", () => {
+    expect(chooseReplyer([blocked, ready], null, () => null)?.id).toBe("a");
   });
   it("respects choosing none", () => {
     expect(chooseReplyer([ready], NO_REPLYER)).toBeNull();

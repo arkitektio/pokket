@@ -208,7 +208,7 @@ export function ChatRoom({ id, replyer }: { id: string; replyer: ReplyerControll
           replyer={
             replyer
               ? {
-                  label: replyer.chosen ? (replyer.blocker ? `${replyer.chosen.name} cannot run here` : replyer.chosen.name) : 'No replyer',
+                  label: replyer.chosen ? (replyer.blocker ? `${replyer.chosen.name} needs settings` : replyer.chosen.name) : 'No replyer',
                   warning: !!replyer.blocker,
                   onPress: () => setPicking(true),
                 }

@@ -20,7 +20,9 @@ import {
   settleFromTasks,
   startTask,
 } from "./activeTasks";
-import { chooseReplyer, NO_REPLYER, Replyer, replyerArgs, replyerBlocker } from "./replyer";
+import { argsFor, useRememberedArgs } from "@/lib/rekuest/assign/rememberedArgs";
+import type { ReplyerActionFragment } from "@/lib/rekuest/api/graphql";
+import { chooseReplyer, NO_REPLYER, replyerArgs, replyerBlocker } from "./replyer";
 import { loadChoice, saveChoice } from "./replyerChoice";
 
 /** A message landing while a pill still spins may mean its replyer is done: ask once, a moment later. */
@@ -29,12 +31,17 @@ const RECHECK_AFTER_MESSAGE_MS = 5000;
 export type ReplyerController = {
   /** The replyers and this room's choice are known: before that, `run` has nothing to run. */
   ready: boolean;
-  replyers: readonly Replyer[];
+  replyers: readonly ReplyerActionFragment[];
   /** The replyer this room runs after each message; null for none. */
-  chosen: Replyer | null;
-  /** Why the chosen replyer cannot run from here, if it cannot. */
+  chosen: ReplyerActionFragment | null;
+  /** Why the chosen replyer cannot run as it stands, if it cannot. */
   blocker: string | null;
   choose: (id: string) => void;
+  /** Why a replyer cannot run as it stands: it needs settings it has none of. */
+  blockerOf: (replyer: ReplyerActionFragment) => string | null;
+  /** A replyer's settings as saved on this phone, if any. */
+  settingsOf: (replyer: ReplyerActionFragment) => Record<string, unknown> | null;
+  saveSettings: (replyer: ReplyerActionFragment, args: Record<string, unknown>) => void;
   tasks: readonly ActiveTask[];
   /** Assign the chosen replyer to a message. Does nothing without a runnable replyer. */
   run: (messageId: string) => Promise<void>;
@@ -52,7 +59,14 @@ export type ReplyerController = {
 export const useReplyer = (roomId: string): ReplyerController => {
   const client = useRekuestClient();
   const { data, error } = useReplyerActionsQuery({ fetchPolicy: "cache-and-network" });
-  const replyers: readonly Replyer[] = React.useMemo(() => data?.actions ?? [], [data]);
+  const replyers: readonly ReplyerActionFragment[] = React.useMemo(() => data?.actions ?? [], [data]);
+  const { all: remembered, remember } = useRememberedArgs();
+  const settingsOf = React.useCallback((replyer: ReplyerActionFragment) => argsFor(remembered, replyer.id), [remembered]);
+  const blockerOf = React.useCallback((replyer: ReplyerActionFragment) => replyerBlocker(replyer, settingsOf(replyer)), [settingsOf]);
+  const saveSettings = React.useCallback(
+    (replyer: ReplyerActionFragment, args: Record<string, unknown>) => remember(replyer.id, args),
+    [remember],
+  );
 
   const [choice, setChoice] = React.useState<{ room: string; id: string | null } | null>(null);
   React.useEffect(() => {
@@ -66,8 +80,8 @@ export const useReplyer = (roomId: string): ReplyerController => {
     };
   }, [roomId]);
   const chosenId = choice?.room === roomId ? choice.id : null;
-  const chosen = React.useMemo(() => chooseReplyer(replyers, chosenId), [replyers, chosenId]);
-  const blocker = chosen ? replyerBlocker(chosen) : null;
+  const chosen = React.useMemo(() => chooseReplyer(replyers, chosenId, blockerOf), [replyers, chosenId, blockerOf]);
+  const blocker = chosen ? blockerOf(chosen) : null;
 
   const choose = React.useCallback(
     (id: string) => {
@@ -145,13 +159,13 @@ export const useReplyer = (roomId: string): ReplyerController => {
 
   const run = React.useCallback(
     async (messageId: string) => {
-      if (!chosen || replyerBlocker(chosen)) return;
+      if (!chosen || blockerOf(chosen)) return;
       const reference = Crypto.randomUUID();
       setTasks((prev) => startTask(prev, reference, chosen.name));
       try {
         const result = await assign({
           variables: {
-            input: { action: chosen.id, args: replyerArgs(chosen, messageId), reference, capture: false },
+            input: { action: chosen.id, args: replyerArgs(chosen, messageId, settingsOf(chosen)), reference, capture: false },
           },
         });
         const task = result.data?.assign;
@@ -161,7 +175,7 @@ export const useReplyer = (roomId: string): ReplyerController => {
         setTasks((prev) => failTask(prev, reference, e instanceof Error ? e.message : String(e)));
       }
     },
-    [chosen, assign],
+    [chosen, assign, blockerOf, settingsOf],
   );
 
   const cancel = React.useCallback(
@@ -180,8 +194,8 @@ export const useReplyer = (roomId: string): ReplyerController => {
     [],
   );
 
-  const ready = (!!data || !!error) && choice?.room === roomId;
-  return { ready, replyers, chosen, blocker, choose, tasks, run, cancel, recheckSoon, dismiss };
+  const ready = (!!data || !!error) && choice?.room === roomId && remembered !== null;
+  return { ready, replyers, chosen, blocker, choose, blockerOf, settingsOf, saveSettings, tasks, run, cancel, recheckSoon, dismiss };
 };
 
 export { NO_REPLYER };
