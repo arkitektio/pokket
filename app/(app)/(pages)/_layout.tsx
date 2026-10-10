@@ -1,3 +1,4 @@
+import { RunOnButton } from '@/components/actions/RunOnButton';
 import { CallAboutButton } from '@/components/calls/CallAboutButton';
 import { ExitGuard } from '@/components/navigation/ExitGuard';
 import { MenuButton, SearchButton, ShareButton } from '@/components/navigation/HeaderButtons';
@@ -38,6 +39,7 @@ const screenOptions = ({ navigation }: { navigation: Nav }) => ({
   headerRight: () => (
     <View className="flex-row items-center">
       <CallAboutButton />
+      <RunOnButton />
       <ShareButton />
       <SearchButton />
     </View>

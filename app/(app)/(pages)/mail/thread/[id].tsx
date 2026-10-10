@@ -1,3 +1,4 @@
+import { RunOnButton } from '@/components/actions/RunOnButton';
 import { CallAboutButton } from '@/components/calls/CallAboutButton';
 import { MessageCard } from '@/components/mail/MessageCard';
 import { KuvertUnavailable, MailLoadingState } from '@/components/mail/states';
@@ -76,6 +77,7 @@ function ThreadContent({ id }: { id: string }) {
         <Trash2 size={20} color={colors.destructive} />
       </Pressable>
       <CallAboutButton />
+      <RunOnButton />
       <SearchButton />
     </View>
   );

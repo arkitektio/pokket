@@ -65,3 +65,16 @@ export const structureForRoute = (pathname: string): (CallStructure & { label: s
   }
   return null;
 };
+
+/**
+ * The object the page at `pathname` shows, whether or not a call can be about
+ * it: what an action can be run on.
+ */
+export const objectForRoute = (pathname: string): CallStructure | null => {
+  for (const kind of KINDS) {
+    if (!pathname.startsWith(kind.prefix)) continue;
+    const rest = pathname.slice(kind.prefix.length);
+    if (/^\d+$/.test(rest)) return { identifier: kind.identifier, object: Number(rest) };
+  }
+  return null;
+};

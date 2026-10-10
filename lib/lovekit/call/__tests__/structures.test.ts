@@ -1,7 +1,24 @@
 import { describe, expect, it } from "@jest/globals";
 import { callRoute, callTitle } from "../links";
 import { currentTopic, toStructureInput, toStructureInputs } from "../structureInput";
-import { structureForRoute, structureLabel, structureRoute } from "../structures";
+import { objectForRoute, structureForRoute, structureKindName, structureLabel, structureRoute } from "../structures";
+
+describe("the object a page shows", () => {
+  it("is found for any page of a known kind, callable or not", () => {
+    expect(objectForRoute("/mikro/arraydatasets/7")).toEqual({ identifier: "@mikro/arraydataset", object: 7 });
+    expect(objectForRoute("/calls/5")).toEqual({ identifier: "@lovekit/call", object: 5 });
+    expect(structureForRoute("/calls/5")).toBeNull();
+  });
+  it("is nothing for a list, a page without a whole-number id, or an unknown page", () => {
+    expect(objectForRoute("/mikro/arraydatasets")).toBeNull();
+    expect(objectForRoute("/tasks/abc")).toBeNull();
+    expect(objectForRoute("/settings")).toBeNull();
+  });
+  it("is named by its kind", () => {
+    expect(structureKindName("@mikro/arraydataset")).toBe("Dataset");
+    expect(structureKindName("@kraph/entity")).toBe("entity");
+  });
+});
 
 describe("call structures", () => {
   it("names and links the objects pokket has a page for", () => {
