@@ -1,3 +1,21 @@
+# [1.12.0](https://github.com/arkitektio/pokket/compare/v1.11.0...v1.12.0) (2026-10-10)
+
+
+### Bug Fixes
+
+* **ports:** an empty list is still a field on show ([2b1bfa1](https://github.com/arkitektio/pokket/commit/2b1bfa172c2c0cb091757db1a8a7f1f0cba8da98))
+
+
+### Features
+
+* **alpaka:** replyer settings ([216e9b7](https://github.com/arkitektio/pokket/commit/216e9b7dfa2da9968ae600594174953b7efba17c))
+* **ports:** the port engine: values, validation and calls ([f9fcc08](https://github.com/arkitektio/pokket/commit/f9fcc08f415f249c6325756003ee0e6748c72060))
+* **ports:** widgets and the port form ([b1d5fa8](https://github.com/arkitektio/pokket/commit/b1d5fa8099cccb61934ceddf01b62d8539504203))
+* **rekuest:** action and port documents ([b9292b6](https://github.com/arkitektio/pokket/commit/b9292b6b432bd625261e865f51b091466fd7e939))
+* **rekuest:** browse actions, assign them and choose the agent ([3667896](https://github.com/arkitektio/pokket/commit/3667896ad2dae8eedc87029913019f72d59d6218))
+* **rekuest:** run an action on the object on show ([5ecb501](https://github.com/arkitektio/pokket/commit/5ecb5015906935a1b0591bf2d6e5ae8a024ea39c))
+* **tasks:** linked values and run again ([9efb029](https://github.com/arkitektio/pokket/commit/9efb0297a7dcef0ee57d07afe42bd229e389c817))
+
 # [1.11.0](https://github.com/arkitektio/pokket/compare/v1.10.0...v1.11.0) (2026-10-10)
 
 
