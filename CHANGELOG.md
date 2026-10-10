@@ -1,3 +1,10 @@
+# [1.14.0](https://github.com/arkitektio/pokket/compare/v1.13.0...v1.14.0) (2026-10-10)
+
+
+### Features
+
+* **deeplink:** open smartlinks, and the relay's callback says it is the desktop's ([b8381b1](https://github.com/arkitektio/pokket/commit/b8381b185d6334708dafce544bb7fd7f6aaab6a7))
+
 # [1.13.0](https://github.com/arkitektio/pokket/compare/v1.12.0...v1.13.0) (2026-10-10)
 
 
