@@ -1,3 +1,10 @@
+## [1.15.3](https://github.com/arkitektio/pokket/compare/v1.15.2...v1.15.3) (2026-10-10)
+
+
+### Bug Fixes
+
+* **deeplink:** sharing has no fallback to the arkitekt.live form ([b4d68bc](https://github.com/arkitektio/pokket/commit/b4d68bcf524d6cf5e065a440a069d2c9d16c684f))
+
 ## [1.15.2](https://github.com/arkitektio/pokket/compare/v1.15.1...v1.15.2) (2026-10-10)
 
 
