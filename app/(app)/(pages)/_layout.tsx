@@ -109,6 +109,7 @@ export default function PagesLayout() {
         <Stack.Screen name="timeline/index" options={page('Timeline')} />
         <Stack.Screen name="timeline/place/[id]" options={{ title: 'Place' }} />
         <Stack.Screen name="settings" options={page('Settings')} />
+        <Stack.Screen name="not-here" options={{ title: 'Not on the phone' }} />
         <Stack.Screen name="debug" options={page('Debug')} />
       </Stack>
     </>

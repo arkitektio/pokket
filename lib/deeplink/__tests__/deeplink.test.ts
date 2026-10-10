@@ -1,4 +1,5 @@
 import { describe, expect, it } from "@jest/globals";
+import { fromDesktopPath } from "../desktopPaths";
 import { parseIncomingLink } from "../incoming";
 import { decodeShareRequest, encodeOpaqueScope, encodeShareScope, matchScope, normalizeLinkPath } from "../shareScope";
 
@@ -64,7 +65,8 @@ describe("incoming links", () => {
   it("reads the arkitekt.live wrapper", () => {
     const url = `https://arkitekt.live/deeplink?pokket=${encodeURIComponent(gate)}`;
     expect(parseIncomingLink(url)).toEqual(decodeShareRequest(gate.split("?")[1]));
-    expect(parseIncomingLink("https://arkitekt.live/deeplink?orkestrator=%2Fmikro")).toBeNull();
+    // The desktop's parameter is read too, now that the app answers to its name.
+    expect(parseIncomingLink("https://arkitekt.live/deeplink?orkestrator=%2Fmikro")?.path).toBe("/mikro");
     expect(parseIncomingLink("https://example.com/deeplink?pokket=%2Fbank")).toBeNull();
   });
 
@@ -76,5 +78,65 @@ describe("incoming links", () => {
     expect(parseIncomingLink("exp://10.0.0.2:8081/--/bank")).toBeNull();
     expect(parseIncomingLink("/bank")).toBeNull();
     expect(parseIncomingLink("pokket://open?to=https%3A%2F%2Fx.io")).toBeNull();
+  });
+});
+
+describe("links from the desktop app", () => {
+  it("name the phone's page for what both apps show", () => {
+    expect(fromDesktopPath("/rekuest/tasks/5")).toBe("/tasks/5");
+    expect(fromDesktopPath("/rekuest/actions/5")).toBe("/actions/5");
+    expect(fromDesktopPath("/kuvert/threads/9")).toBe("/mail/thread/9");
+    expect(fromDesktopPath("/bank/transactions/3")).toBe("/bank/transaction/3");
+    expect(fromDesktopPath("/lovekit/solobroadcasts/2")).toBe("/solo-broadcast/2");
+    expect(fromDesktopPath("/lovekit/calls/2?join=1")).toBe("/calls/2?join=1");
+  });
+  it("keep the paths both apps share", () => {
+    expect(fromDesktopPath("/mikro/arraydatasets/7")).toBe("/mikro/arraydatasets/7");
+    expect(fromDesktopPath("/alpaka/rooms/4")).toBe("/alpaka/rooms/4");
+    expect(fromDesktopPath("/mikro")).toBe("/mikro");
+    expect(fromDesktopPath("/bank?view=spending")).toBe("/bank?view=spending");
+  });
+  it("open a service's front page as the phone's stand-in for it", () => {
+    expect(fromDesktopPath("/rekuest")).toBe("/tasks");
+    expect(fromDesktopPath("/rekuest/home")).toBe("/tasks");
+    expect(fromDesktopPath("/kuvert")).toBe("/mail");
+  });
+  it("say so when the phone has no such page", () => {
+    expect(fromDesktopPath("/rekuest/agents/3")).toBe("/not-here?path=%2Frekuest%2Fagents%2F3");
+    expect(fromDesktopPath("/mikro/coordinatesystems/3")).toBe("/not-here?path=%2Fmikro%2Fcoordinatesystems%2F3");
+    expect(fromDesktopPath("/bank/accounts/3")).toBe("/not-here?path=%2Fbank%2Faccounts%2F3");
+    expect(fromDesktopPath("/kabinet")).toBe("/not-here?path=%2Fkabinet");
+  });
+  it("let a phone path through", () => {
+    expect(fromDesktopPath("/tasks")).toBe("/tasks");
+    expect(fromDesktopPath("/mail/thread/9")).toBe("/mail/thread/9");
+    expect(fromDesktopPath("/settings")).toBe("/settings");
+  });
+
+  it("are translated when they arrive by the desktop's scheme", () => {
+    expect(parseIncomingLink("orkestrator://rekuest/tasks/5")?.path).toBe("/tasks/5");
+    expect(parseIncomingLink("orkestrator://tasks")?.path).toBe("/tasks");
+  });
+  it("are translated inside a scoped link, keeping the scope", () => {
+    const gate = encodeShareScope(scope, "/kuvert/threads/9");
+    expect(parseIncomingLink(`orkestrator:/${gate}`)).toEqual({
+      scope: { baseUrl: "https://go.arkitekt.live", org: "7", hub: null },
+      digest: null,
+      path: "/mail/thread/9",
+    });
+  });
+  it("are translated when they arrive by the desktop's wrapper parameter", () => {
+    const url = `https://arkitekt.live/deeplink?orkestrator=${encodeURIComponent("/rekuest/tasks/5")}`;
+    expect(parseIncomingLink(url)?.path).toBe("/tasks/5");
+  });
+  it("leave the phone's own links exactly as they are", () => {
+    // A phone path that happens to look like a desktop one is not second-guessed.
+    expect(parseIncomingLink("pokket://rekuest/tasks/5")?.path).toBe("/rekuest/tasks/5");
+    const url = `https://arkitekt.live/deeplink?pokket=${encodeURIComponent("/tasks/5")}`;
+    expect(parseIncomingLink(url)?.path).toBe("/tasks/5");
+  });
+  it("still leave the self-test and the dev client to the router", () => {
+    expect(parseIncomingLink("orkestrator://mesh-selftest?key=1")).toBeNull();
+    expect(parseIncomingLink("orkestrator://")).toBeNull();
   });
 });

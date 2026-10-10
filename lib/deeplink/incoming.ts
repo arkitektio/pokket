@@ -1,9 +1,24 @@
+import { fromDesktopPath } from "./desktopPaths";
 import { decodeQuery, decodeShareRequest, normalizeLinkPath, SHARE_GATE_PATH, ShareRequest } from "./shareScope";
 
+/**
+ * The app's own scheme and wrapper parameter, and the desktop app's, which it
+ * answers to as well. A link by the desktop's names a page the desktop's way
+ * (`desktopPaths.ts`); one by its own is taken as it is.
+ */
 const SCHEME = "pokket";
+const DESKTOP_SCHEME = "orkestrator";
 const UNIVERSAL_HOST = "arkitekt.live";
 const UNIVERSAL_PATH = "/deeplink";
 const UNIVERSAL_PARAM = "pokket";
+const DESKTOP_PARAM = "orkestrator";
+
+/** The same request, its page named the phone's way. */
+const translated = (request: ShareRequest | null): ShareRequest | null => {
+  if (!request) return null;
+  const path = normalizeLinkPath(fromDesktopPath(request.path));
+  return path ? { ...request, path } : null;
+};
 
 /** What stays with the router: the on-device self-test and the dev client's own links. */
 const LEFT_TO_ROUTER = new Set(["mesh-selftest", "expo-development-client"]);
@@ -37,13 +52,17 @@ export const parseIncomingLink = (url: string): ShareRequest | null => {
     const [host, ...segments] = location.split("/");
     if (host.toLowerCase() !== UNIVERSAL_HOST) return null;
     if (`/${segments.join("/")}`.replace(/\/+$/, "") !== UNIVERSAL_PATH) return null;
-    const wrapped = decodeQuery(query)[UNIVERSAL_PARAM];
-    return wrapped ? fromAppPath("/" + wrapped.replace(/^\/+/, "")) : null;
+    const params = decodeQuery(query);
+    const own = params[UNIVERSAL_PARAM];
+    if (own) return fromAppPath("/" + own.replace(/^\/+/, ""));
+    const desktop = params[DESKTOP_PARAM];
+    return desktop ? translated(fromAppPath("/" + desktop.replace(/^\/+/, ""))) : null;
   }
 
-  if (scheme !== SCHEME) return null;
+  if (scheme !== SCHEME && scheme !== DESKTOP_SCHEME) return null;
   const appPath = rest.replace(/^\/+/, "");
   const first = appPath.split(/[/?]/)[0];
   if (!first || LEFT_TO_ROUTER.has(first)) return null;
-  return fromAppPath("/" + appPath);
+  const request = fromAppPath("/" + appPath);
+  return scheme === DESKTOP_SCHEME ? translated(request) : request;
 };

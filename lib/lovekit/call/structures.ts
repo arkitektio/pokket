@@ -13,15 +13,17 @@ type StructureKind = {
   prefix: string;
   /** A call can be started about it from its page. */
   callable: boolean;
+  /** Where the desktop app shows it, when that differs: links shared from there name this. */
+  desktop?: string;
 };
 
 const KINDS: readonly StructureKind[] = [
-  { identifier: "@rekuest/task", name: "Task", prefix: "/tasks/", callable: true },
-  { identifier: "@rekuest/action", name: "Action", prefix: "/actions/", callable: false },
-  { identifier: "@bank/transaction", name: "Transaction", prefix: "/bank/transaction/", callable: true },
-  { identifier: "@kuvert/thread", name: "Thread", prefix: "/mail/thread/", callable: true },
-  { identifier: "@lovekit/solo_broadcast", name: "Broadcast", prefix: "/solo-broadcast/", callable: true },
-  { identifier: "@lovekit/call", name: "Call", prefix: "/calls/", callable: false },
+  { identifier: "@rekuest/task", name: "Task", prefix: "/tasks/", callable: true, desktop: "/rekuest/tasks/" },
+  { identifier: "@rekuest/action", name: "Action", prefix: "/actions/", callable: false, desktop: "/rekuest/actions/" },
+  { identifier: "@bank/transaction", name: "Transaction", prefix: "/bank/transaction/", callable: true, desktop: "/bank/transactions/" },
+  { identifier: "@kuvert/thread", name: "Thread", prefix: "/mail/thread/", callable: true, desktop: "/kuvert/threads/" },
+  { identifier: "@lovekit/solo_broadcast", name: "Broadcast", prefix: "/solo-broadcast/", callable: true, desktop: "/lovekit/solobroadcasts/" },
+  { identifier: "@lovekit/call", name: "Call", prefix: "/calls/", callable: false, desktop: "/lovekit/calls/" },
   { identifier: "@mikro/arraydataset", name: "Dataset", prefix: "/mikro/arraydatasets/", callable: true },
   { identifier: "@mikro/lens", name: "Lens", prefix: "/mikro/lenses/", callable: true },
   { identifier: "@mikro/folder", name: "Folder", prefix: "/mikro/folders/", callable: true },
@@ -78,3 +80,7 @@ export const objectForRoute = (pathname: string): CallStructure | null => {
   }
   return null;
 };
+
+/** The desktop app's page prefixes and the phone's, for the kinds whose pages are named differently. */
+export const desktopPrefixes = (): { desktop: string; phone: string }[] =>
+  KINDS.flatMap((kind) => (kind.desktop ? [{ desktop: kind.desktop, phone: kind.prefix }] : []));
