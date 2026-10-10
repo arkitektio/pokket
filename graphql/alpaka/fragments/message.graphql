@@ -1,0 +1,24 @@
+fragment MessageAgent on Agent {
+  id
+  name
+  user {
+    id
+    preferredUsername
+  }
+}
+
+# The whole message every time: a streaming reply arrives as updates of this
+# same object, `text` grown and `isStreaming` still set, never as chunks.
+fragment ListMessage on Message {
+  id
+  text
+  isStreaming
+  agent {
+    ...MessageAgent
+  }
+  attachedStructures {
+    identifier
+    object
+  }
+  createdAt
+}

@@ -1,0 +1,15 @@
+mutation CreateRoom($input: CreateRoomInput!) {
+  createRoom(input: $input) {
+    ...Room
+  }
+}
+
+mutation DeleteRoom($id: ID!) {
+  deleteRoom(input: { id: $id })
+}
+
+mutation SendMessage($input: SendMessageInput!) {
+  send(input: $input) {
+    ...ListMessage
+  }
+}

@@ -1,0 +1,9 @@
+# `filterOwn: false`: our own message comes back too, which is what turns a
+# pending row into a delivered one.
+subscription WatchMessages($room: ID!, $agentId: ID!) {
+  room(room: $room, agentId: $agentId, filterOwn: false) {
+    message {
+      ...ListMessage
+    }
+  }
+}

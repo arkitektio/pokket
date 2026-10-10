@@ -1,0 +1,25 @@
+overwrite: true
+schema:
+  "http://jhnnsrs-lab/alpaka/schema":
+    handleAsSDL: true
+documents: "graphql/alpaka/**/*.graphql"
+generates:
+  lib/alpaka/api/fragments.ts:
+    plugins:
+      - "fragment-matcher"
+  lib/alpaka/api/graphql.ts:
+    plugins:
+      - "typescript"
+      - "typescript-operations"
+      - "typescript-react-apollo"
+    config:
+      withHooks: true
+      reactApolloVersion: 3
+      apolloReactHooksImportFrom: "@/lib/alpaka/funcs"
+
+  lib/alpaka/graphql.schema.json:
+    plugins:
+      - "introspection"
+config:
+  scalars:
+    DateTime: string

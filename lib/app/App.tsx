@@ -7,6 +7,7 @@ import { kuvertServiceDefinition } from "../kuvert/service";
 import { lokateServiceDefinition } from "../lokate/service";
 import { livekitServiceDefinition } from "../livekit/service";
 import { datalayerServiceDefinition } from "../datalayer/service";
+import { alpakaServiceDefinition } from "../alpaka/service";
 import { lokServiceBuilder } from "../lok/service";
 import { lovekitServiceDefinition } from "../lovekit/service";
 import { mesh } from "../mesh/integration";
@@ -83,6 +84,7 @@ export const App = buildArkitekt({
     bank: bankServiceDefinition,
     lokate: lokateServiceDefinition,
     datalayer: datalayerServiceDefinition,
+    alpaka: alpakaServiceDefinition,
 
   },
   selfServiceBuilder: lokServiceBuilder,
@@ -104,5 +106,6 @@ export const Guard = {
   Bank: App.buildServiceGuard("bank"),
   Lokate: App.buildServiceGuard("lokate"),
   Datalayer: App.buildServiceGuard("datalayer"),
+  Alpaka: App.buildServiceGuard("alpaka"),
 };
 

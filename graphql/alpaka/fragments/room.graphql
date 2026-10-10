@@ -1,0 +1,36 @@
+fragment Room on Room {
+  id
+  title
+  description
+  createdAt
+  creator {
+    id
+    preferredUsername
+  }
+  organization {
+    id
+    slug
+  }
+  agents {
+    ...MessageAgent
+  }
+  messages {
+    ...ListMessage
+  }
+}
+
+fragment RecentRoom on Room {
+  id
+  title
+  description
+  createdAt
+  latest: messages(ordering: [{ createdAt: DESC }], pagination: { limit: 1 }) {
+    id
+    text
+    createdAt
+    attachedStructures {
+      identifier
+      object
+    }
+  }
+}
