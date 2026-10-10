@@ -15,11 +15,11 @@ const describe = (status: BackupStatus, org: string): { text: string; tone: 'mut
     case 'working':
       return { text: `${status.step}…`, tone: 'muted' };
     case 'error':
-      return { text: `Backup failed: ${status.message}. It is tried again next time pokket opens.`, tone: 'error' };
+      return { text: `Backup failed: ${status.message}. It is tried again next time Orkestrator opens.`, tone: 'error' };
     case 'idle':
       return status.lastAt
         ? { text: `Backed up to ${org} at ${new Date(status.lastAt).toLocaleString()}.`, tone: 'ok' }
-        : { text: `On. Backs up to ${org} whenever pokket is open.`, tone: 'muted' };
+        : { text: `On. Backs up to ${org} whenever Orkestrator is open.`, tone: 'muted' };
   }
 };
 
@@ -49,8 +49,8 @@ function AutoBackup({ intervalMin, disabled }: { intervalMin: number; disabled: 
       </View>
       <Text className="text-xs text-muted-foreground">
         {intervalMin === 0
-          ? 'Backs up when pokket opens, and on "Back up now".'
-          : `Every ${intervalLabel(intervalMin)} while pokket is open, and in the background at most that often. The system decides when: ` +
+          ? 'Backs up when Orkestrator opens, and on "Back up now".'
+          : `Every ${intervalLabel(intervalMin)} while Orkestrator is open, and in the background at most that often. The system decides when: ` +
             'iPhones often wait for the phone to charge. It goes through the organization\'s mesh when lokate needs it.'}
       </Text>
     </View>
@@ -59,7 +59,7 @@ function AutoBackup({ intervalMin, disabled }: { intervalMin: number; disabled: 
 
 /**
  * The timeline's backup to the organization's lokate. Off by default; one
- * organization at a time. It runs while pokket is open and that organization
+ * organization at a time. It runs while Orkestrator is open and that organization
  * is the one connected, and, with an interval set, in the background too.
  */
 export function TimelineBackup() {

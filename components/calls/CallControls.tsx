@@ -57,7 +57,7 @@ export function MicToggle({ small }: { small?: boolean }) {
     try {
       if (!allowed) {
         if (!(await requestMicrophone())) {
-          toast('The microphone is off for Pokket', { action: openSettings });
+          toast('The microphone is off for Orkestrator', { action: openSettings });
           return;
         }
         const { call, setMedia } = callStore.getState();

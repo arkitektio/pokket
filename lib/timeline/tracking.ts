@@ -204,7 +204,7 @@ export const recordNow = async (): Promise<RecordNowResult> => {
 
 export const deniedHint = (background: boolean) =>
   !background
-    ? "Location is turned off for pokket in the system settings."
+    ? "Location is turned off for Orkestrator in the system settings."
     : Platform.OS === "ios"
-      ? "pokket may only use location while open. Set Location to “Always” in the system settings."
-      : "pokket may only use location while open. Choose “Allow all the time” in the system settings.";
+      ? "Orkestrator may only use location while open. Set Location to “Always” in the system settings."
+      : "Orkestrator may only use location while open. Choose “Allow all the time” in the system settings.";

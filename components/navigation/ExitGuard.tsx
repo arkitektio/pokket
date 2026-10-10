@@ -30,7 +30,7 @@ export function ExitGuard() {
         lastPress.current = now;
         // Android's own little popout, as the system uses for the same thing —
         // not an in-app notification.
-        ToastAndroid.show('This will leave Pokket. Press back again.', ToastAndroid.SHORT);
+        ToastAndroid.show('This will leave Orkestrator. Press back again.', ToastAndroid.SHORT);
         return true;
       });
       return () => subscription.remove();

@@ -66,7 +66,7 @@ export default function TimelineScreen() {
     try {
       const result = await recordNow();
       if (result.kind === 'denied') {
-        toast.error('Location is turned off for pokket', {
+        toast.error('Location is turned off for Orkestrator', {
           action: { label: 'Settings', onClick: () => void Linking.openSettings() },
         });
         return;

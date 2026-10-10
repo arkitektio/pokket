@@ -26,7 +26,7 @@ const describe = (status: PushStatus, org: string): { text: string; tone: 'muted
         tone: 'ok',
       };
     case 'denied':
-      return { text: 'Notifications are turned off for pokket in the system settings.', tone: 'warn' };
+      return { text: 'Notifications are turned off for Orkestrator in the system settings.', tone: 'warn' };
     case 'unavailable':
       return { text: status.reason, tone: 'warn' };
     case 'error':

@@ -62,7 +62,7 @@ export const AppLayout = () => {
     <Stack>
       <Stack.Protected guard={isLoggedIn}>
         {/* The sidebar and the one page view (app/(app)). */}
-        <Stack.Screen name="(app)" options={{ headerShown: false, title: "Pokket" }} />
+        <Stack.Screen name="(app)" options={{ headerShown: false, title: "Orkestrator" }} />
         {/* Search: the palette, over everything. */}
         <Stack.Screen name="search" options={{ headerShown: false, presentation: 'fullScreenModal', animation: 'fade' }} />
       </Stack.Protected>

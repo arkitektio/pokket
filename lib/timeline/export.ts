@@ -26,9 +26,9 @@ export const toGpx = (data: Awaited<ReturnType<typeof allForExport>>): string =>
     })
     .join("\n");
   return `<?xml version="1.0" encoding="UTF-8"?>
-<gpx version="1.1" creator="pokket" xmlns="http://www.topografix.com/GPX/1/1">
+<gpx version="1.1" creator="Orkestrator" xmlns="http://www.topografix.com/GPX/1/1">
 ${waypoints}
-  <trk><name>pokket timeline</name><trkseg>
+  <trk><name>Orkestrator timeline</name><trkseg>
 ${points}
   </trkseg></trk>
 </gpx>
@@ -46,6 +46,6 @@ const share = async (name: string, contents: string, mimeType: string) => {
 export const exportTimeline = async (format: "gpx" | "json") => {
   const data = await allForExport();
   const stamp = new Date().toISOString().slice(0, 10);
-  if (format === "gpx") await share(`pokket-timeline-${stamp}.gpx`, toGpx(data), "application/gpx+xml");
-  else await share(`pokket-timeline-${stamp}.json`, JSON.stringify({ version: 1, ...data }, null, 2), "application/json");
+  if (format === "gpx") await share(`orkestrator-timeline-${stamp}.gpx`, toGpx(data), "application/gpx+xml");
+  else await share(`orkestrator-timeline-${stamp}.json`, JSON.stringify({ version: 1, ...data }, null, 2), "application/json");
 };

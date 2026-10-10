@@ -32,7 +32,7 @@ export function UpdatePrompt() {
 
   React.useEffect(() => {
     if (!isUpdatePending) return;
-    toast('A new version of Pokket is ready', {
+    toast('A new version of Orkestrator is ready', {
       duration: Infinity,
       action: { label: 'Restart', onClick: () => void Updates.reloadAsync() },
     });

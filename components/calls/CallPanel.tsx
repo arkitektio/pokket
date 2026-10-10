@@ -131,7 +131,7 @@ function ListeningOnly() {
   return (
     <Pressable onPress={() => void Linking.openSettings()} className="rounded-xl bg-muted px-3 py-2 active:opacity-70">
       <Text className="text-center text-xs text-muted-foreground">
-        The microphone is off for Pokket. You can listen; tap to turn it on in Settings to speak.
+        The microphone is off for Orkestrator. You can listen; tap to turn it on in Settings to speak.
       </Text>
     </Pressable>
   );

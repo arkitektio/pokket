@@ -53,7 +53,8 @@ export function Sidebar({ navigation }: DrawerContentComponentProps) {
   return (
     <View style={{ paddingTop: insets.top + 8, paddingBottom: insets.bottom + 8 }} className="flex-1 bg-card px-3">
       <View className="flex-row items-baseline gap-2 px-1 pb-3">
-        <Text className="text-lg font-bold text-card-foreground">Pokket</Text>
+        <Text className="text-lg font-bold text-card-foreground">Orkestrator</Text>
+        <Text className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">pokket edition</Text>
         {deployment ? (
           <Text numberOfLines={1} className="flex-1 text-xs text-muted-foreground">
             {deployment}

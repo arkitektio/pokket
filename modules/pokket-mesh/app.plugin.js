@@ -12,7 +12,7 @@
 const { withAndroidManifest, withInfoPlist } = require("expo/config-plugins");
 
 const LOCAL_NETWORK_USAGE =
-  "$(PRODUCT_NAME) connects to your organisation's mesh, and looks for the machines on it on your local network to reach them directly.";
+  "Orkestrator connects to your organisation's mesh, and looks for the machines on it on your local network to reach them directly.";
 
 const withMeshAndroid = (config) =>
   withAndroidManifest(config, (config) => {

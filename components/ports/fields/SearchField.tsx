@@ -139,7 +139,7 @@ export function SearchField(props: FieldProps) {
   // No client for this ward (pokket does not connect to that service): the id can still be typed.
   if (!client || !query) {
     if (port.kind === PortKind.Structure) return <StructureField {...props} />;
-    return <Text className="text-sm text-muted-foreground">Pokket cannot search {widget?.ward || 'this service'}.</Text>;
+    return <Text className="text-sm text-muted-foreground">This app cannot search {widget?.ward || 'this service'}.</Text>;
   }
 
   return (

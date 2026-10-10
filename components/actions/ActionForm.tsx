@@ -52,7 +52,7 @@ export function ActionForm({
       {children}
       {blocking.length ? (
         <Text className="text-sm text-destructive">
-          This needs {blocking.map(portLabel).join(', ')}, which pokket cannot set yet. Run it once from orkestrator and pokket
+          This needs {blocking.map(portLabel).join(', ')}, which this app cannot set yet. Run it once from the desktop app and it
           reuses what you chose there.
         </Text>
       ) : null}

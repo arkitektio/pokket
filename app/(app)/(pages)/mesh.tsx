@@ -94,7 +94,7 @@ export default function MeshScreen() {
       <View className="px-4 pt-6 pb-10">
         {!available ? (
           <Notice title="This build has no mesh">
-            The mesh needs a build of pokket made with the mesh sidecar (`pnpm build:mesh`). Every
+            The mesh needs a build of Orkestrator made with the mesh sidecar (`pnpm build:mesh`). Every
             service is reached directly.
           </Notice>
         ) : null}
@@ -102,7 +102,7 @@ export default function MeshScreen() {
         {available && endpoint?.mesh_coord_url && !record ? (
           <Notice title="Not on this deployment's mesh">
             {endpoint.name} has a mesh, but this organization&apos;s login was not let into it. Add the
-            organization again from the switcher, and allow the mesh when you approve pokket.
+            organization again from the switcher, and allow the mesh when you approve Orkestrator.
           </Notice>
         ) : null}
 

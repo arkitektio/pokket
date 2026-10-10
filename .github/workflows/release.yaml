@@ -162,14 +162,14 @@ jobs:
         id: apk
         run: |
           if [ "${{ steps.native.outputs.needed }}" = "true" ]; then
-            gh release upload "v$VERSION" "pokket.apk#pokket $VERSION for Android" --clobber
+            gh release upload "v$VERSION" "pokket.apk#Orkestrator (pokket edition) $VERSION for Android" --clobber
             echo "apk=built" >> "$GITHUB_OUTPUT"
           else
             # JS only: the newest APK is still the app. It picks this release's
             # JS up over the air on its first launch.
             from="$(scripts/ci/copy-apk.sh "v$VERSION" pokket.apk)"
             gh release upload "v$VERSION" \
-              "pokket.apk#pokket $VERSION for Android (app from $from; updates itself on first launch)" --clobber
+              "pokket.apk#Orkestrator (pokket edition) $VERSION for Android (app from $from; updates itself on first launch)" --clobber
             echo "apk=copied" >> "$GITHUB_OUTPUT"
             echo "from=$from" >> "$GITHUB_OUTPUT"
           fi

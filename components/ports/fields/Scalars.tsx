@@ -91,10 +91,10 @@ export function UnsupportedField({ port, path }: FieldProps) {
     <View className="flex-row items-start gap-2.5 rounded-xl border border-dashed border-border bg-muted/40 px-3 py-2.5">
       <MonitorSmartphone size={16} color={colors.mutedForeground} style={{ marginTop: 2 }} />
       <View className="flex-1 gap-0.5">
-        <Text className="text-sm text-foreground">Set this from orkestrator</Text>
+        <Text className="text-sm text-foreground">Set this from the desktop app</Text>
         <Text className="text-xs text-muted-foreground">
           {unsupportedReason(port)}{' '}
-          {set ? 'The value of the last run is used.' : port.nullable ? 'It is optional and is left out.' : 'It is required, so this cannot run from pokket yet.'}
+          {set ? 'The value of the last run is used.' : port.nullable ? 'It is optional and is left out.' : 'It is required, so this cannot run from the phone yet.'}
         </Text>
       </View>
     </View>

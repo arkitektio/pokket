@@ -51,9 +51,9 @@ export const unsupportedReason = (port: FormPort): string => {
     [PortKind.Quantity]: "a quantity with a unit",
     [PortKind.MemoryStructure]: "something an agent holds in memory",
     [PortKind.Interface]: "an interface",
-    [PortKind.List]: "a list pokket cannot edit",
+    [PortKind.List]: "a list this app cannot edit",
   };
-  return `It is ${kinds[port.kind] ?? `of a kind pokket does not know (${port.kind.toLowerCase()})`}.`;
+  return `It is ${kinds[port.kind] ?? `of a kind this app does not know (${port.kind.toLowerCase()})`}.`;
 };
 
 const isSet = (value: unknown) => value !== null && value !== undefined && value !== "";

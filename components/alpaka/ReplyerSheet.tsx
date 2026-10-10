@@ -125,7 +125,7 @@ export function ReplyerSheet({
             })}
             {replyer.replyers.length === 0 ? (
               <Text className="px-3 py-4 text-sm text-muted-foreground">
-                No app in this organization offers a replyer yet. Install one from orkestrator.
+                No app in this organization offers a replyer yet. Install one from the desktop app.
               </Text>
             ) : null}
           </ScrollView>

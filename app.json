@@ -6,14 +6,15 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "pokket",
+    "scheme": ["pokket", "orkestrator"],
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "live.arkitekt.pokket",
       "infoPlist": {
-        "NSBluetoothAlwaysUsageDescription": "Allow $(PRODUCT_NAME) to connect to bluetooth devices",
-        "NSBluetoothPeripheralUsageDescription": "Allow $(PRODUCT_NAME) to connect to bluetooth devices",
+        "CFBundleDisplayName": "Orkestrator",
+        "NSBluetoothAlwaysUsageDescription": "Allow Orkestrator to connect to bluetooth devices",
+        "NSBluetoothPeripheralUsageDescription": "Allow Orkestrator to connect to bluetooth devices",
         "ITSAppUsesNonExemptEncryption": false,
         "UIBackgroundModes": ["audio"]
       }
@@ -53,7 +54,7 @@
         {
           "isBackgroundEnabled": true,
           "modes": ["peripheral", "central"],
-          "bluetoothAlwaysPermission": "Allow $(PRODUCT_NAME) to connect to bluetooth devices"
+          "bluetoothAlwaysPermission": "Allow Orkestrator to connect to bluetooth devices"
         }
       ],
       "expo-font",
@@ -63,19 +64,20 @@
       [
         "@config-plugins/react-native-webrtc",
         {
-          "cameraPermission": "Allow $(PRODUCT_NAME) to use the camera in calls and broadcasts.",
-          "microphonePermission": "Allow $(PRODUCT_NAME) to use the microphone in calls and broadcasts."
+          "cameraPermission": "Allow Orkestrator to use the camera in calls and broadcasts.",
+          "microphonePermission": "Allow Orkestrator to use the microphone in calls and broadcasts."
         }
       ],
       "./modules/pokket-mesh/app.plugin.js",
       "./plugins/withGradleMemory.js",
+      "./plugins/withAppLabel.js",
       "expo-background-task",
       [
         "expo-location",
         {
-          "locationAlwaysPermission": "Allow $(PRODUCT_NAME) to record where you go for your private timeline. It is stored on this phone only.",
-          "locationAlwaysAndWhenInUsePermission": "Allow $(PRODUCT_NAME) to record where you go for your private timeline. It is stored on this phone only.",
-          "locationWhenInUsePermission": "Allow $(PRODUCT_NAME) to use your location for your private timeline. It is stored on this phone only.",
+          "locationAlwaysPermission": "Allow Orkestrator to record where you go for your private timeline. It is stored on this phone only.",
+          "locationAlwaysAndWhenInUsePermission": "Allow Orkestrator to record where you go for your private timeline. It is stored on this phone only.",
+          "locationWhenInUsePermission": "Allow Orkestrator to use your location for your private timeline. It is stored on this phone only.",
           "isIosBackgroundLocationEnabled": true,
           "isAndroidBackgroundLocationEnabled": true,
           "isAndroidForegroundServiceEnabled": true

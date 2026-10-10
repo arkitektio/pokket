@@ -133,7 +133,7 @@ function SearchList({ port, child, widget, path }: { port: FormPort; child: Form
   const ids = rows.map((row) => valueId(row.__value)).filter(notEmpty);
   const asked = useOptionLabels(search, ids);
 
-  if (!client || !query) return <Text className="text-sm text-muted-foreground">Pokket cannot search {widget.ward || 'this service'}.</Text>;
+  if (!client || !query) return <Text className="text-sm text-muted-foreground">This app cannot search {widget.ward || 'this service'}.</Text>;
 
   return (
     <View className="gap-2">
