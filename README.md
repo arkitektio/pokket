@@ -1,14 +1,23 @@
-# Pokket
+# Orkestrator (pokket edition)
 
-![Pokket App](docs/image.png)
+![Orkestrator on a phone](docs/image.png)
 
-**Pokket** is your mobile gateway to the [Arkitekt](https://arkitekt.live) ecosystem. It serves as a companion app for managing your Arkitekt services, tasks, and connected devices directly from your phone.
+**Orkestrator (pokket edition)** is your mobile gateway to the [Arkitekt](https://arkitekt.live) ecosystem. It serves as a companion app for managing your Arkitekt services, tasks, and connected devices directly from your phone. It is the phone-sized sibling of the desktop
+[Orkestrator](https://github.com/arkitektio/orkestrator).
+
+The app is called Orkestrator on the phone and in its own text. The project keeps the name pokket:
+this repository, the package id (`live.arkitekt.pokket`), the native modules and the download
+`pokket.apk`. That is on purpose, so an installed app updates in place and keeps its logins.
+
+Links work under both names: `pokket://` and `orkestrator://` open the app. A link shared from the
+desktop app opens the matching page on the phone (its `/rekuest/tasks/5` is `/tasks/5` here), and
+says so when the phone has no such page.
 
 ## Features
 
 ### 🔗 Arkitekt Connection
 
-Seamlessly connect to your Arkitekt instance. Pokket handles authentication via `lok` and provides a secure connection to your services.
+Seamlessly connect to your Arkitekt instance. Orkestrator handles authentication via `lok` and provides a secure connection to your services.
 
 ### 📋 Task Management
 
@@ -16,7 +25,7 @@ Stay on top of your workflows. View and manage your latest tasks through the `re
 
 ### 📡 Device Provisioning
 
-Easily provision ESP32-based devices for your lab or home. Pokket uses the **Improv Wi-Fi** protocol over BLE to configure devices with:
+Easily provision ESP32-based devices for your lab or home. Orkestrator uses the **Improv Wi-Fi** protocol over BLE to configure devices with:
 
 - Wi-Fi Credentials (Standard & Eduroam support)
 - Arkitekt Connection Tokens
@@ -27,14 +36,14 @@ Manage your Wi-Fi configurations in one place. Save standard and Eduroam profile
 
 ### 📞 Calls
 
-Video calls with your organisation through `lovekit`, the same calls orkestrator has. **Calls**
+Video calls with your organisation through `lovekit`, the same calls the desktop app has. **Calls**
 lists the ones in progress and anyone in the organisation can join; a phone button in the header
 of a task, a transaction, a conversation or a broadcast starts a call about it (or finds the one
 already running). Invite people from a call, and be asked in: invitations and calls someone just
-started show as a toast with Join and Dismiss while pokket is open. Nothing is pushed to a phone
-that has pokket closed.
+started show as a toast with Join and Dismiss while Orkestrator is open. Nothing is pushed to a phone
+that has Orkestrator closed.
 
-A call goes on wherever you are in the app, with a bar that leads back to it, and when pokket is
+A call goes on wherever you are in the app, with a bar that leads back to it, and when Orkestrator is
 in the background or the screen is locked: iOS through its `audio` background mode, Android
 through a foreground service (`modules/pokket-call`) with an ongoing notification. The camera
 pauses while in the background. The microphone is asked for when you tap Join and the camera
@@ -45,12 +54,12 @@ when you first switch it on; refuse the microphone and you still join, listening
 The organisation's microscopy data, read-only: **Mikro** opens on the newest datasets and lenses,
 pinned and top-level folders and recent files, and has a list and a page for datasets, lenses,
 folders, files, scenes, tables, charts and annotations. Search finds datasets, lenses, folders and
-files. The paths are orkestrator's (`/mikro/arraydatasets/12`), so a link shared from either opens
+files. The paths are the desktop app's (`/mikro/arraydatasets/12`), so a link shared from either opens
 in the other.
 
-There is no viewer: orkestrator renders scenes with WebGPU, which a phone app cannot. What pokket
+There is no viewer: the desktop app renders scenes with WebGPU, which a phone app cannot. What Orkestrator
 shows is a scene's last snapshot, where one has been taken (many datasets have none, and show a
-glyph). Pictures and file downloads come straight from the datalayer by a presigned URL that pokket
+glyph). Pictures and file downloads come straight from the datalayer by a presigned URL that Orkestrator
 signs itself (`lib/datalayer/presign.ts`), also through the mesh. A file's **Download** fetches it
 whole and hands it to the share sheet.
 
@@ -71,7 +80,7 @@ is not there yet. Without `rekuest` a room is a plain message board.
 
 What the organisation's apps can do, to run from the phone. **Actions** (under Tasks, and in
 search) lists and searches them; an action opens as a form of its arguments, drawn from the ports
-and widgets its app declared, the way orkestrator draws them: text and numbers, switches, choices,
+and widgets its app declared, the way the desktop app draws them: text and numbers, switches, choices,
 sliders, dates, searches (also ones that depend on another field), lists and nested models, with
 the app's own validation and show/hide rules. **Run** assigns it and opens the task, which is
 followed live. "Run on" picks the agent; left alone, rekuest picks one.
@@ -83,21 +92,21 @@ opens its form with the object filled in. A task has **Run again**, which reopen
 that task's inputs.
 
 Not every kind of argument can be edited here yet: dictionaries, unions, quantities with units,
-choices read from an agent's live state and files show as "Set this from orkestrator". Such an
-action still runs from pokket when that argument is optional or has a value from an earlier run.
-The engine behind the form (`lib/ports`) is orkestrator's, ported with its tests.
+choices read from an agent's live state and files show as "Set this from the desktop app". Such an
+action still runs from Orkestrator when that argument is optional or has a value from an earlier run.
+The engine behind the form (`lib/ports`) is the desktop app's, ported with its tests.
 
 ### 🕸️ Organisation Mesh
 
 Deployments that run an organisation mesh (an [ionscale](https://github.com/jsiebens/ionscale)
-tailnet, advertised as `mesh_coord_url` in `.well-known/fakts`) can let pokket in when you
-approve it. Pokket then runs its own in-app Tailscale node — no VPN permission, no Tailscale app
+tailnet, advertised as `mesh_coord_url` in `.well-known/fakts`) can let Orkestrator in when you
+approve it. Orkestrator then runs its own in-app Tailscale node — no VPN permission, no Tailscale app
 — and reaches the services that only live on the mesh through it. The **Mesh** screen shows the
 node, the machines it sees, which services it carries, and lets you switch it off.
 
 ## Install
 
-### Using pokket
+### Using Orkestrator
 
 | Platform | Where | Notes |
 |---|---|---|
@@ -105,7 +114,7 @@ node, the machines it sees, which services it carries, and lets you switch it of
 | **iPhone / iPad** | [TestFlight](https://testflight.apple.com/) | Ask a maintainer to add you as a tester; you get an e-mail invite. Install TestFlight from the App Store and accept it. |
 
 **Updates install themselves.** Most releases change only the app's JavaScript. They are
-delivered over the air: pokket downloads them on launch and offers a restart. You only need
+delivered over the air: Orkestrator downloads them on launch and offers a restart. You only need
 a new APK or TestFlight build when a release changes the native app. TestFlight tells you
 when that happens; for Android, the release notes say "A new app", and the same link has it.
 
