@@ -13,10 +13,19 @@ export const MountedProvider = MountedContext.Provider;
  * A port's field in the form: its value and setter, and its place among the
  * fields on screen (see `MountedFields`).
  */
-export const usePortField = (path: readonly string[]) => {
+/**
+ * Say that the field at `path` is on screen, for a control that edits it
+ * through something other than `usePortField` (a list of item fields).
+ */
+export const useMountedField = (path: readonly string[]) => {
   const name = pathToName([...path]);
   const mounted = React.useContext(MountedContext);
   React.useEffect(() => mounted?.mount(name), [mounted, name]);
+  return name;
+};
+
+export const usePortField = (path: readonly string[]) => {
+  const name = useMountedField(path);
   const { field } = useController({ name });
   return { name, value: field.value as unknown, onChange: field.onChange as (value: unknown) => void, onBlur: field.onBlur };
 };

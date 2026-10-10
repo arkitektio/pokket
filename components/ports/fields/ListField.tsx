@@ -5,14 +5,13 @@ import { notEmpty, PortKind } from '@/lib/ports/kinds';
 import { isTagListPort, portLabel, portPlaceholder } from '@/lib/ports/presentation';
 import { effectiveWidget } from '@/lib/ports/supported';
 import type { FormPort } from '@/lib/ports/types';
-import { pathToName } from '@/lib/ports/values';
 import { useWardClient } from '@/lib/ports/wards';
 import { useThemeColors } from '@/lib/theme/BrandProvider';
 import { Plus, X } from 'lucide-react-native';
 import * as React from 'react';
 import { useFieldArray, useFormContext } from 'react-hook-form';
 import { Pressable, TextInput, View } from 'react-native';
-import { usePortField, useWidgetDependencies } from '../context';
+import { useMountedField, usePortField, useWidgetDependencies } from '../context';
 import { INPUT_CLASS } from '../PortRow';
 import { ChoiceSheet, PickerButton } from './ChoiceField';
 import type { FieldProps } from './Scalars';
@@ -173,7 +172,9 @@ function SearchList({ port, child, widget, path }: { port: FormPort; child: Form
 function ItemList({ child, path, Field }: { child: FormPort; path: string[]; Field: React.ComponentType<{ port: FormPort; path: string[]; bare?: boolean }> }) {
   const colors = useThemeColors();
   const { control } = useFormContext();
-  const { fields, append, remove } = useFieldArray({ control, name: pathToName(path) });
+  // The list itself is on show even when empty: an empty required list must still be refused.
+  const name = useMountedField(path);
+  const { fields, append, remove } = useFieldArray({ control, name });
   return (
     <View className="gap-2">
       {fields.map((field, index) => (
