@@ -1,3 +1,10 @@
+# [1.15.0](https://github.com/arkitektio/pokket/compare/v1.14.0...v1.15.0) (2026-10-10)
+
+
+### Features
+
+* **deeplink:** share smartlinks and page links through kontrol ([f25c5d6](https://github.com/arkitektio/pokket/commit/f25c5d6e9d00dc89a8ac57e5c95c83f0b5b75984))
+
 # [1.14.0](https://github.com/arkitektio/pokket/compare/v1.13.0...v1.14.0) (2026-10-10)
 
 
