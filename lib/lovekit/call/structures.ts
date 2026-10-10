@@ -36,11 +36,13 @@ export type CallStructure = { identifier: string; object: number };
 
 const kindOf = (identifier: string) => KINDS.find((kind) => kind.identifier === identifier);
 
-/** "Task 42"; for something pokket does not know, its identifier's last word. */
-export const structureLabel = ({ identifier, object }: CallStructure): string => {
-  const name = kindOf(identifier)?.name ?? identifier.split("/").pop() ?? identifier;
-  return `${name} ${object}`;
-};
+/** "Task"; for something pokket does not know, its identifier's last word. */
+export const structureKindName = (identifier: string): string =>
+  kindOf(identifier)?.name ?? identifier.split("/").pop() ?? identifier;
+
+/** "Task 42". */
+export const structureLabel = ({ identifier, object }: CallStructure): string =>
+  `${structureKindName(identifier)} ${object}`;
 
 /** The page that shows it, when pokket has one. */
 export const structureRoute = ({ identifier, object }: CallStructure): string | null => {
