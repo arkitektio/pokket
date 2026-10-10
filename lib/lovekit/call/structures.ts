@@ -53,6 +53,12 @@ export const structureRoute = ({ identifier, object }: CallStructure): string | 
   return kind ? `${kind.prefix}${object}` : null;
 };
 
+/** The page for an object a link names (`lib/deeplink/smartLink.ts`): its id is whatever the link says. */
+export const structurePage = (identifier: string, id: string): string | null => {
+  const kind = kindOf(identifier);
+  return kind ? `${kind.prefix}${encodeURIComponent(id)}` : null;
+};
+
 /**
  * The object the page at `pathname` shows, if a call can be about it: one of
  * the pages above, with the whole-number id lovekit asks for.

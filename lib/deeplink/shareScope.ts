@@ -71,17 +71,29 @@ export const encodeOpaqueScope = (digest: string, path: string): string =>
   `${SHARE_GATE_PATH}?${encodeQuery([["s", digest], ["path", path]])}`;
 
 /**
- * What a link asks for: a path to land on, and where. `scope` and `digest`
- * are both null for a portable link, which opens wherever the app is.
+ * Where a smartlink's object lives (`smartLink.ts`): the organization by its
+ * slug, since that is what kontrol's URL names, and lok's id of the hub.
+ */
+export type SmartHome = { slug: string; hub: string };
+
+/**
+ * What a link asks for: a path to land on, and where. `scope`, `digest` and
+ * `organization` are all unset for a portable link, which opens wherever the
+ * app is.
  */
 export type ShareRequest = {
   scope: ShareScope | null;
   digest: string | null;
+  /** A smartlink's organization; the others are null then. */
+  organization?: SmartHome;
   path: string;
 };
 
-/** Root screens a link must not reach: the gate itself, and the ones outside the app frame. */
-const CLOSED_TO_LINKS = new Set(["open", "login", "search", "mesh-selftest"]);
+/**
+ * Root screens a link must not reach: the gate itself, the ones outside the
+ * app frame, and the desktop's host namespaces that are no page here.
+ */
+const CLOSED_TO_LINKS = new Set(["open", "login", "search", "mesh-selftest", "smart", "auth"]);
 
 /**
  * A link's target as an app path: exactly one leading slash (so `//host/x`
@@ -131,6 +143,14 @@ export const matchScope = (link: ShareScope, active: ShareScope): boolean => {
   if (a.hub !== null && b.hub !== null && a.hub !== b.hub) return false;
   return true;
 };
+
+/**
+ * Is this kept login in a smartlink's organization? The slug decides, as the
+ * profile last heard it. Pokket's profiles record no hub, and the hub is the
+ * link's untrusted half anyway.
+ */
+export const inSmartHome = (profile: StoredProfile, home: SmartHome): boolean =>
+  profile.label.organizationSlug === home.slug;
 
 /**
  * The scope a kept login stands for. Read from its stored identity, so a

@@ -9,7 +9,7 @@ import {
 } from '@/lib/arkitekt/fakts/profileStorageSchema';
 import { scopeDigest } from '@/lib/deeplink/digest';
 import { clearPendingLink, usePendingLink } from '@/lib/deeplink/pending';
-import { matchScope, profileScope, ShareRequest } from '@/lib/deeplink/shareScope';
+import { inSmartHome, matchScope, profileScope, ShareRequest } from '@/lib/deeplink/shareScope';
 import { afterReturningToApp } from '@/lib/navigation';
 import { useTabActions, useTabsBootedFor } from '@/lib/tabs/TabsProvider';
 import { useThemeColors } from '@/lib/theme/BrandProvider';
@@ -25,13 +25,17 @@ const findHome = async (
   active: StoredProfile | null,
   profiles: StoredProfile[],
 ): Promise<Home> => {
-  if (!request.scope && !request.digest) return { kind: 'here' };
+  if (!request.scope && !request.digest && !request.organization) return { kind: 'here' };
   // The live login first, then the others: two logins can share a deployment
   // and an organization (two users), and the live one needs no switch.
   const ordered = active ? [active, ...profiles.filter((p) => p.id !== active.id)] : profiles;
   for (const profile of ordered) {
     const scope = profileScope(profile);
-    const matches = request.scope ? matchScope(request.scope, scope) : (await scopeDigest(scope)) === request.digest;
+    const matches = request.organization
+      ? inSmartHome(profile, request.organization)
+      : request.scope
+        ? matchScope(request.scope, scope)
+        : (await scopeDigest(scope)) === request.digest;
     if (matches) return profile.id === active?.id ? { kind: 'here' } : { kind: 'profile', profile };
   }
   return { kind: 'unknown' };
@@ -52,7 +56,9 @@ const describe = (profile: StoredProfile): string => {
  * word, once that organization's tabs are up (at launch, that is after the
  * login is restored). One that belongs to another kept login asks before
  * switching; one that names a deployment this phone has no login for offers
- * to connect; a private link to somewhere unknown can only be refused.
+ * to connect; a private link to somewhere unknown can only be refused. A
+ * smartlink names its organization by slug and no deployment, so it offers a
+ * sign-in on the live one, and with nobody signed in it waits for the sign-in.
  *
  * An overlay rather than a screen, because the cases it exists for are the
  * ones where the navigator underneath is about to be replaced: a restore, a
@@ -128,15 +134,22 @@ export function DeepLinkGate() {
       await connect({ endpoint, controller });
     });
 
+  const signIn = (profile: StoredProfile) =>
+    run(() => connect({ endpoint: profile.session.endpoint, controller: new AbortController() }));
+
   if (!request || !home || home.kind === 'here') return null;
+  // A smartlink says where to sign in only through the live login. Without
+  // one the sign-in screen is up: the link is kept for the login that follows.
+  if (request.organization && home.kind === 'unknown' && !active) return null;
 
   // A fresh sign-in to the link's deployment has no organization until lok
   // answers; until then it is not a mismatch, just not known yet.
-  const identifying =
-    !!request.scope &&
-    !!active &&
-    isProvisionalProfileId(active.id) &&
-    normalizeBaseUrl(active.identity.baseUrl) === request.scope.baseUrl;
+  const identifying = request.organization
+    ? home.kind === 'unknown' && !!active && !active.label.organizationSlug
+    : !!request.scope &&
+      !!active &&
+      isProvisionalProfileId(active.id) &&
+      normalizeBaseUrl(active.identity.baseUrl) === request.scope.baseUrl;
 
   let title: string;
   let body: string;
@@ -150,6 +163,10 @@ export function DeepLinkGate() {
     title = `Open in ${where}?`;
     body = `This link belongs to ${where}. ${active ? `You are on ${describe(active)}.` : 'You are not signed in.'}${stale ? ' That organization signed you out, so you will sign in again.' : ''}`;
     action = { label: stale ? 'Sign in and open' : 'Switch and open', onPress: () => void switchTo(home.profile) };
+  } else if (request.organization && active) {
+    title = `You have no login for ${request.organization.slug} on this phone`;
+    body = 'This link opens an object in that organization. Sign in to it to follow the link — you will choose the organization in your browser.';
+    action = { label: 'Sign in…', onPress: () => void signIn(active) };
   } else if (request.scope) {
     const baseUrl = request.scope.baseUrl;
     title = 'You are not connected to this organization';

@@ -11,7 +11,10 @@ this repository, the package id (`live.arkitekt.pokket`), the native modules and
 
 Links work under both names: `pokket://` and `orkestrator://` open the app. A link shared from the
 desktop app opens the matching page on the phone (its `/rekuest/tasks/5` is `/tasks/5` here), and
-says so when the phone has no such page.
+says so when the phone has no such page. So does a smartlink, which names an object rather than a
+page (`orkestrator://smart/<org>/<hub>/<identifier>/<id>`, what an organization's front door hands
+over for `https://<frontend>/smartlink/…`): it opens in the login that is in that organization, asks
+before switching to it, and offers a sign-in when the phone has none.
 
 ## Features
 

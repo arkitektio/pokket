@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 import { fromDesktopPath } from "../desktopPaths";
 import { parseIncomingLink } from "../incoming";
+import { parseSmartPath } from "../smartLink";
 import { decodeShareRequest, encodeOpaqueScope, encodeShareScope, matchScope, normalizeLinkPath } from "../shareScope";
 
 const scope = { baseUrl: "https://Go.Arkitekt.live/", org: "7", hub: null };
@@ -138,5 +139,68 @@ describe("links from the desktop app", () => {
   it("still leave the self-test and the dev client to the router", () => {
     expect(parseIncomingLink("orkestrator://mesh-selftest?key=1")).toBeNull();
     expect(parseIncomingLink("orkestrator://")).toBeNull();
+  });
+});
+
+describe("smartlinks", () => {
+  const home = { slug: "my-lab", hub: "3" };
+
+  it("keep an encoded identifier as one segment", () => {
+    expect(parseSmartPath("/smart/my-lab/3/%40mikro%2Farraydataset/42")).toEqual({
+      org: "my-lab",
+      hub: "3",
+      identifier: "@mikro/arraydataset",
+      id: "42",
+    });
+    expect(parseSmartPath("/smart/my-lab/3/@mikro/arraydataset/42")?.identifier).toBe("@mikro/arraydataset");
+  });
+  it("refuse what names no object", () => {
+    expect(parseSmartPath("/smart/my-lab/3/42")).toBeNull();
+    expect(parseSmartPath("/smart/my-lab/3/mikro/42")).toBeNull();
+    expect(parseSmartPath("/smart/my-lab/3/%E0%A4%A/42")).toBeNull();
+    expect(parseIncomingLink("orkestrator://smart/my-lab/3")).toBeNull();
+  });
+
+  it("open the phone's page for the object, in the link's organization", () => {
+    expect(parseIncomingLink("orkestrator://smart/my-lab/3/%40rekuest%2Ftask/5")).toEqual({
+      scope: null,
+      digest: null,
+      organization: home,
+      path: "/tasks/5",
+    });
+    expect(parseIncomingLink("orkestrator://smart/my-lab/3/%40kuvert%2Fthread/9")?.path).toBe("/mail/thread/9");
+    expect(parseIncomingLink("pokket://smart/my-lab/3/%40mikro%2Flens/7")?.path).toBe("/mikro/lenses/7");
+  });
+  it("drop the sharer and keep the rest of the query", () => {
+    expect(parseIncomingLink("orkestrator://smart/my-lab/3/%40lovekit%2Fcall/2?user_id=8&join=1")?.path).toBe("/calls/2?join=1");
+    expect(parseIncomingLink("orkestrator://smart/my-lab/3/%40lovekit%2Fcall/2?user_id=8")?.path).toBe("/calls/2");
+  });
+  it("say so when the phone has no page for the object", () => {
+    expect(parseIncomingLink("orkestrator://smart/my-lab/3/%40mikro%2Fimage/42?user_id=8")).toEqual({
+      scope: null,
+      digest: null,
+      organization: home,
+      path: "/not-here?path=%40mikro%2Fimage%2F42",
+    });
+  });
+  it("arrive by the arkitekt.live wrapper too", () => {
+    const url = `https://arkitekt.live/deeplink?orkestrator=${encodeURIComponent("/smart/my-lab/3/%40rekuest%2Ftask/5")}`;
+    expect(parseIncomingLink(url)).toEqual({ scope: null, digest: null, organization: home, path: "/tasks/5" });
+  });
+  it("cannot be the page a gate link asks for", () => {
+    expect(normalizeLinkPath("/smart/my-lab/3/%40rekuest%2Ftask/5")).toBeNull();
+  });
+});
+
+describe("the auth relay's callback", () => {
+  it("has nothing to finish on the phone, and leaves its code behind", () => {
+    expect(parseIncomingLink("orkestrator://bank/auth/callback?code=a%2Fb&state=s")).toEqual({
+      scope: null,
+      digest: null,
+      path: "/not-here?path=%2Fbank%2Fauth%2Fcallback",
+    });
+    expect(parseIncomingLink("orkestrator://kuvert/auth/callback?error=access_denied")?.path).toBe(
+      "/not-here?path=%2Fkuvert%2Fauth%2Fcallback",
+    );
   });
 });
