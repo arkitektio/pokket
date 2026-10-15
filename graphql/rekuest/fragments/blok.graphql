@@ -1,0 +1,64 @@
+# Materialized bloks: a blok (component tree + demo state) bound to agents.
+# The tree comes as the single JSON field `componentTree` (snake_case, no depth
+# limit), the shape the blok runtime reads.
+
+fragment BlokDiagnostic on Diagnostic {
+  level
+  code
+  message
+  path
+}
+
+fragment BlokAgentMapping on BlokAgentMapping {
+  key
+  agent {
+    id
+    name
+    connected
+  }
+}
+
+fragment MaterializedBlok on MaterializedBlok {
+  id
+  name
+  description
+  isDefault
+  createdAt
+  blok {
+    id
+    name
+    description
+    context
+    componentTree
+    demoState
+    dependencies {
+      id
+      key
+      description
+      optional
+    }
+    diagnostics {
+      ...BlokDiagnostic
+    }
+  }
+  agentMappings {
+    ...BlokAgentMapping
+  }
+}
+
+fragment ListMaterializedBlok on MaterializedBlok {
+  id
+  name
+  description
+  isDefault
+  updatedAt
+  blok {
+    id
+    name
+    description
+    context
+  }
+  agentMappings {
+    ...BlokAgentMapping
+  }
+}

@@ -90,6 +90,14 @@ export const MODULE_CATALOG: ModuleDecl[] = [
         description: "What the organization's apps can do",
         keywords: ["rekuest", "run", "assign", "functions", "start"],
       },
+      {
+        label: "Bloks",
+        route: "/bloks",
+        group: "Run",
+        icon: "layout-dashboard",
+        description: "Interfaces your agents provide",
+        keywords: ["rekuest", "blok", "ui", "dashboard", "panel", "interface"],
+      },
     ],
   },
   {
