@@ -4,6 +4,9 @@ const { hairlineWidth } = require("nativewind/theme");
 module.exports = {
   darkMode: "class",
   content: ["./app/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}"],
+  /* A blok's `className` comes from the server at runtime, after the build
+     has decided which classes exist: compile the ones bloks use anyway. */
+  safelist: require("./tailwind.blok-safelist"),
   presets: [require("nativewind/preset")],
   theme: {
     extend: {
