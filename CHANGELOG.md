@@ -1,3 +1,10 @@
+# [1.17.0](https://github.com/arkitektio/pokket/compare/v1.16.0...v1.17.0) (2026-10-15)
+
+
+### Features
+
+* **bloks:** compile the tailwind classes bloks use ([c3fcbe8](https://github.com/arkitektio/pokket/commit/c3fcbe8809bd90e63aa1211c8680e520a2600e48))
+
 # [1.16.0](https://github.com/arkitektio/pokket/compare/v1.15.4...v1.16.0) (2026-10-15)
 
 
