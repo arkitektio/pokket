@@ -1,3 +1,10 @@
+# [1.16.0](https://github.com/arkitektio/pokket/compare/v1.15.4...v1.16.0) (2026-10-15)
+
+
+### Features
+
+* **bloks:** render materialized bloks natively ([d2e1b50](https://github.com/arkitektio/pokket/commit/d2e1b503d17481e0359638e790508f81de7b231c))
+
 ## [1.15.4](https://github.com/arkitektio/pokket/compare/v1.15.3...v1.15.4) (2026-10-10)
 
 
