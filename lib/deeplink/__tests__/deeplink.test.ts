@@ -197,15 +197,18 @@ describe("smartlinks", () => {
 });
 
 describe("the auth relay's callback", () => {
-  it("has nothing to finish on the phone, and leaves its code behind", () => {
+  it("goes to the callback page with its query exactly as the relay passed it", () => {
     expect(parseIncomingLink("orkestrator://bank/auth/callback?code=a%2Fb&state=s")).toEqual({
       scope: null,
       digest: null,
-      path: "/not-here?path=%2Fbank%2Fauth%2Fcallback",
+      path: "/auth/callback/bank?code=a%2Fb&state=s",
     });
-    expect(parseIncomingLink("orkestrator://kuvert/auth/callback?error=access_denied")?.path).toBe(
-      "/not-here?path=%2Fkuvert%2Fauth%2Fcallback",
+    expect(parseIncomingLink("pokket://kuvert/auth/callback/?error=access_denied")?.path).toBe(
+      "/auth/callback/kuvert?error=access_denied",
     );
+  });
+  it("is not a desktop page to translate", () => {
+    expect(parseIncomingLink("orkestrator:///bank/auth/callback")?.path).toBe("/auth/callback/bank");
   });
 });
 

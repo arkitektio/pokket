@@ -1,0 +1,25 @@
+fragment ProviderKind on ProviderKind {
+  kind
+  label
+  description
+  finish
+  hasInstitutions
+}
+
+fragment ListBankProvider on BankProvider {
+  id
+  name
+  kind
+  enabled
+  kindInfo {
+    ...ProviderKind
+  }
+}
+
+fragment Institution on Institution {
+  name
+  country
+  logo
+  bic
+  maximumConsentDays
+}

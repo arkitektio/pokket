@@ -191,6 +191,30 @@
       },
       {
         "kind": "ENUM",
+        "name": "AuthFinish",
+        "description": "How a started login finishes.",
+        "isOneOf": null,
+        "fields": null,
+        "inputFields": null,
+        "interfaces": null,
+        "enumValues": [
+          {
+            "name": "POLL",
+            "description": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "REDIRECT",
+            "description": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          }
+        ],
+        "possibleTypes": null
+      },
+      {
+        "kind": "ENUM",
         "name": "AuthMethod",
         "description": "How the service logs in. PASSWORD: Username and (app) password; XOAUTH2: OAuth 2.0 access token (SASL XOAUTH2).",
         "isOneOf": null,
@@ -215,17 +239,85 @@
       },
       {
         "kind": "OBJECT",
-        "name": "AuthSession",
-        "description": "A started OAuth login: open `openUrl`; the provider redirects to `redirectUrl` with `?code&state`; call `completeOAuthLink` with them.",
+        "name": "AuthResult",
+        "description": "A Structure: what the login linked, so the app can open its page.",
         "isOneOf": null,
         "fields": [
           {
-            "name": "account",
-            "description": "The mailbox this login re-links, if it does.",
+            "name": "id",
+            "description": null,
             "args": [],
             "type": {
-              "kind": "OBJECT",
-              "name": "MailAccount",
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "ID",
+                "kind": "SCALAR",
+                "ofType": null
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "identifier",
+            "description": null,
+            "args": [],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "String",
+                "kind": "SCALAR",
+                "ofType": null
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "label",
+            "description": null,
+            "args": [],
+            "type": {
+              "kind": "SCALAR",
+              "name": "String",
+              "ofType": null
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          }
+        ],
+        "inputFields": null,
+        "interfaces": [],
+        "enumValues": null,
+        "possibleTypes": null
+      },
+      {
+        "kind": "OBJECT",
+        "name": "AuthSession",
+        "description": "A login at an external provider, the same shape in every service. Open `openUrl` in the user's browser; then, by `finish`: REDIRECT — the provider redirects to `redirectUrl` with `code` and `state`, call `completeAuth` with both; POLL — call `completeAuth` with the `state` every `interval` seconds until `status` is not PENDING.",
+        "isOneOf": null,
+        "fields": [
+          {
+            "name": "errorCode",
+            "description": "FAILED: machine-readable, the service's own error codes.",
+            "args": [],
+            "type": {
+              "kind": "SCALAR",
+              "name": "String",
+              "ofType": null
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "errorMessage",
+            "description": "FAILED: one sentence for the user.",
+            "args": [],
+            "type": {
+              "kind": "SCALAR",
+              "name": "String",
               "ofType": null
             },
             "isDeprecated": false,
@@ -233,7 +325,7 @@
           },
           {
             "name": "expiresAt",
-            "description": null,
+            "description": "Until when the first approval can happen.",
             "args": [],
             "type": {
               "kind": "NON_NULL",
@@ -249,45 +341,13 @@
           },
           {
             "name": "finish",
-            "description": "How the login finishes: REDIRECT (catch the redirect, then `completeOAuthLink`).",
-            "args": [],
-            "type": {
-              "kind": "NON_NULL",
-              "name": null,
-              "ofType": {
-                "name": "String",
-                "kind": "SCALAR",
-                "ofType": null
-              }
-            },
-            "isDeprecated": false,
-            "deprecationReason": null
-          },
-          {
-            "name": "openUrl",
             "description": null,
             "args": [],
             "type": {
               "kind": "NON_NULL",
               "name": null,
               "ofType": {
-                "name": "String",
-                "kind": "SCALAR",
-                "ofType": null
-              }
-            },
-            "isDeprecated": false,
-            "deprecationReason": null
-          },
-          {
-            "name": "provider",
-            "description": null,
-            "args": [],
-            "type": {
-              "kind": "NON_NULL",
-              "name": null,
-              "ofType": {
-                "name": "Provider",
+                "name": "AuthFinish",
                 "kind": "ENUM",
                 "ofType": null
               }
@@ -296,8 +356,20 @@
             "deprecationReason": null
           },
           {
-            "name": "redirectUrl",
-            "description": null,
+            "name": "interval",
+            "description": "POLL: seconds between two completeAuth calls.",
+            "args": [],
+            "type": {
+              "kind": "SCALAR",
+              "name": "Int",
+              "ofType": null
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "openUrl",
+            "description": "https. What the app opens in the user's browser.",
             "args": [],
             "type": {
               "kind": "NON_NULL",
@@ -312,8 +384,32 @@
             "deprecationReason": null
           },
           {
+            "name": "redirectUrl",
+            "description": "REDIRECT: where the provider sends the browser back to (the relay URL).",
+            "args": [],
+            "type": {
+              "kind": "SCALAR",
+              "name": "String",
+              "ofType": null
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "result",
+            "description": "DONE: what was linked. May be set earlier when it already exists (a relink).",
+            "args": [],
+            "type": {
+              "kind": "OBJECT",
+              "name": "AuthResult",
+              "ofType": null
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
             "name": "state",
-            "description": null,
+            "description": "Opaque, unguessable, single-use, stored server-side. THE handle of the login.",
             "args": [],
             "type": {
               "kind": "NON_NULL",
@@ -326,11 +422,93 @@
             },
             "isDeprecated": false,
             "deprecationReason": null
+          },
+          {
+            "name": "status",
+            "description": null,
+            "args": [],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "AuthStatus",
+                "kind": "ENUM",
+                "ofType": null
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "step",
+            "description": "Null until the first approval; then what is still awaited, e.g. MFA.",
+            "args": [],
+            "type": {
+              "kind": "SCALAR",
+              "name": "String",
+              "ofType": null
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "userCode",
+            "description": "POLL: the code the user confirms on the provider's page.",
+            "args": [],
+            "type": {
+              "kind": "SCALAR",
+              "name": "String",
+              "ofType": null
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
           }
         ],
         "inputFields": null,
         "interfaces": [],
         "enumValues": null,
+        "possibleTypes": null
+      },
+      {
+        "kind": "ENUM",
+        "name": "AuthStatus",
+        "description": "Where a login is.",
+        "isOneOf": null,
+        "fields": null,
+        "inputFields": null,
+        "interfaces": null,
+        "enumValues": [
+          {
+            "name": "CANCELLED",
+            "description": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "DONE",
+            "description": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "EXPIRED",
+            "description": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "FAILED",
+            "description": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "PENDING",
+            "description": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          }
+        ],
         "possibleTypes": null
       },
       {
@@ -1270,24 +1448,44 @@
       },
       {
         "kind": "INPUT_OBJECT",
-        "name": "CompleteOAuthLinkInput",
-        "description": "What the provider's redirect carried.",
+        "name": "CompleteAuthInput",
+        "description": "Finish (REDIRECT) or advance (POLL) a started login.",
         "isOneOf": false,
         "fields": null,
         "inputFields": [
           {
             "name": "code",
+            "description": "REDIRECT: the `code` query parameter of the redirect. POLL: omitted.",
+            "type": {
+              "kind": "SCALAR",
+              "name": "String",
+              "ofType": null
+            },
+            "defaultValue": "null",
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "error",
+            "description": "REDIRECT: the provider's `error` / `error_description`, when it refused.",
+            "type": {
+              "kind": "SCALAR",
+              "name": "String",
+              "ofType": null
+            },
+            "defaultValue": "null",
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "errorDescription",
             "description": null,
             "type": {
-              "kind": "NON_NULL",
-              "name": null,
-              "ofType": {
-                "name": "String",
-                "kind": "SCALAR",
-                "ofType": null
-              }
+              "kind": "SCALAR",
+              "name": "String",
+              "ofType": null
             },
-            "defaultValue": null,
+            "defaultValue": "null",
             "isDeprecated": false,
             "deprecationReason": null
           },
@@ -1881,6 +2079,128 @@
       },
       {
         "kind": "INPUT_OBJECT",
+        "name": "DescriptorConstraintInput",
+        "description": "One constraint on an object's descriptors, in the shape a rekuest port states its `requires` in -- so a picker hands a port's constraints on unchanged. `key` is one of the keys the structure declares (e.g. `@kuvert/has_attachments`); a key it does not declare is refused.",
+        "isOneOf": false,
+        "fields": null,
+        "inputFields": [
+          {
+            "name": "key",
+            "description": "The descriptor key, e.g. `@kuvert/has_attachments`",
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "String",
+                "kind": "SCALAR",
+                "ofType": null
+              }
+            },
+            "defaultValue": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "operator",
+            "description": "How the object's value is compared with `value`. MATCHES is equality, as EQUALS is",
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "DescriptorOperator",
+                "kind": "ENUM",
+                "ofType": null
+              }
+            },
+            "defaultValue": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "value",
+            "description": "The value compared against: a number for GTE and LTE, a list for IN and NOT_IN, true or false for EXISTS, the member looked for with CONTAINS",
+            "type": {
+              "kind": "SCALAR",
+              "name": "JSON",
+              "ofType": null
+            },
+            "defaultValue": "null",
+            "isDeprecated": false,
+            "deprecationReason": null
+          }
+        ],
+        "interfaces": null,
+        "enumValues": null,
+        "possibleTypes": null
+      },
+      {
+        "kind": "ENUM",
+        "name": "DescriptorOperator",
+        "description": "How a descriptor constraint compares the object's value with the stated one. The operators a rekuest port's `requires` and `provides` are written in, with the same meaning.",
+        "isOneOf": null,
+        "fields": null,
+        "inputFields": null,
+        "interfaces": null,
+        "enumValues": [
+          {
+            "name": "CONTAINS",
+            "description": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "EQUALS",
+            "description": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "EXISTS",
+            "description": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "GTE",
+            "description": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "IN",
+            "description": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "LTE",
+            "description": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "MATCHES",
+            "description": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "NOT_EQUALS",
+            "description": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "NOT_IN",
+            "description": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          }
+        ],
+        "possibleTypes": null
+      },
+      {
+        "kind": "INPUT_OBJECT",
         "name": "FinishBigFileUploadInput",
         "description": null,
         "isOneOf": false,
@@ -2015,6 +2335,17 @@
         "kind": "SCALAR",
         "name": "Int",
         "description": "The `Int` scalar type represents non-fractional signed whole numeric values. Int can represent values between -(2^31) and 2^31 - 1.",
+        "isOneOf": null,
+        "fields": null,
+        "inputFields": null,
+        "interfaces": null,
+        "enumValues": null,
+        "possibleTypes": null
+      },
+      {
+        "kind": "SCALAR",
+        "name": "JSON",
+        "description": "The `JSON` scalar type represents JSON values as specified by [ECMA-404](https://ecma-international.org/wp-content/uploads/ECMA-404_2nd_edition_december_2017.pdf).",
         "isOneOf": null,
         "fields": null,
         "inputFields": null,
@@ -2482,6 +2813,18 @@
                 "kind": "OBJECT",
                 "ofType": null
               }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "pendingAuth",
+            "description": "The re-link of this mailbox still to be finished, when you started it and it is PENDING: continue it with `resumeAuth(state)`. Null otherwise.",
+            "args": [],
+            "type": {
+              "kind": "OBJECT",
+              "name": "AuthSession",
+              "ofType": null
             },
             "isDeprecated": false,
             "deprecationReason": null
@@ -4454,6 +4797,22 @@
             "deprecationReason": null
           },
           {
+            "name": "descriptors",
+            "description": "This object's descriptors, a flat mapping of key to value: the facts about it that an action's port can `require` and a trigger can test (e.g. `@kuvert/message_count`). The keys are the ones kuvert declares for this structure, and the values are the ones a signal about the object carries. Empty for a structure that declares none",
+            "args": [],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "JSON",
+                "kind": "SCALAR",
+                "ofType": null
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
             "name": "flags",
             "description": "The flags and keywords as they are here: the server's with local changes applied.",
             "args": [],
@@ -5132,6 +5491,26 @@
             "deprecationReason": null
           },
           {
+            "name": "requires",
+            "description": null,
+            "type": {
+              "kind": "LIST",
+              "name": null,
+              "ofType": {
+                "name": null,
+                "kind": "NON_NULL",
+                "ofType": {
+                  "name": "DescriptorConstraintInput",
+                  "kind": "INPUT_OBJECT",
+                  "ofType": null
+                }
+              }
+            },
+            "defaultValue": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
             "name": "search",
             "description": "Search by text: a case-insensitive substring of the subject, sender or text; or semantic similarity to them (\"flight booking\" finds the airline's confirmation). Substring matches rank first, then by similarity; an explicit `ordering` replaces that ranking.",
             "type": {
@@ -5339,8 +5718,8 @@
         "isOneOf": null,
         "fields": [
           {
-            "name": "cancelOAuthLink",
-            "description": "Drop the caller's pending OAuth login.",
+            "name": "cancelAuth",
+            "description": "Drop a login that will not be finished. Idempotent.",
             "args": [
               {
                 "name": "state",
@@ -5363,8 +5742,8 @@
               "kind": "NON_NULL",
               "name": null,
               "ofType": {
-                "name": "String",
-                "kind": "SCALAR",
+                "name": "AuthSession",
+                "kind": "OBJECT",
                 "ofType": null
               }
             },
@@ -5413,8 +5792,8 @@
             "deprecationReason": null
           },
           {
-            "name": "completeOAuthLink",
-            "description": "Finish an OAuth login with the redirect's code and state.",
+            "name": "completeAuth",
+            "description": "REDIRECT: finish with the code. POLL: advance one step; call until not PENDING.",
             "args": [
               {
                 "name": "input",
@@ -5423,7 +5802,7 @@
                   "kind": "NON_NULL",
                   "name": null,
                   "ofType": {
-                    "name": "CompleteOAuthLinkInput",
+                    "name": "CompleteAuthInput",
                     "kind": "INPUT_OBJECT",
                     "ofType": null
                   }
@@ -5437,7 +5816,7 @@
               "kind": "NON_NULL",
               "name": null,
               "ofType": {
-                "name": "MailAccount",
+                "name": "AuthSession",
                 "kind": "OBJECT",
                 "ofType": null
               }
@@ -5981,8 +6360,8 @@
             "deprecationReason": null
           },
           {
-            "name": "resumeOAuthLink",
-            "description": "The caller's pending OAuth login again.",
+            "name": "resumeAuth",
+            "description": "The same login again (a fresh openUrl if the old one cannot be reused).",
             "args": [
               {
                 "name": "state",
@@ -6952,6 +7331,22 @@
             "deprecationReason": null
           },
           {
+            "name": "descriptors",
+            "description": "This object's descriptors, a flat mapping of key to value: the facts about it that an action's port can `require` and a trigger can test (e.g. `@kuvert/message_count`). The keys are the ones kuvert declares for this structure, and the values are the ones a signal about the object carries. Empty for a structure that declares none",
+            "args": [],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "JSON",
+                "kind": "SCALAR",
+                "ofType": null
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
             "name": "error",
             "description": "Why sending failed.",
             "args": [],
@@ -7233,6 +7628,26 @@
             "deprecationReason": null
           },
           {
+            "name": "requires",
+            "description": null,
+            "type": {
+              "kind": "LIST",
+              "name": null,
+              "ofType": {
+                "name": null,
+                "kind": "NON_NULL",
+                "ofType": {
+                  "name": "DescriptorConstraintInput",
+                  "kind": "INPUT_OBJECT",
+                  "ofType": null
+                }
+              }
+            },
+            "defaultValue": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
             "name": "status",
             "description": null,
             "type": {
@@ -7469,6 +7884,39 @@
               "name": null,
               "ofType": {
                 "name": "_Service",
+                "kind": "OBJECT",
+                "ofType": null
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "authSession",
+            "description": "Where a login is. No side effect.",
+            "args": [
+              {
+                "name": "state",
+                "description": null,
+                "type": {
+                  "kind": "NON_NULL",
+                  "name": null,
+                  "ofType": {
+                    "name": "String",
+                    "kind": "SCALAR",
+                    "ofType": null
+                  }
+                },
+                "defaultValue": null,
+                "isDeprecated": false,
+                "deprecationReason": null
+              }
+            ],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "AuthSession",
                 "kind": "OBJECT",
                 "ofType": null
               }
@@ -10526,6 +10974,22 @@
             "deprecationReason": null
           },
           {
+            "name": "descriptors",
+            "description": "This object's descriptors, a flat mapping of key to value: the facts about it that an action's port can `require` and a trigger can test (e.g. `@kuvert/message_count`). The keys are the ones kuvert declares for this structure, and the values are the ones a signal about the object carries. Empty for a structure that declares none",
+            "args": [],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "JSON",
+                "kind": "SCALAR",
+                "ofType": null
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
             "name": "flagged",
             "description": "Whether any message of the conversation is flagged.",
             "args": [],
@@ -10940,6 +11404,26 @@
                 "ofType": {
                   "name": "ID",
                   "kind": "SCALAR",
+                  "ofType": null
+                }
+              }
+            },
+            "defaultValue": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "requires",
+            "description": null,
+            "type": {
+              "kind": "LIST",
+              "name": null,
+              "ofType": {
+                "name": null,
+                "kind": "NON_NULL",
+                "ofType": {
+                  "name": "DescriptorConstraintInput",
+                  "kind": "INPUT_OBJECT",
                   "ofType": null
                 }
               }

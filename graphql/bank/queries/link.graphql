@@ -1,0 +1,24 @@
+query ListBankProviders($filters: BankProviderFilter, $pagination: OffsetPaginationInput) {
+  bankProviders(filters: $filters, pagination: $pagination) {
+    ...ListBankProvider
+  }
+}
+
+query BankInstitutions($provider: ID!, $country: String!) {
+  bankInstitutions(provider: $provider, country: $country) {
+    ...Institution
+  }
+}
+
+# The lists a finished login adds to: only refetched, so just the ids.
+query ListBankConnections {
+  bankConnections {
+    id
+  }
+}
+
+query AuthSession($state: String!) {
+  authSession(state: $state) {
+    ...AuthSession
+  }
+}

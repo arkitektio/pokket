@@ -137,21 +137,49 @@ export enum AuthFinish {
   Redirect = 'REDIRECT'
 }
 
-/** A started (or resumed) login, the same shape for every provider. Open `openUrl` in the user's browser; then, by `finish`: REDIRECT — the provider redirects to `redirectUrl` with `code` and `state`, call `completeBankLink`; POLL — call `completeScalableLink(state)` every `interval` seconds until the connection is ACTIVE. `state` is stored server-side, so any replica completes it and `resumeLink` returns it again. */
+/** A Structure: what the login linked, so the app can open its page. */
+export type AuthResult = {
+  __typename?: 'AuthResult';
+  id: Scalars['ID']['output'];
+  identifier: Scalars['String']['output'];
+  label?: Maybe<Scalars['String']['output']>;
+};
+
+/** A login at an external provider, the same shape in every service. Open `openUrl` in the user's browser; then, by `finish`: REDIRECT — the provider redirects to `redirectUrl` with `code` and `state`, call `completeAuth` with both; POLL — call `completeAuth` with the `state` every `interval` seconds until `status` is not PENDING. */
 export type AuthSession = {
   __typename?: 'AuthSession';
-  connection: BankConnection;
+  /** FAILED: machine-readable, the service's own error codes. */
+  errorCode?: Maybe<Scalars['String']['output']>;
+  /** FAILED: one sentence for the user. */
+  errorMessage?: Maybe<Scalars['String']['output']>;
+  /** Until when the first approval can happen. */
   expiresAt: Scalars['DateTime']['output'];
   finish: AuthFinish;
-  /** POLL only: seconds between complete calls. */
+  /** POLL: seconds between two completeAuth calls. */
   interval?: Maybe<Scalars['Int']['output']>;
+  /** https. What the app opens in the user's browser. */
   openUrl: Scalars['String']['output'];
-  /** REDIRECT only: where the provider sends the browser back to. */
+  /** REDIRECT: where the provider sends the browser back to (the relay URL). */
   redirectUrl?: Maybe<Scalars['String']['output']>;
+  /** DONE: what was linked. May be set earlier when it already exists (a relink). */
+  result?: Maybe<AuthResult>;
+  /** Opaque, unguessable, single-use, stored server-side. THE handle of the login. */
   state: Scalars['String']['output'];
-  /** POLL only: the code the user checks on the provider's page. */
+  status: AuthStatus;
+  /** Null until the first approval; then what is still awaited, e.g. MFA. */
+  step?: Maybe<Scalars['String']['output']>;
+  /** POLL: the code the user confirms on the provider's page. */
   userCode?: Maybe<Scalars['String']['output']>;
 };
+
+/** Where a login is. */
+export enum AuthStatus {
+  Cancelled = 'CANCELLED',
+  Done = 'DONE',
+  Expired = 'EXPIRED',
+  Failed = 'FAILED',
+  Pending = 'PENDING'
+}
 
 /** An end-of-day balance. */
 export type BalanceExtreme = {
@@ -259,6 +287,8 @@ export type BankAccountFilter = {
   connection?: InputMaybe<Scalars['ID']['input']>;
   ids?: InputMaybe<Array<Scalars['ID']['input']>>;
   kind?: InputMaybe<AccountKind>;
+  /** Filter to the objects satisfying every one of these descriptor constraints: the `requires` of a port, handed on unchanged, so a picker offers what the port accepts. Answered from the stored descriptors, in one indexed query */
+  requires?: InputMaybe<Array<DescriptorConstraintInput>>;
   search?: InputMaybe<Scalars['String']['input']>;
 };
 
@@ -278,6 +308,8 @@ export type BankConnection = {
   aspspCountry: Scalars['String']['output'];
   /** The bank's name, exactly as Enable Banking lists it. */
   aspspName: Scalars['String']['output'];
+  /** The organization's provider it was made through; null when it is attached to none (it then cannot sync until an admin sets its provider up again). */
+  bankProvider?: Maybe<BankProvider>;
   /** When the link was started. */
   createdAt: Scalars['DateTime']['output'];
   /** The user who started the link. */
@@ -301,9 +333,11 @@ export type BankConnection = {
   nextSyncAllowedAt?: Maybe<Scalars['DateTime']['output']>;
   /** The organization this connection belongs to. */
   organization: Organization;
-  /** PENDING only: when the login can no longer be completed. Nothing flips it on a timer — past this, a PENDING link is dead: hide it or `cancelLink` it. */
+  /** The login still to be finished, when you started it and it is PENDING: continue it with `resumeAuth(state)`. Null otherwise. */
+  pendingAuth?: Maybe<AuthSession>;
+  /** PENDING only: when the login can no longer be completed. Nothing flips it on a timer — past this, a PENDING link is dead: hide it or `cancelAuth` it. */
   pendingExpiresAt?: Maybe<Scalars['DateTime']['output']>;
-  /** Who the accounts are reached through. */
+  /** The kind of provider it goes through. */
   provider: Provider;
   /** Where this consent is in its lifecycle. */
   status: ConnectionStatus;
@@ -319,7 +353,7 @@ export type BankConnection = {
  * One consent at one bank (an Enable Banking session) or one Scalable Capital login.
  *
  * A Scalable connection keeps its credentials — the DPoP private key and the rotating refresh
- * token bound to it — Fernet-encrypted in ``secret`` (see :mod:`finance.scalable.crypto`).
+ * token bound to it — Fernet-encrypted in ``secret`` (see :mod:`finance.crypto`).
  */
 export type BankConnectionFilter = {
   AND?: InputMaybe<BankConnectionFilter>;
@@ -327,6 +361,9 @@ export type BankConnectionFilter = {
   NOT?: InputMaybe<BankConnectionFilter>;
   OR?: InputMaybe<BankConnectionFilter>;
   ids?: InputMaybe<Array<Scalars['ID']['input']>>;
+  provider?: InputMaybe<Scalars['ID']['input']>;
+  /** Filter to the objects satisfying every one of these descriptor constraints: the `requires` of a port, handed on unchanged, so a picker offers what the port accepts. Answered from the stored descriptors, in one indexed query */
+  requires?: InputMaybe<Array<DescriptorConstraintInput>>;
   status?: InputMaybe<ConnectionStatus>;
 };
 
@@ -338,11 +375,71 @@ export enum BankErrorCode {
   ConnectionInactive = 'CONNECTION_INACTIVE',
   ConsentExpired = 'CONSENT_EXPIRED',
   InvalidState = 'INVALID_STATE',
+  LoginRefused = 'LOGIN_REFUSED',
   MfaRejected = 'MFA_REJECTED',
   NotConfigured = 'NOT_CONFIGURED',
   RateLimited = 'RATE_LIMITED',
   SyncInProgress = 'SYNC_IN_PROGRESS'
 }
+
+/** A provider the organization set up (an Enable Banking application, Scalable Capital). Banks are linked through one; credentials are never returned. */
+export type BankProvider = {
+  __typename?: 'BankProvider';
+  /** The capabilities switched on for this provider. */
+  capabilities: Array<ProviderCapability>;
+  /** The consents and logins made through it. */
+  connections: Array<BankConnection>;
+  /** When the provider was set up. */
+  createdAt: Scalars['DateTime']['output'];
+  /** The admin who set it up. */
+  creator?: Maybe<User>;
+  /** Syncs per account per day before the service stops asking the provider (null: unlimited). */
+  dailySyncLimit?: Maybe<Scalars['Int']['output']>;
+  /** This object's descriptors, a flat mapping of key to value: the facts about it that an action's port can `require` and a trigger can test (e.g. `@bank/kind`). The keys are the ones bank declares for this structure, and the values are the ones a signal about the object carries. Empty for a structure that declares none */
+  descriptors: Scalars['JSON']['output'];
+  /** Its settings when it is an Enable Banking provider, else null. */
+  enableBanking?: Maybe<EnableBankingProviderSettings>;
+  /** A disabled provider starts no links and syncs nothing. */
+  enabled: Scalars['Boolean']['output'];
+  id: Scalars['ID']['output'];
+  /** Which provider this is an instance of. */
+  kind: Provider;
+  /** What its kind is and can do. */
+  kindInfo: ProviderKind;
+  /** What the organization calls it. */
+  name: Scalars['String']['output'];
+  /** The organization this provider belongs to. */
+  organization: Organization;
+  /** When it was last changed. */
+  updatedAt: Scalars['DateTime']['output'];
+};
+
+
+/** A provider the organization set up (an Enable Banking application, Scalable Capital). Banks are linked through one; credentials are never returned. */
+export type BankProviderConnectionsArgs = {
+  filters?: InputMaybe<BankConnectionFilter>;
+  pagination?: InputMaybe<OffsetPaginationInput>;
+};
+
+/**
+ * A provider an organization set up: one kind, its settings and credentials, and what is switched on.
+ *
+ * For Enable Banking that is one application (its id in ``settings``, its private key
+ * Fernet-encrypted in ``secret``, see :mod:`finance.crypto`); a Scalable provider holds no
+ * credentials. The code of a kind is its backend (:mod:`finance.providers`), which validates
+ * ``settings`` and reads ``capabilities``; a kind needing other settings needs no migration.
+ */
+export type BankProviderFilter = {
+  AND?: InputMaybe<BankProviderFilter>;
+  DISTINCT?: InputMaybe<Scalars['Boolean']['input']>;
+  NOT?: InputMaybe<BankProviderFilter>;
+  OR?: InputMaybe<BankProviderFilter>;
+  enabled?: InputMaybe<Scalars['Boolean']['input']>;
+  ids?: InputMaybe<Array<Scalars['ID']['input']>>;
+  kind?: InputMaybe<Provider>;
+  /** Filter to the objects satisfying every one of these descriptor constraints: the `requires` of a port, handed on unchanged, so a picker offers what the port accepts. Answered from the stored descriptors, in one indexed query */
+  requires?: InputMaybe<Array<DescriptorConstraintInput>>;
+};
 
 /** Temporary S3 credentials for reading a big file. */
 export type BigFileAccessGrant = {
@@ -442,6 +539,8 @@ export type BudgetFilter = {
   OR?: InputMaybe<BudgetFilter>;
   activeIn?: InputMaybe<Scalars['Date']['input']>;
   category?: InputMaybe<Scalars['ID']['input']>;
+  /** Filter to the objects satisfying every one of these descriptor constraints: the `requires` of a port, handed on unchanged, so a picker offers what the port accepts. Answered from the stored descriptors, in one indexed query */
+  requires?: InputMaybe<Array<DescriptorConstraintInput>>;
 };
 
 export type BudgetOrder =
@@ -582,6 +681,8 @@ export type CategoryFilter = {
   hidden?: InputMaybe<Scalars['Boolean']['input']>;
   ids?: InputMaybe<Array<Scalars['ID']['input']>>;
   kind?: InputMaybe<CategoryKind>;
+  /** Filter to the objects satisfying every one of these descriptor constraints: the `requires` of a port, handed on unchanged, so a picker offers what the port accepts. Answered from the stored descriptors, in one indexed query */
+  requires?: InputMaybe<Array<DescriptorConstraintInput>>;
   roots?: InputMaybe<Scalars['Boolean']['input']>;
   /** Search by text: a substring of name or description, or semantic similarity to both. */
   search?: InputMaybe<Scalars['String']['input']>;
@@ -718,17 +819,20 @@ export enum Comparison {
   SamePeriodLastYear = 'SAME_PERIOD_LAST_YEAR'
 }
 
-/** Finish a bank link with what the bank redirected back with. */
-export type CompleteBankLinkInput = {
-  /** The `code` query parameter of the redirect. */
-  code: Scalars['String']['input'];
-  /** The `state` query parameter of the redirect. */
+/** Finish (REDIRECT) or advance (POLL) a started login. */
+export type CompleteAuthInput = {
+  /** REDIRECT: the `code` query parameter of the redirect. POLL: omitted. */
+  code?: InputMaybe<Scalars['String']['input']>;
+  /** REDIRECT: the provider's `error` / `error_description`, when it refused. */
+  error?: InputMaybe<Scalars['String']['input']>;
+  errorDescription?: InputMaybe<Scalars['String']['input']>;
   state: Scalars['String']['input'];
 };
 
 /** Lifecycle of a bank consent. */
 export enum ConnectionStatus {
   Active = 'ACTIVE',
+  Cancelled = 'CANCELLED',
   Expired = 'EXPIRED',
   Failed = 'FAILED',
   Pending = 'PENDING',
@@ -785,6 +889,26 @@ export type CreateCategoryRuleInput = {
   priority?: Scalars['Int']['input'];
 };
 
+/** A new Enable Banking provider: one application from the Enable Banking control panel. */
+export type CreateEnableBankingProviderInput = {
+  /** The application id. */
+  appId: Scalars['String']['input'];
+  /** What to switch on; everything the kind can do by default (see `providerKinds`). */
+  capabilities?: InputMaybe<Array<ProviderCapability>>;
+  /** How long a new consent is requested for, in days. */
+  consentDays?: Scalars['Int']['input'];
+  /** Syncs per account per day; null is unlimited. Omitted: the kind's default. */
+  dailySyncLimit?: InputMaybe<Scalars['Int']['input']>;
+  /** What to call it, unique in the organization. */
+  name: Scalars['String']['input'];
+  /** The application's private key: the text of its `.pem` file. Stored encrypted and never returned. */
+  privateKey: Scalars['String']['input'];
+  /** `personal` or `business`. */
+  psuType?: Scalars['String']['input'];
+  /** The redirect URLs links may use, the default first. Omitted: those registered for the application at Enable Banking. */
+  redirectUrls?: InputMaybe<Array<Scalars['String']['input']>>;
+};
+
 /** Preview an uploaded Finanzguru export. */
 export type CreateFinanzguruImportInput = {
   /** The uploaded file's store (`finishBigfileUpload`'s id). */
@@ -828,6 +952,16 @@ export type CreateMerchantRuleInput = {
   priority?: Scalars['Int']['input'];
 };
 
+/** A new Scalable Capital provider. It holds no credentials: each login keeps its own. */
+export type CreateScalableProviderInput = {
+  /** What to switch on; everything the kind can do by default (see `providerKinds`). */
+  capabilities?: InputMaybe<Array<ProviderCapability>>;
+  /** Syncs per account per day; null is unlimited. Omitted: the kind's default. */
+  dailySyncLimit?: InputMaybe<Scalars['Int']['input']>;
+  /** What to call it, unique in the organization. */
+  name?: Scalars['String']['input'];
+};
+
 /** An amount in one currency. */
 export type CurrencyTotal = {
   __typename?: 'CurrencyTotal';
@@ -845,11 +979,49 @@ export type DayTotals = {
   income: Scalars['Decimal']['output'];
 };
 
+/** One constraint on an object's descriptors, in the shape a rekuest port states its `requires` in -- so a picker hands a port's constraints on unchanged. `key` is one of the keys the structure declares (e.g. `@bank/direction`); a key it does not declare is refused. */
+export type DescriptorConstraintInput = {
+  /** The descriptor key, e.g. `@bank/direction` */
+  key: Scalars['String']['input'];
+  /** How the object's value is compared with `value`. MATCHES is equality, as EQUALS is */
+  operator: DescriptorOperator;
+  /** The value compared against: a number for GTE and LTE, a list for IN and NOT_IN, true or false for EXISTS, the member looked for with CONTAINS */
+  value?: InputMaybe<Scalars['JSON']['input']>;
+};
+
+/** How a descriptor constraint compares the object's value with the stated one. The operators a rekuest port's `requires` is written in, with the same meaning. */
+export enum DescriptorOperator {
+  Contains = 'CONTAINS',
+  Equals = 'EQUALS',
+  Exists = 'EXISTS',
+  Gte = 'GTE',
+  In = 'IN',
+  Lte = 'LTE',
+  Matches = 'MATCHES',
+  NotEquals = 'NOT_EQUALS',
+  NotIn = 'NOT_IN'
+}
+
 /** Money in or money out. */
 export enum Direction {
   In = 'IN',
   Out = 'OUT'
 }
+
+/** The settings of an Enable Banking provider. Its private key is never returned. */
+export type EnableBankingProviderSettings = {
+  __typename?: 'EnableBankingProviderSettings';
+  /** The Enable Banking application id. */
+  appId: Scalars['String']['output'];
+  /** How long a new consent is requested for, in days. */
+  consentDays: Scalars['Int']['output'];
+  /** A fingerprint of the stored private key's public half, to recognise which key is in use. */
+  keyFingerprint: Scalars['String']['output'];
+  /** `personal` or `business`. */
+  psuType: Scalars['String']['output'];
+  /** The redirect URLs a link may use; the first is the default. */
+  redirectUrls: Array<Scalars['String']['output']>;
+};
 
 export type FinishBigFileUploadInput = {
   storeId: Scalars['String']['input'];
@@ -1025,7 +1197,7 @@ export enum ImportTargetKind {
   Skipped = 'SKIPPED'
 }
 
-/** A bank Enable Banking can reach. */
+/** A bank a provider can reach. */
 export type Institution = {
   __typename?: 'Institution';
   bic?: Maybe<Scalars['String']['output']>;
@@ -1204,6 +1376,8 @@ export type MerchantFilter = {
   /** Only merchants with a located store within `radiusMeters` of a point, nearest first (`distanceMeters` on each). */
   near?: InputMaybe<NearInput>;
   online?: InputMaybe<Scalars['Boolean']['input']>;
+  /** Filter to the objects satisfying every one of these descriptor constraints: the `requires` of a port, handed on unchanged, so a picker offers what the port accepts. Answered from the stored descriptors, in one indexed query */
+  requires?: InputMaybe<Array<DescriptorConstraintInput>>;
   /** Search by text: a substring of name, description or an alias, or semantic similarity to name and description. */
   search?: InputMaybe<Scalars['String']['input']>;
 };
@@ -1468,22 +1642,22 @@ export type Mutation = {
   applyStatementImport: StatementImport;
   /** Link many transactions to a merchant (by id or key) and place (by id or store number), by hand; null hands them back to matching. */
   assignMerchant: Array<Transaction>;
-  /** Delete a pending link you started. */
-  cancelLink: Scalars['ID']['output'];
+  /** Drop a login that will not be finished. Idempotent. */
+  cancelAuth: AuthSession;
   /** Set or clear a transaction's category. */
   categorizeTransaction: Transaction;
   /** Set or clear the category of many transactions at once. */
   categorizeTransactions: Array<Transaction>;
-  /** Finish linking a bank with the redirect's code and state. */
-  completeBankLink: BankConnection;
-  /** Advance a Scalable Capital link; call until the connection is ACTIVE. */
-  completeScalableLink: BankConnection;
+  /** REDIRECT: finish with the code. POLL: advance one step; call until not PENDING. */
+  completeAuth: AuthSession;
   /** Create a monthly budget. */
   createBudget: Budget;
   /** Create a category. */
   createCategory: Category;
   /** Create a categorization rule. */
   createCategoryRule: CategoryRule;
+  /** Admins: set up an Enable Banking application (id and private key) as a provider. */
+  createEnableBankingProvider: BankProvider;
   /** Preview an uploaded Finanzguru export (nothing is written into the accounts yet). */
   createFinanzguruImport: StatementImport;
   /** Create a merchant (aliases from `fromTransactions` by default) and match it everywhere. */
@@ -1492,6 +1666,8 @@ export type Mutation = {
   createMerchantLocation: MerchantLocation;
   /** Create a rule mapping matching transactions to a merchant. */
   createMerchantRule: MerchantRule;
+  /** Admins: let the organization link Scalable Capital. */
+  createScalableProvider: BankProvider;
   /** Delete a budget. */
   deleteBudget: Scalars['ID']['output'];
   /** Delete a category (reassigning its transactions, or handing them back to rules and suggestions); `dryRun` reports what would happen. */
@@ -1504,6 +1680,8 @@ export type Mutation = {
   deleteMerchantLocation: Scalars['ID']['output'];
   /** Delete a merchant rule. */
   deleteMerchantRule: Scalars['ID']['output'];
+  /** Admins: remove a provider that has no active or pending connections. */
+  deleteProvider: Scalars['ID']['output'];
   /** Detect recurring payments. */
   detectRecurring: Array<RecurringPayment>;
   /** Finalize a file upload after the client has written the object. */
@@ -1532,8 +1710,8 @@ export type Mutation = {
   resolveSecurityListings: Array<SecurityListing>;
   /** Bring back a deleted base category. */
   restoreBaseCategory: Array<Category>;
-  /** Get the auth session of a pending link you started again (to continue a login). */
-  resumeLink: AuthSession;
+  /** The same login again (a fresh openUrl if the old one cannot be reused). */
+  resumeAuth: AuthSession;
   /** Withdraw a bank consent; data is kept. */
   revokeBankConnection: BankConnection;
   /** Add the base categories this organization lacks; returns all categories. */
@@ -1546,10 +1724,8 @@ export type Mutation = {
   setRecurringStatuses: Array<RecurringPayment>;
   /** Set or clear a transaction's note. */
   setTransactionNote: Transaction;
-  /** Start linking a bank; returns the auth session (finish: REDIRECT). */
-  startBankLink: AuthSession;
-  /** Start linking Scalable Capital; returns the auth session (finish: POLL). */
-  startScalableLink: AuthSession;
+  /** Start a login through a provider; returns the auth session. */
+  startLink: AuthSession;
   /** Pull an account from the bank now. */
   syncAccount: SyncResult;
   /** Add base categories this organization does not have yet; returns the created ones. */
@@ -1562,12 +1738,16 @@ export type Mutation = {
   updateCategory: Category;
   /** Change a categorization rule. */
   updateCategoryRule: CategoryRule;
+  /** Admins: change an Enable Banking provider; an empty key keeps the stored one. */
+  updateEnableBankingProvider: BankProvider;
   /** Change a merchant; a new default category re-categorizes its transactions. */
   updateMerchant: Merchant;
   /** Correct a merchant place. */
   updateMerchantLocation: MerchantLocation;
   /** Change a merchant rule. */
   updateMerchantRule: MerchantRule;
+  /** Admins: rename, enable or disable any provider, or change its capabilities. */
+  updateProvider: BankProvider;
   /** Create a merchant, or update the one with this key (aliases are added). */
   upsertMerchant: Merchant;
 };
@@ -1589,8 +1769,8 @@ export type MutationAssignMerchantArgs = {
 };
 
 
-export type MutationCancelLinkArgs = {
-  connection: Scalars['ID']['input'];
+export type MutationCancelAuthArgs = {
+  state: Scalars['String']['input'];
 };
 
 
@@ -1605,13 +1785,8 @@ export type MutationCategorizeTransactionsArgs = {
 };
 
 
-export type MutationCompleteBankLinkArgs = {
-  input: CompleteBankLinkInput;
-};
-
-
-export type MutationCompleteScalableLinkArgs = {
-  state: Scalars['String']['input'];
+export type MutationCompleteAuthArgs = {
+  input: CompleteAuthInput;
 };
 
 
@@ -1627,6 +1802,11 @@ export type MutationCreateCategoryArgs = {
 
 export type MutationCreateCategoryRuleArgs = {
   input: CreateCategoryRuleInput;
+};
+
+
+export type MutationCreateEnableBankingProviderArgs = {
+  input: CreateEnableBankingProviderInput;
 };
 
 
@@ -1647,6 +1827,11 @@ export type MutationCreateMerchantLocationArgs = {
 
 export type MutationCreateMerchantRuleArgs = {
   input: CreateMerchantRuleInput;
+};
+
+
+export type MutationCreateScalableProviderArgs = {
+  input: CreateScalableProviderInput;
 };
 
 
@@ -1680,6 +1865,11 @@ export type MutationDeleteMerchantLocationArgs = {
 
 export type MutationDeleteMerchantRuleArgs = {
   apply?: Scalars['Boolean']['input'];
+  id: Scalars['ID']['input'];
+};
+
+
+export type MutationDeleteProviderArgs = {
   id: Scalars['ID']['input'];
 };
 
@@ -1762,8 +1952,8 @@ export type MutationRestoreBaseCategoryArgs = {
 };
 
 
-export type MutationResumeLinkArgs = {
-  connection: Scalars['ID']['input'];
+export type MutationResumeAuthArgs = {
+  state: Scalars['String']['input'];
 };
 
 
@@ -1793,8 +1983,8 @@ export type MutationSetTransactionNoteArgs = {
 };
 
 
-export type MutationStartBankLinkArgs = {
-  input: StartBankLinkInput;
+export type MutationStartLinkArgs = {
+  input: StartLinkInput;
 };
 
 
@@ -1823,6 +2013,11 @@ export type MutationUpdateCategoryRuleArgs = {
 };
 
 
+export type MutationUpdateEnableBankingProviderArgs = {
+  input: UpdateEnableBankingProviderInput;
+};
+
+
 export type MutationUpdateMerchantArgs = {
   input: UpdateMerchantInput;
 };
@@ -1835,6 +2030,11 @@ export type MutationUpdateMerchantLocationArgs = {
 
 export type MutationUpdateMerchantRuleArgs = {
   input: UpdateMerchantRuleInput;
+};
+
+
+export type MutationUpdateProviderArgs = {
+  input: UpdateProviderInput;
 };
 
 
@@ -1992,6 +2192,39 @@ export enum Provider {
   Scalable = 'SCALABLE'
 }
 
+/** Something a provider kind can do, switched on or off per provider (see `providerKinds`). */
+export enum ProviderCapability {
+  Balances = 'BALANCES',
+  Holdings = 'HOLDINGS',
+  Prices = 'PRICES',
+  ScheduledSync = 'SCHEDULED_SYNC',
+  Transactions = 'TRANSACTIONS'
+}
+
+/** A capability of a provider kind: something it can do, which an admin switches on or off per provider. */
+export type ProviderCapabilityInfo = {
+  __typename?: 'ProviderCapabilityInfo';
+  capability: ProviderCapability;
+  description: Scalars['String']['output'];
+  label: Scalars['String']['output'];
+};
+
+/** A kind of provider this server can run. What a client needs to offer it, without knowing the kinds itself. */
+export type ProviderKind = {
+  __typename?: 'ProviderKind';
+  /** Everything the kind can do; a provider enables a subset. */
+  capabilities: Array<ProviderCapabilityInfo>;
+  /** Syncs per account per day a new provider starts with (null: unlimited). */
+  defaultDailySyncLimit?: Maybe<Scalars['Int']['output']>;
+  description: Scalars['String']['output'];
+  /** How a login through it finishes. */
+  finish: AuthFinish;
+  /** True when a link is to one of many banks: pick one from `bankInstitutions` and pass it to `startLink`. */
+  hasInstitutions: Scalars['Boolean']['output'];
+  kind: Provider;
+  label: Scalars['String']['output'];
+};
+
 export type Query = {
   __typename?: 'Query';
   _entities: Array<Maybe<_Entity>>;
@@ -2000,6 +2233,8 @@ export type Query = {
   accountInsights: AccountInsights;
   /** Stats for located places inside a circle or viewport. */
   areaInsights: AreaInsights;
+  /** Where a login is. No side effect. */
+  authSession: AuthSession;
   /** An account's end-of-day balance over a range. */
   balanceHistory: Array<BalancePoint>;
   /** A bank account by id. */
@@ -2010,8 +2245,12 @@ export type Query = {
   bankConnection: BankConnection;
   /** The organization's bank connections. */
   bankConnections: Array<BankConnection>;
-  /** The banks that can be linked in a country. */
+  /** The banks a provider can link in a country. */
   bankInstitutions: Array<Institution>;
+  /** A provider by id. */
+  bankProvider: BankProvider;
+  /** The providers the organization set up; banks are linked through one. */
+  bankProviders: Array<BankProvider>;
   /** A budget by id. */
   budget: Budget;
   /** Budgeted vs. spent for a month. */
@@ -2062,6 +2301,8 @@ export type Query = {
   portfolioInsights: PortfolioInsights;
   /** How each depot position's price moved over a window. */
   positionPerformance: Array<PositionPerformance>;
+  /** The kinds of provider this server can run, each with its capabilities. */
+  providerKinds: Array<ProviderKind>;
   /** Recurring payments: commitment, due, missed, price changes. */
   recurringInsights: RecurringInsights;
   /** A recurring payment by id. */
@@ -2116,6 +2357,11 @@ export type QueryAreaInsightsArgs = {
 };
 
 
+export type QueryAuthSessionArgs = {
+  state: Scalars['String']['input'];
+};
+
+
 export type QueryBalanceHistoryArgs = {
   account: Scalars['ID']['input'];
   dateFrom: Scalars['Date']['input'];
@@ -2148,6 +2394,18 @@ export type QueryBankConnectionsArgs = {
 
 export type QueryBankInstitutionsArgs = {
   country: Scalars['String']['input'];
+  provider: Scalars['ID']['input'];
+};
+
+
+export type QueryBankProviderArgs = {
+  id: Scalars['ID']['input'];
+};
+
+
+export type QueryBankProvidersArgs = {
+  filters?: InputMaybe<BankProviderFilter>;
+  pagination?: InputMaybe<OffsetPaginationInput>;
 };
 
 
@@ -2373,6 +2631,7 @@ export type QueryStatementImportArgs = {
 
 
 export type QueryStatementImportsArgs = {
+  filters?: InputMaybe<StatementImportFilter>;
   pagination?: InputMaybe<OffsetPaginationInput>;
 };
 
@@ -2500,6 +2759,8 @@ export type RecurringPaymentFilter = {
   NOT?: InputMaybe<RecurringPaymentFilter>;
   OR?: InputMaybe<RecurringPaymentFilter>;
   accounts?: InputMaybe<Array<Scalars['ID']['input']>>;
+  /** Filter to the objects satisfying every one of these descriptor constraints: the `requires` of a port, handed on unchanged, so a picker offers what the port accepts. Answered from the stored descriptors, in one indexed query */
+  requires?: InputMaybe<Array<DescriptorConstraintInput>>;
   status?: InputMaybe<RecurringStatus>;
 };
 
@@ -2608,13 +2869,15 @@ export type Share = {
   share: Scalars['Float']['output'];
 };
 
-/** Start linking a bank. */
-export type StartBankLinkInput = {
-  /** The bank's name exactly as `bankInstitutions` lists it. */
-  aspspName: Scalars['String']['input'];
-  /** The bank's ISO country code, e.g. AT. */
-  country: Scalars['String']['input'];
-  /** One of the server's registered redirect URLs; the first by default. */
+/** Start a login through one of the organization's providers. */
+export type StartLinkInput = {
+  /** For a kind with institutions: the bank's ISO country code, e.g. AT. */
+  country?: InputMaybe<Scalars['String']['input']>;
+  /** For a kind with institutions: the bank's name exactly as `bankInstitutions` lists it. */
+  institution?: InputMaybe<Scalars['String']['input']>;
+  /** The provider to link through (see `bankProviders`). */
+  provider: Scalars['ID']['input'];
+  /** REDIRECT kinds: one of the provider's redirect URLs; the first by default. */
   redirectUrl?: InputMaybe<Scalars['String']['input']>;
 };
 
@@ -2657,6 +2920,23 @@ export type StatementImport = {
   unmappedCategories: Array<UnmappedImportCategory>;
   /** What was odd about the file (skipped lines, split parts that do not add up, unknown columns). */
   warnings: Array<Scalars['String']['output']>;
+};
+
+/**
+ * One uploaded statement export (a Finanzguru file), previewed and then applied.
+ *
+ * Preview parses the file and matches every row against the accounts and their synced history
+ * without writing a transaction; ``report`` says what applying would do. Applying writes it — idempotently:
+ * a row already imported (by its ``import_ref``) is updated, never duplicated.
+ */
+export type StatementImportFilter = {
+  AND?: InputMaybe<StatementImportFilter>;
+  DISTINCT?: InputMaybe<Scalars['Boolean']['input']>;
+  NOT?: InputMaybe<StatementImportFilter>;
+  OR?: InputMaybe<StatementImportFilter>;
+  ids?: InputMaybe<Array<Scalars['ID']['input']>>;
+  /** Filter to the objects satisfying every one of these descriptor constraints: the `requires` of a port, handed on unchanged, so a picker offers what the port accepts. Answered from the stored descriptors, in one indexed query */
+  requires?: InputMaybe<Array<DescriptorConstraintInput>>;
 };
 
 /** Which transactions a view looks at: a booking-date range (the last 12 months by default) and optionally some accounts. */
@@ -2824,6 +3104,8 @@ export type TransactionFilter = {
   near?: InputMaybe<NearInput>;
   /** Keep transactions that look like they belong to this category — close to what the organization put there, or to one of its terms — closest first. */
   nearCategory?: InputMaybe<Scalars['ID']['input']>;
+  /** Filter to the objects satisfying every one of these descriptor constraints: the `requires` of a port, handed on unchanged, so a picker offers what the port accepts. Answered from the stored descriptors, in one indexed query */
+  requires?: InputMaybe<Array<DescriptorConstraintInput>>;
   /** Search by text: a case-insensitive substring of counterparty, remittance or note; semantic similarity to them; or a category whose terms mean the text ("supermarket" finds what is in Groceries). Substring matches rank first, then by similarity; an explicit `ordering` replaces that ranking. */
   search?: InputMaybe<Scalars['String']['input']>;
   /** Order by similarity to the given transaction, nearest first (no cut-off, composes with other filters and pagination). Empty when it is not in this organization or has no embedding yet. */
@@ -2923,6 +3205,22 @@ export type UpdateCategoryRuleInput = {
   priority?: InputMaybe<Scalars['Int']['input']>;
 };
 
+/** Changes to an Enable Banking provider; omitted fields stay as they are. */
+export type UpdateEnableBankingProviderInput = {
+  appId?: InputMaybe<Scalars['String']['input']>;
+  capabilities?: InputMaybe<Array<ProviderCapability>>;
+  consentDays?: InputMaybe<Scalars['Int']['input']>;
+  /** Null is unlimited. */
+  dailySyncLimit?: InputMaybe<Scalars['Int']['input']>;
+  enabled?: InputMaybe<Scalars['Boolean']['input']>;
+  id: Scalars['ID']['input'];
+  name?: InputMaybe<Scalars['String']['input']>;
+  /** A new private key (PEM text). Omitted or empty: the stored key is kept. */
+  privateKey?: InputMaybe<Scalars['String']['input']>;
+  psuType?: InputMaybe<Scalars['String']['input']>;
+  redirectUrls?: InputMaybe<Array<Scalars['String']['input']>>;
+};
+
 /** Changes to a merchant; omitted fields stay as they are. */
 export type UpdateMerchantInput = {
   /** The default category, or null for none; its transactions follow. */
@@ -2970,6 +3268,16 @@ export type UpdateMerchantRuleInput = {
   merchant?: InputMaybe<MerchantRef>;
   pattern?: InputMaybe<Scalars['String']['input']>;
   priority?: InputMaybe<Scalars['Int']['input']>;
+};
+
+/** Changes any provider takes, whatever its kind; omitted fields stay as they are. */
+export type UpdateProviderInput = {
+  capabilities?: InputMaybe<Array<ProviderCapability>>;
+  /** Null is unlimited. */
+  dailySyncLimit?: InputMaybe<Scalars['Int']['input']>;
+  enabled?: InputMaybe<Scalars['Boolean']['input']>;
+  id: Scalars['ID']['input'];
+  name?: InputMaybe<Scalars['String']['input']>;
 };
 
 /** Create a merchant, or update the one with this key. Omitted fields keep their value on update; `aliases` are added (never removed). */
@@ -3038,7 +3346,7 @@ export type WindowInfo = {
   start: Scalars['Date']['output'];
 };
 
-export type _Entity = AccountSyncer | BalanceSnapshot | BankAccount | BankConnection | BigFileStore | Budget | Category | CategoryRule | HoldingSnapshot | ImportCategoryMapping | Merchant | MerchantAlias | MerchantLocation | MerchantRule | Organization | RecurringPayment | SecurityListing | StatementImport | Transaction | User;
+export type _Entity = AccountSyncer | BalanceSnapshot | BankAccount | BankConnection | BankProvider | BigFileStore | Budget | Category | CategoryRule | HoldingSnapshot | ImportCategoryMapping | Merchant | MerchantAlias | MerchantLocation | MerchantRule | Organization | RecurringPayment | SecurityListing | StatementImport | Transaction | User;
 
 export type _Service = {
   __typename?: '_Service';
@@ -3047,7 +3355,15 @@ export type _Service = {
 
 export type BalanceFragment = { __typename?: 'BalanceSnapshot', id: string, date: string, balanceType: string, amount: string, currency: string };
 
-export type ListBankAccountFragment = { __typename?: 'BankAccount', id: string, iban?: string | null, name?: string | null, kind: AccountKind, currency: string, lastSyncedAt?: string | null, isSyncing: boolean, latestBalance?: { __typename?: 'BalanceSnapshot', id: string, date: string, balanceType: string, amount: string, currency: string } | null, connection?: { __typename?: 'BankConnection', id: string, aspspName: string, needsReauth: boolean } | null };
+export type ListBankAccountFragment = { __typename?: 'BankAccount', id: string, iban?: string | null, name?: string | null, kind: AccountKind, currency: string, lastSyncedAt?: string | null, isSyncing: boolean, latestBalance?: { __typename?: 'BalanceSnapshot', id: string, date: string, balanceType: string, amount: string, currency: string } | null, connection?: { __typename?: 'BankConnection', id: string, aspspName: string, aspspCountry: string, needsReauth: boolean, bankProvider?: { __typename?: 'BankProvider', id: string } | null } | null };
+
+export type AuthSessionFragment = { __typename?: 'AuthSession', state: string, status: AuthStatus, finish: AuthFinish, openUrl: string, expiresAt: string, redirectUrl?: string | null, interval?: number | null, userCode?: string | null, step?: string | null, errorCode?: string | null, errorMessage?: string | null, result?: { __typename?: 'AuthResult', identifier: string, id: string, label?: string | null } | null };
+
+export type ProviderKindFragment = { __typename?: 'ProviderKind', kind: Provider, label: string, description: string, finish: AuthFinish, hasInstitutions: boolean };
+
+export type ListBankProviderFragment = { __typename?: 'BankProvider', id: string, name: string, kind: Provider, enabled: boolean, kindInfo: { __typename?: 'ProviderKind', kind: Provider, label: string, description: string, finish: AuthFinish, hasInstitutions: boolean } };
+
+export type InstitutionFragment = { __typename?: 'Institution', name: string, country: string, logo?: string | null, bic?: string | null, maximumConsentDays?: number | null };
 
 export type PickerCategoryFragment = { __typename?: 'Category', id: string, name: string, color?: string | null, kind: CategoryKind, parent?: { __typename?: 'Category', id: string, name: string } | null };
 
@@ -3058,6 +3374,34 @@ export type TransactionCategoryFragment = { __typename?: 'Category', id: string,
 export type ListTransactionFragment = { __typename?: 'Transaction', id: string, bookingDate?: string | null, transactionDate?: string | null, amount: string, currency: string, status: TransactionStatus, counterparty?: string | null, remittance?: string | null, isTransfer: boolean, kind?: TransactionKind | null, merchant?: { __typename?: 'Merchant', id: string, name: string, logoUrl?: string | null } | null, category?: { __typename?: 'Category', id: string, name: string, color?: string | null, kind: CategoryKind } | null, account: { __typename?: 'BankAccount', id: string, name?: string | null, iban?: string | null } };
 
 export type TransactionFragment = { __typename?: 'Transaction', valueDate?: string | null, note?: string | null, categorySource: CategorySource, merchantSource: MerchantSource, counterpartyIban?: string | null, id: string, bookingDate?: string | null, transactionDate?: string | null, amount: string, currency: string, status: TransactionStatus, counterparty?: string | null, remittance?: string | null, isTransfer: boolean, kind?: TransactionKind | null, merchantLocation?: { __typename?: 'MerchantLocation', id: string, name: string, street?: string | null, city?: string | null } | null, merchant?: { __typename?: 'Merchant', id: string, name: string, logoUrl?: string | null } | null, category?: { __typename?: 'Category', id: string, name: string, color?: string | null, kind: CategoryKind } | null, account: { __typename?: 'BankAccount', id: string, name?: string | null, iban?: string | null } };
+
+export type StartLinkMutationVariables = Exact<{
+  input: StartLinkInput;
+}>;
+
+
+export type StartLinkMutation = { __typename?: 'Mutation', startLink: { __typename?: 'AuthSession', state: string, status: AuthStatus, finish: AuthFinish, openUrl: string, expiresAt: string, redirectUrl?: string | null, interval?: number | null, userCode?: string | null, step?: string | null, errorCode?: string | null, errorMessage?: string | null, result?: { __typename?: 'AuthResult', identifier: string, id: string, label?: string | null } | null } };
+
+export type CompleteAuthMutationVariables = Exact<{
+  input: CompleteAuthInput;
+}>;
+
+
+export type CompleteAuthMutation = { __typename?: 'Mutation', completeAuth: { __typename?: 'AuthSession', state: string, status: AuthStatus, finish: AuthFinish, openUrl: string, expiresAt: string, redirectUrl?: string | null, interval?: number | null, userCode?: string | null, step?: string | null, errorCode?: string | null, errorMessage?: string | null, result?: { __typename?: 'AuthResult', identifier: string, id: string, label?: string | null } | null } };
+
+export type ResumeAuthMutationVariables = Exact<{
+  state: Scalars['String']['input'];
+}>;
+
+
+export type ResumeAuthMutation = { __typename?: 'Mutation', resumeAuth: { __typename?: 'AuthSession', state: string, status: AuthStatus, finish: AuthFinish, openUrl: string, expiresAt: string, redirectUrl?: string | null, interval?: number | null, userCode?: string | null, step?: string | null, errorCode?: string | null, errorMessage?: string | null, result?: { __typename?: 'AuthResult', identifier: string, id: string, label?: string | null } | null } };
+
+export type CancelAuthMutationVariables = Exact<{
+  state: Scalars['String']['input'];
+}>;
+
+
+export type CancelAuthMutation = { __typename?: 'Mutation', cancelAuth: { __typename?: 'AuthSession', state: string, status: AuthStatus, finish: AuthFinish, openUrl: string, expiresAt: string, redirectUrl?: string | null, interval?: number | null, userCode?: string | null, step?: string | null, errorCode?: string | null, errorMessage?: string | null, result?: { __typename?: 'AuthResult', identifier: string, id: string, label?: string | null } | null } };
 
 export type CategorizeTransactionMutationVariables = Exact<{
   input: CategorizeTransactionInput;
@@ -3094,7 +3438,35 @@ export type ListBankAccountsQueryVariables = Exact<{
 }>;
 
 
-export type ListBankAccountsQuery = { __typename?: 'Query', bankAccounts: Array<{ __typename?: 'BankAccount', id: string, iban?: string | null, name?: string | null, kind: AccountKind, currency: string, lastSyncedAt?: string | null, isSyncing: boolean, latestBalance?: { __typename?: 'BalanceSnapshot', id: string, date: string, balanceType: string, amount: string, currency: string } | null, connection?: { __typename?: 'BankConnection', id: string, aspspName: string, needsReauth: boolean } | null }> };
+export type ListBankAccountsQuery = { __typename?: 'Query', bankAccounts: Array<{ __typename?: 'BankAccount', id: string, iban?: string | null, name?: string | null, kind: AccountKind, currency: string, lastSyncedAt?: string | null, isSyncing: boolean, latestBalance?: { __typename?: 'BalanceSnapshot', id: string, date: string, balanceType: string, amount: string, currency: string } | null, connection?: { __typename?: 'BankConnection', id: string, aspspName: string, aspspCountry: string, needsReauth: boolean, bankProvider?: { __typename?: 'BankProvider', id: string } | null } | null }> };
+
+export type ListBankProvidersQueryVariables = Exact<{
+  filters?: InputMaybe<BankProviderFilter>;
+  pagination?: InputMaybe<OffsetPaginationInput>;
+}>;
+
+
+export type ListBankProvidersQuery = { __typename?: 'Query', bankProviders: Array<{ __typename?: 'BankProvider', id: string, name: string, kind: Provider, enabled: boolean, kindInfo: { __typename?: 'ProviderKind', kind: Provider, label: string, description: string, finish: AuthFinish, hasInstitutions: boolean } }> };
+
+export type BankInstitutionsQueryVariables = Exact<{
+  provider: Scalars['ID']['input'];
+  country: Scalars['String']['input'];
+}>;
+
+
+export type BankInstitutionsQuery = { __typename?: 'Query', bankInstitutions: Array<{ __typename?: 'Institution', name: string, country: string, logo?: string | null, bic?: string | null, maximumConsentDays?: number | null }> };
+
+export type ListBankConnectionsQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type ListBankConnectionsQuery = { __typename?: 'Query', bankConnections: Array<{ __typename?: 'BankConnection', id: string }> };
+
+export type AuthSessionQueryVariables = Exact<{
+  state: Scalars['String']['input'];
+}>;
+
+
+export type AuthSessionQuery = { __typename?: 'Query', authSession: { __typename?: 'AuthSession', state: string, status: AuthStatus, finish: AuthFinish, openUrl: string, expiresAt: string, redirectUrl?: string | null, interval?: number | null, userCode?: string | null, step?: string | null, errorCode?: string | null, errorMessage?: string | null, result?: { __typename?: 'AuthResult', identifier: string, id: string, label?: string | null } | null } };
 
 export type BankPaletteSearchQueryVariables = Exact<{
   search: Scalars['String']['input'];
@@ -3164,10 +3536,63 @@ export const ListBankAccountFragmentDoc = gql`
   connection {
     id
     aspspName
+    aspspCountry
     needsReauth
+    bankProvider {
+      id
+    }
   }
 }
     ${BalanceFragmentDoc}`;
+export const AuthSessionFragmentDoc = gql`
+    fragment AuthSession on AuthSession {
+  state
+  status
+  finish
+  openUrl
+  expiresAt
+  redirectUrl
+  interval
+  userCode
+  step
+  errorCode
+  errorMessage
+  result {
+    identifier
+    id
+    label
+  }
+}
+    `;
+export const ProviderKindFragmentDoc = gql`
+    fragment ProviderKind on ProviderKind {
+  kind
+  label
+  description
+  finish
+  hasInstitutions
+}
+    `;
+export const ListBankProviderFragmentDoc = gql`
+    fragment ListBankProvider on BankProvider {
+  id
+  name
+  kind
+  enabled
+  kindInfo {
+    ...ProviderKind
+  }
+}
+    ${ProviderKindFragmentDoc}`;
+export const InstitutionFragmentDoc = gql`
+    fragment Institution on Institution {
+  name
+  country
+  logo
+  bic
+  maximumConsentDays
+}
+    `;
 export const TransactionCategoryFragmentDoc = gql`
     fragment TransactionCategory on Category {
   id
@@ -3239,6 +3664,138 @@ export const TransactionFragmentDoc = gql`
   }
 }
     ${ListTransactionFragmentDoc}`;
+export const StartLinkDocument = gql`
+    mutation StartLink($input: StartLinkInput!) {
+  startLink(input: $input) {
+    ...AuthSession
+  }
+}
+    ${AuthSessionFragmentDoc}`;
+export type StartLinkMutationFn = Apollo.MutationFunction<StartLinkMutation, StartLinkMutationVariables>;
+
+/**
+ * __useStartLinkMutation__
+ *
+ * To run a mutation, you first call `useStartLinkMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useStartLinkMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [startLinkMutation, { data, loading, error }] = useStartLinkMutation({
+ *   variables: {
+ *      input: // value for 'input'
+ *   },
+ * });
+ */
+export function useStartLinkMutation(baseOptions?: ApolloReactHooks.MutationHookOptions<StartLinkMutation, StartLinkMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return ApolloReactHooks.useMutation<StartLinkMutation, StartLinkMutationVariables>(StartLinkDocument, options);
+      }
+export type StartLinkMutationHookResult = ReturnType<typeof useStartLinkMutation>;
+export type StartLinkMutationResult = Apollo.MutationResult<StartLinkMutation>;
+export type StartLinkMutationOptions = Apollo.BaseMutationOptions<StartLinkMutation, StartLinkMutationVariables>;
+export const CompleteAuthDocument = gql`
+    mutation CompleteAuth($input: CompleteAuthInput!) {
+  completeAuth(input: $input) {
+    ...AuthSession
+  }
+}
+    ${AuthSessionFragmentDoc}`;
+export type CompleteAuthMutationFn = Apollo.MutationFunction<CompleteAuthMutation, CompleteAuthMutationVariables>;
+
+/**
+ * __useCompleteAuthMutation__
+ *
+ * To run a mutation, you first call `useCompleteAuthMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useCompleteAuthMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [completeAuthMutation, { data, loading, error }] = useCompleteAuthMutation({
+ *   variables: {
+ *      input: // value for 'input'
+ *   },
+ * });
+ */
+export function useCompleteAuthMutation(baseOptions?: ApolloReactHooks.MutationHookOptions<CompleteAuthMutation, CompleteAuthMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return ApolloReactHooks.useMutation<CompleteAuthMutation, CompleteAuthMutationVariables>(CompleteAuthDocument, options);
+      }
+export type CompleteAuthMutationHookResult = ReturnType<typeof useCompleteAuthMutation>;
+export type CompleteAuthMutationResult = Apollo.MutationResult<CompleteAuthMutation>;
+export type CompleteAuthMutationOptions = Apollo.BaseMutationOptions<CompleteAuthMutation, CompleteAuthMutationVariables>;
+export const ResumeAuthDocument = gql`
+    mutation ResumeAuth($state: String!) {
+  resumeAuth(state: $state) {
+    ...AuthSession
+  }
+}
+    ${AuthSessionFragmentDoc}`;
+export type ResumeAuthMutationFn = Apollo.MutationFunction<ResumeAuthMutation, ResumeAuthMutationVariables>;
+
+/**
+ * __useResumeAuthMutation__
+ *
+ * To run a mutation, you first call `useResumeAuthMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useResumeAuthMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [resumeAuthMutation, { data, loading, error }] = useResumeAuthMutation({
+ *   variables: {
+ *      state: // value for 'state'
+ *   },
+ * });
+ */
+export function useResumeAuthMutation(baseOptions?: ApolloReactHooks.MutationHookOptions<ResumeAuthMutation, ResumeAuthMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return ApolloReactHooks.useMutation<ResumeAuthMutation, ResumeAuthMutationVariables>(ResumeAuthDocument, options);
+      }
+export type ResumeAuthMutationHookResult = ReturnType<typeof useResumeAuthMutation>;
+export type ResumeAuthMutationResult = Apollo.MutationResult<ResumeAuthMutation>;
+export type ResumeAuthMutationOptions = Apollo.BaseMutationOptions<ResumeAuthMutation, ResumeAuthMutationVariables>;
+export const CancelAuthDocument = gql`
+    mutation CancelAuth($state: String!) {
+  cancelAuth(state: $state) {
+    ...AuthSession
+  }
+}
+    ${AuthSessionFragmentDoc}`;
+export type CancelAuthMutationFn = Apollo.MutationFunction<CancelAuthMutation, CancelAuthMutationVariables>;
+
+/**
+ * __useCancelAuthMutation__
+ *
+ * To run a mutation, you first call `useCancelAuthMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useCancelAuthMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [cancelAuthMutation, { data, loading, error }] = useCancelAuthMutation({
+ *   variables: {
+ *      state: // value for 'state'
+ *   },
+ * });
+ */
+export function useCancelAuthMutation(baseOptions?: ApolloReactHooks.MutationHookOptions<CancelAuthMutation, CancelAuthMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return ApolloReactHooks.useMutation<CancelAuthMutation, CancelAuthMutationVariables>(CancelAuthDocument, options);
+      }
+export type CancelAuthMutationHookResult = ReturnType<typeof useCancelAuthMutation>;
+export type CancelAuthMutationResult = Apollo.MutationResult<CancelAuthMutation>;
+export type CancelAuthMutationOptions = Apollo.BaseMutationOptions<CancelAuthMutation, CancelAuthMutationVariables>;
 export const CategorizeTransactionDocument = gql`
     mutation CategorizeTransaction($input: CategorizeTransactionInput!) {
   categorizeTransaction(input: $input) {
@@ -3408,6 +3965,147 @@ export function useListBankAccountsLazyQuery(baseOptions?: ApolloReactHooks.Lazy
 export type ListBankAccountsQueryHookResult = ReturnType<typeof useListBankAccountsQuery>;
 export type ListBankAccountsLazyQueryHookResult = ReturnType<typeof useListBankAccountsLazyQuery>;
 export type ListBankAccountsQueryResult = Apollo.QueryResult<ListBankAccountsQuery, ListBankAccountsQueryVariables>;
+export const ListBankProvidersDocument = gql`
+    query ListBankProviders($filters: BankProviderFilter, $pagination: OffsetPaginationInput) {
+  bankProviders(filters: $filters, pagination: $pagination) {
+    ...ListBankProvider
+  }
+}
+    ${ListBankProviderFragmentDoc}`;
+
+/**
+ * __useListBankProvidersQuery__
+ *
+ * To run a query within a React component, call `useListBankProvidersQuery` and pass it any options that fit your needs.
+ * When your component renders, `useListBankProvidersQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useListBankProvidersQuery({
+ *   variables: {
+ *      filters: // value for 'filters'
+ *      pagination: // value for 'pagination'
+ *   },
+ * });
+ */
+export function useListBankProvidersQuery(baseOptions?: ApolloReactHooks.QueryHookOptions<ListBankProvidersQuery, ListBankProvidersQueryVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return ApolloReactHooks.useQuery<ListBankProvidersQuery, ListBankProvidersQueryVariables>(ListBankProvidersDocument, options);
+      }
+export function useListBankProvidersLazyQuery(baseOptions?: ApolloReactHooks.LazyQueryHookOptions<ListBankProvidersQuery, ListBankProvidersQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return ApolloReactHooks.useLazyQuery<ListBankProvidersQuery, ListBankProvidersQueryVariables>(ListBankProvidersDocument, options);
+        }
+export type ListBankProvidersQueryHookResult = ReturnType<typeof useListBankProvidersQuery>;
+export type ListBankProvidersLazyQueryHookResult = ReturnType<typeof useListBankProvidersLazyQuery>;
+export type ListBankProvidersQueryResult = Apollo.QueryResult<ListBankProvidersQuery, ListBankProvidersQueryVariables>;
+export const BankInstitutionsDocument = gql`
+    query BankInstitutions($provider: ID!, $country: String!) {
+  bankInstitutions(provider: $provider, country: $country) {
+    ...Institution
+  }
+}
+    ${InstitutionFragmentDoc}`;
+
+/**
+ * __useBankInstitutionsQuery__
+ *
+ * To run a query within a React component, call `useBankInstitutionsQuery` and pass it any options that fit your needs.
+ * When your component renders, `useBankInstitutionsQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useBankInstitutionsQuery({
+ *   variables: {
+ *      provider: // value for 'provider'
+ *      country: // value for 'country'
+ *   },
+ * });
+ */
+export function useBankInstitutionsQuery(baseOptions: ApolloReactHooks.QueryHookOptions<BankInstitutionsQuery, BankInstitutionsQueryVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return ApolloReactHooks.useQuery<BankInstitutionsQuery, BankInstitutionsQueryVariables>(BankInstitutionsDocument, options);
+      }
+export function useBankInstitutionsLazyQuery(baseOptions?: ApolloReactHooks.LazyQueryHookOptions<BankInstitutionsQuery, BankInstitutionsQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return ApolloReactHooks.useLazyQuery<BankInstitutionsQuery, BankInstitutionsQueryVariables>(BankInstitutionsDocument, options);
+        }
+export type BankInstitutionsQueryHookResult = ReturnType<typeof useBankInstitutionsQuery>;
+export type BankInstitutionsLazyQueryHookResult = ReturnType<typeof useBankInstitutionsLazyQuery>;
+export type BankInstitutionsQueryResult = Apollo.QueryResult<BankInstitutionsQuery, BankInstitutionsQueryVariables>;
+export const ListBankConnectionsDocument = gql`
+    query ListBankConnections {
+  bankConnections {
+    id
+  }
+}
+    `;
+
+/**
+ * __useListBankConnectionsQuery__
+ *
+ * To run a query within a React component, call `useListBankConnectionsQuery` and pass it any options that fit your needs.
+ * When your component renders, `useListBankConnectionsQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useListBankConnectionsQuery({
+ *   variables: {
+ *   },
+ * });
+ */
+export function useListBankConnectionsQuery(baseOptions?: ApolloReactHooks.QueryHookOptions<ListBankConnectionsQuery, ListBankConnectionsQueryVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return ApolloReactHooks.useQuery<ListBankConnectionsQuery, ListBankConnectionsQueryVariables>(ListBankConnectionsDocument, options);
+      }
+export function useListBankConnectionsLazyQuery(baseOptions?: ApolloReactHooks.LazyQueryHookOptions<ListBankConnectionsQuery, ListBankConnectionsQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return ApolloReactHooks.useLazyQuery<ListBankConnectionsQuery, ListBankConnectionsQueryVariables>(ListBankConnectionsDocument, options);
+        }
+export type ListBankConnectionsQueryHookResult = ReturnType<typeof useListBankConnectionsQuery>;
+export type ListBankConnectionsLazyQueryHookResult = ReturnType<typeof useListBankConnectionsLazyQuery>;
+export type ListBankConnectionsQueryResult = Apollo.QueryResult<ListBankConnectionsQuery, ListBankConnectionsQueryVariables>;
+export const AuthSessionDocument = gql`
+    query AuthSession($state: String!) {
+  authSession(state: $state) {
+    ...AuthSession
+  }
+}
+    ${AuthSessionFragmentDoc}`;
+
+/**
+ * __useAuthSessionQuery__
+ *
+ * To run a query within a React component, call `useAuthSessionQuery` and pass it any options that fit your needs.
+ * When your component renders, `useAuthSessionQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useAuthSessionQuery({
+ *   variables: {
+ *      state: // value for 'state'
+ *   },
+ * });
+ */
+export function useAuthSessionQuery(baseOptions: ApolloReactHooks.QueryHookOptions<AuthSessionQuery, AuthSessionQueryVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return ApolloReactHooks.useQuery<AuthSessionQuery, AuthSessionQueryVariables>(AuthSessionDocument, options);
+      }
+export function useAuthSessionLazyQuery(baseOptions?: ApolloReactHooks.LazyQueryHookOptions<AuthSessionQuery, AuthSessionQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return ApolloReactHooks.useLazyQuery<AuthSessionQuery, AuthSessionQueryVariables>(AuthSessionDocument, options);
+        }
+export type AuthSessionQueryHookResult = ReturnType<typeof useAuthSessionQuery>;
+export type AuthSessionLazyQueryHookResult = ReturnType<typeof useAuthSessionLazyQuery>;
+export type AuthSessionQueryResult = Apollo.QueryResult<AuthSessionQuery, AuthSessionQueryVariables>;
 export const BankPaletteSearchDocument = gql`
     query BankPaletteSearch($search: String!, $limit: Int!) {
   transactions(filters: {search: $search}, pagination: {limit: $limit}) {

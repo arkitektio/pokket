@@ -1,0 +1,23 @@
+mutation StartOAuthLink($input: StartOAuthLinkInput!) {
+  startOAuthLink(input: $input) {
+    ...AuthSession
+  }
+}
+
+mutation CompleteAuth($input: CompleteAuthInput!) {
+  completeAuth(input: $input) {
+    ...AuthSession
+  }
+}
+
+mutation ResumeAuth($state: String!) {
+  resumeAuth(state: $state) {
+    ...AuthSession
+  }
+}
+
+mutation CancelAuth($state: String!) {
+  cancelAuth(state: $state) {
+    ...AuthSession
+  }
+}

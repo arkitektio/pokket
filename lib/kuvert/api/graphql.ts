@@ -20,6 +20,8 @@ export type Scalars = {
   ByteCount: { input: number; output: number; }
   /** Date with time (isoformat) */
   DateTime: { input: string; output: string; }
+  /** The `JSON` scalar type represents JSON values as specified by [ECMA-404](https://ecma-international.org/wp-content/uploads/ECMA-404_2nd_edition_december_2017.pdf). */
+  JSON: { input: any; output: any; }
   _Any: { input: any; output: any; }
 };
 
@@ -52,25 +54,61 @@ export type Attachment = {
   store?: Maybe<BigFileStore>;
 };
 
+/** How a started login finishes. */
+export enum AuthFinish {
+  Poll = 'POLL',
+  Redirect = 'REDIRECT'
+}
+
 /** How the service logs in. PASSWORD: Username and (app) password; XOAUTH2: OAuth 2.0 access token (SASL XOAUTH2). */
 export enum AuthMethod {
   Password = 'PASSWORD',
   Xoauth2 = 'XOAUTH2'
 }
 
-/** A started OAuth login: open `openUrl`; the provider redirects to `redirectUrl` with `?code&state`; call `completeOAuthLink` with them. */
+/** A Structure: what the login linked, so the app can open its page. */
+export type AuthResult = {
+  __typename?: 'AuthResult';
+  id: Scalars['ID']['output'];
+  identifier: Scalars['String']['output'];
+  label?: Maybe<Scalars['String']['output']>;
+};
+
+/** A login at an external provider, the same shape in every service. Open `openUrl` in the user's browser; then, by `finish`: REDIRECT — the provider redirects to `redirectUrl` with `code` and `state`, call `completeAuth` with both; POLL — call `completeAuth` with the `state` every `interval` seconds until `status` is not PENDING. */
 export type AuthSession = {
   __typename?: 'AuthSession';
-  /** The mailbox this login re-links, if it does. */
-  account?: Maybe<MailAccount>;
+  /** FAILED: machine-readable, the service's own error codes. */
+  errorCode?: Maybe<Scalars['String']['output']>;
+  /** FAILED: one sentence for the user. */
+  errorMessage?: Maybe<Scalars['String']['output']>;
+  /** Until when the first approval can happen. */
   expiresAt: Scalars['DateTime']['output'];
-  /** How the login finishes: REDIRECT (catch the redirect, then `completeOAuthLink`). */
-  finish: Scalars['String']['output'];
+  finish: AuthFinish;
+  /** POLL: seconds between two completeAuth calls. */
+  interval?: Maybe<Scalars['Int']['output']>;
+  /** https. What the app opens in the user's browser. */
   openUrl: Scalars['String']['output'];
-  provider: Provider;
-  redirectUrl: Scalars['String']['output'];
+  /** REDIRECT: where the provider sends the browser back to (the relay URL). */
+  redirectUrl?: Maybe<Scalars['String']['output']>;
+  /** DONE: what was linked. May be set earlier when it already exists (a relink). */
+  result?: Maybe<AuthResult>;
+  /** Opaque, unguessable, single-use, stored server-side. THE handle of the login. */
   state: Scalars['String']['output'];
+  status: AuthStatus;
+  /** Null until the first approval; then what is still awaited, e.g. MFA. */
+  step?: Maybe<Scalars['String']['output']>;
+  /** POLL: the code the user confirms on the provider's page. */
+  userCode?: Maybe<Scalars['String']['output']>;
 };
+
+/** Where a login is. */
+export enum AuthStatus {
+  Cancelled = 'CANCELLED',
+  Done = 'DONE',
+  Expired = 'EXPIRED',
+  Failed = 'FAILED',
+  Pending = 'PENDING'
+}
 
 /** Temporary S3 credentials for reading a big file. */
 export type BigFileAccessGrant = {
@@ -186,9 +224,13 @@ export enum CategorySync {
   Local = 'LOCAL'
 }
 
-/** What the provider's redirect carried. */
-export type CompleteOAuthLinkInput = {
-  code: Scalars['String']['input'];
+/** Finish (REDIRECT) or advance (POLL) a started login. */
+export type CompleteAuthInput = {
+  /** REDIRECT: the `code` query parameter of the redirect. POLL: omitted. */
+  code?: InputMaybe<Scalars['String']['input']>;
+  /** REDIRECT: the provider's `error` / `error_description`, when it refused. */
+  error?: InputMaybe<Scalars['String']['input']>;
+  errorDescription?: InputMaybe<Scalars['String']['input']>;
   state: Scalars['String']['input'];
 };
 
@@ -269,6 +311,29 @@ export type DeleteResult = {
   deleted: Scalars['Int']['output'];
 };
 
+/** One constraint on an object's descriptors, in the shape a rekuest port states its `requires` in -- so a picker hands a port's constraints on unchanged. `key` is one of the keys the structure declares (e.g. `@kuvert/has_attachments`); a key it does not declare is refused. */
+export type DescriptorConstraintInput = {
+  /** The descriptor key, e.g. `@kuvert/has_attachments` */
+  key: Scalars['String']['input'];
+  /** How the object's value is compared with `value`. MATCHES is equality, as EQUALS is */
+  operator: DescriptorOperator;
+  /** The value compared against: a number for GTE and LTE, a list for IN and NOT_IN, true or false for EXISTS, the member looked for with CONTAINS */
+  value?: InputMaybe<Scalars['JSON']['input']>;
+};
+
+/** How a descriptor constraint compares the object's value with the stated one. The operators a rekuest port's `requires` and `provides` are written in, with the same meaning. */
+export enum DescriptorOperator {
+  Contains = 'CONTAINS',
+  Equals = 'EQUALS',
+  Exists = 'EXISTS',
+  Gte = 'GTE',
+  In = 'IN',
+  Lte = 'LTE',
+  Matches = 'MATCHES',
+  NotEquals = 'NOT_EQUALS',
+  NotIn = 'NOT_IN'
+}
+
 export type FinishBigFileUploadInput = {
   storeId: Scalars['String']['input'];
   valid?: Scalars['Boolean']['input'];
@@ -338,6 +403,8 @@ export type MailAccount = {
   name: Scalars['String']['output'];
   /** The organization this mailbox belongs to. */
   organization: Organization;
+  /** The re-link of this mailbox still to be finished, when you started it and it is PENDING: continue it with `resumeAuth(state)`. Null otherwise. */
+  pendingAuth?: Maybe<AuthSession>;
   /** Changes made here that have not reached the server yet. */
   pendingChanges: Scalars['Int']['output'];
   /** POP3: keep downloaded mail on the server. Off deletes it there once stored. */
@@ -621,6 +688,8 @@ export type Message = {
   createdAt: Scalars['DateTime']['output'];
   /** The Date header (else when the server received it). */
   date?: Maybe<Scalars['DateTime']['output']>;
+  /** This object's descriptors, a flat mapping of key to value: the facts about it that an action's port can `require` and a trigger can test (e.g. `@kuvert/message_count`). The keys are the ones kuvert declares for this structure, and the values are the ones a signal about the object carries. Empty for a structure that declares none */
+  descriptors: Scalars['JSON']['output'];
   /** The flags and keywords as they are here: the server's with local changes applied. */
   flags: Array<Scalars['String']['output']>;
   /** The folder the message is in. */
@@ -701,6 +770,7 @@ export type MessageFilter = {
   hasFlag?: InputMaybe<Scalars['String']['input']>;
   ids?: InputMaybe<Array<Scalars['ID']['input']>>;
   recipient?: InputMaybe<Scalars['String']['input']>;
+  requires?: InputMaybe<Array<DescriptorConstraintInput>>;
   /** Search by text: a case-insensitive substring of the subject, sender or text; or semantic similarity to them ("flight booking" finds the airline's confirmation). Substring matches rank first, then by similarity; an explicit `ordering` replaces that ranking. */
   search?: InputMaybe<Scalars['String']['input']>;
   sender?: InputMaybe<Scalars['String']['input']>;
@@ -726,12 +796,12 @@ export type MoveMessagesInput = {
 
 export type Mutation = {
   __typename?: 'Mutation';
-  /** Drop the caller's pending OAuth login. */
-  cancelOAuthLink: Scalars['String']['output'];
+  /** Drop a login that will not be finished. Idempotent. */
+  cancelAuth: AuthSession;
   /** Put messages into categories and take them out. */
   categorizeMessages: Array<Message>;
-  /** Finish an OAuth login with the redirect's code and state. */
-  completeOAuthLink: MailAccount;
+  /** REDIRECT: finish with the code. POLL: advance one step; call until not PENDING. */
+  completeAuth: AuthSession;
   /** Create a category of a mailbox. */
   createCategory: Category;
   /** Link a mailbox with a username and (app) password; the login is tested first. */
@@ -762,8 +832,8 @@ export type Mutation = {
   pushMailChanges: PushResult;
   /** Request temporary S3 credentials to upload one file (an attachment to send). */
   requestBigfileUpload: BigFileUploadGrant;
-  /** The caller's pending OAuth login again. */
-  resumeOAuthLink: AuthSession;
+  /** The same login again (a fresh openUrl if the old one cannot be reused). */
+  resumeAuth: AuthSession;
   /** Queue failed changes again. */
   retryMailChanges: Array<MailChange>;
   /** Drop local-only and queued flag changes of messages: back to what the server has. */
@@ -803,7 +873,7 @@ export type Mutation = {
 };
 
 
-export type MutationCancelOAuthLinkArgs = {
+export type MutationCancelAuthArgs = {
   state: Scalars['String']['input'];
 };
 
@@ -813,8 +883,8 @@ export type MutationCategorizeMessagesArgs = {
 };
 
 
-export type MutationCompleteOAuthLinkArgs = {
-  input: CompleteOAuthLinkInput;
+export type MutationCompleteAuthArgs = {
+  input: CompleteAuthInput;
 };
 
 
@@ -894,7 +964,7 @@ export type MutationRequestBigfileUploadArgs = {
 };
 
 
-export type MutationResumeOAuthLinkArgs = {
+export type MutationResumeAuthArgs = {
   state: Scalars['String']['input'];
 };
 
@@ -1025,6 +1095,8 @@ export type OutgoingMessage = {
   createdAt: Scalars['DateTime']['output'];
   /** The member who sent it. */
   creator?: Maybe<User>;
+  /** This object's descriptors, a flat mapping of key to value: the facts about it that an action's port can `require` and a trigger can test (e.g. `@kuvert/message_count`). The keys are the ones kuvert declares for this structure, and the values are the ones a signal about the object carries. Empty for a structure that declares none */
+  descriptors: Scalars['JSON']['output'];
   /** Why sending failed. */
   error?: Maybe<Scalars['String']['output']>;
   /** The machine-readable kind of `error`. */
@@ -1059,6 +1131,7 @@ export type OutgoingMessageFilter = {
   NOT?: InputMaybe<OutgoingMessageFilter>;
   OR?: InputMaybe<OutgoingMessageFilter>;
   account?: InputMaybe<Scalars['ID']['input']>;
+  requires?: InputMaybe<Array<DescriptorConstraintInput>>;
   status?: InputMaybe<OutgoingStatus>;
 };
 
@@ -1098,6 +1171,8 @@ export type Query = {
   __typename?: 'Query';
   _entities: Array<Maybe<_Entity>>;
   _service: _Service;
+  /** Where a login is. No side effect. */
+  authSession: AuthSession;
   /** Categories of the visible mailboxes (filter by `account`). */
   categories: Array<Category>;
   /** A category by id. */
@@ -1147,6 +1222,11 @@ export type Query = {
 
 export type Query_EntitiesArgs = {
   representations: Array<Scalars['_Any']['input']>;
+};
+
+
+export type QueryAuthSessionArgs = {
+  state: Scalars['String']['input'];
 };
 
 
@@ -1544,6 +1624,8 @@ export type Thread = {
   __typename?: 'Thread';
   /** The mailbox the conversation is in. */
   account: MailAccount;
+  /** This object's descriptors, a flat mapping of key to value: the facts about it that an action's port can `require` and a trigger can test (e.g. `@kuvert/message_count`). The keys are the ones kuvert declares for this structure, and the values are the ones a signal about the object carries. Empty for a structure that declares none */
+  descriptors: Scalars['JSON']['output'];
   /** Whether any message of the conversation is flagged. */
   flagged: Scalars['Boolean']['output'];
   /** Whether any message of the conversation has attachments. */
@@ -1597,6 +1679,7 @@ export type ThreadFilter = {
   hasAttachments?: InputMaybe<Scalars['Boolean']['input']>;
   hasTask?: InputMaybe<Scalars['Boolean']['input']>;
   ids?: InputMaybe<Array<Scalars['ID']['input']>>;
+  requires?: InputMaybe<Array<DescriptorConstraintInput>>;
   /** Only conversations with a message matching the text: the same substring and meaning search as `messages(filters: {search})`. */
   search?: InputMaybe<Scalars['String']['input']>;
   task?: InputMaybe<Scalars['ID']['input']>;
@@ -1736,6 +1819,10 @@ export type MailboxFolderFragment = { __typename?: 'MailFolder', id: string, nam
 
 export type AttachmentFragment = { __typename?: 'Attachment', id: string, position: number, filename: string, contentType: string, size: number, contentId?: string | null, inline: boolean, store?: { __typename?: 'BigFileStore', id: string } | null };
 
+export type AuthSessionFragment = { __typename?: 'AuthSession', state: string, status: AuthStatus, finish: AuthFinish, openUrl: string, expiresAt: string, redirectUrl?: string | null, interval?: number | null, userCode?: string | null, step?: string | null, errorCode?: string | null, errorMessage?: string | null, result?: { __typename?: 'AuthResult', identifier: string, id: string, label?: string | null } | null };
+
+export type MailPresetFragment = { __typename?: 'MailPreset', key: string, name: string, domains: Array<string>, provider: Provider, oauth: boolean, oauthConfigured: boolean, note: string };
+
 export type AddressFragment = { __typename?: 'Address', name: string, address: string };
 
 export type ListMessageFragment = { __typename?: 'Message', id: string, subject: string, senderName: string, senderAddress: string, date?: string | null, snippet: string, isRead: boolean, isFlagged: boolean, isAnswered: boolean, hasAttachments: boolean, syncState: SyncState, account: { __typename?: 'MailAccount', id: string, name: string, emailAddress: string }, folder: { __typename?: 'MailFolder', id: string, name: string, role: FolderRole }, thread?: { __typename?: 'Thread', id: string, messageCount: number } | null };
@@ -1769,10 +1856,52 @@ export type DeleteMessagesMutationVariables = Exact<{
 
 export type DeleteMessagesMutation = { __typename?: 'Mutation', deleteMessages: { __typename?: 'DeleteResult', deleted: number } };
 
+export type StartOAuthLinkMutationVariables = Exact<{
+  input: StartOAuthLinkInput;
+}>;
+
+
+export type StartOAuthLinkMutation = { __typename?: 'Mutation', startOAuthLink: { __typename?: 'AuthSession', state: string, status: AuthStatus, finish: AuthFinish, openUrl: string, expiresAt: string, redirectUrl?: string | null, interval?: number | null, userCode?: string | null, step?: string | null, errorCode?: string | null, errorMessage?: string | null, result?: { __typename?: 'AuthResult', identifier: string, id: string, label?: string | null } | null } };
+
+export type CompleteAuthMutationVariables = Exact<{
+  input: CompleteAuthInput;
+}>;
+
+
+export type CompleteAuthMutation = { __typename?: 'Mutation', completeAuth: { __typename?: 'AuthSession', state: string, status: AuthStatus, finish: AuthFinish, openUrl: string, expiresAt: string, redirectUrl?: string | null, interval?: number | null, userCode?: string | null, step?: string | null, errorCode?: string | null, errorMessage?: string | null, result?: { __typename?: 'AuthResult', identifier: string, id: string, label?: string | null } | null } };
+
+export type ResumeAuthMutationVariables = Exact<{
+  state: Scalars['String']['input'];
+}>;
+
+
+export type ResumeAuthMutation = { __typename?: 'Mutation', resumeAuth: { __typename?: 'AuthSession', state: string, status: AuthStatus, finish: AuthFinish, openUrl: string, expiresAt: string, redirectUrl?: string | null, interval?: number | null, userCode?: string | null, step?: string | null, errorCode?: string | null, errorMessage?: string | null, result?: { __typename?: 'AuthResult', identifier: string, id: string, label?: string | null } | null } };
+
+export type CancelAuthMutationVariables = Exact<{
+  state: Scalars['String']['input'];
+}>;
+
+
+export type CancelAuthMutation = { __typename?: 'Mutation', cancelAuth: { __typename?: 'AuthSession', state: string, status: AuthStatus, finish: AuthFinish, openUrl: string, expiresAt: string, redirectUrl?: string | null, interval?: number | null, userCode?: string | null, step?: string | null, errorCode?: string | null, errorMessage?: string | null, result?: { __typename?: 'AuthResult', identifier: string, id: string, label?: string | null } | null } };
+
 export type MailboxTreeQueryVariables = Exact<{ [key: string]: never; }>;
 
 
 export type MailboxTreeQuery = { __typename?: 'Query', mailAccounts: Array<{ __typename?: 'MailAccount', id: string, name: string, emailAddress: string, unreadCount: number, syncing: boolean, folders: Array<{ __typename?: 'MailFolder', id: string, name: string, role: FolderRole, unreadCount: number }> }> };
+
+export type MailPresetsQueryVariables = Exact<{
+  address?: InputMaybe<Scalars['String']['input']>;
+}>;
+
+
+export type MailPresetsQuery = { __typename?: 'Query', mailPresets: Array<{ __typename?: 'MailPreset', key: string, name: string, domains: Array<string>, provider: Provider, oauth: boolean, oauthConfigured: boolean, note: string }> };
+
+export type AuthSessionQueryVariables = Exact<{
+  state: Scalars['String']['input'];
+}>;
+
+
+export type AuthSessionQuery = { __typename?: 'Query', authSession: { __typename?: 'AuthSession', state: string, status: AuthStatus, finish: AuthFinish, openUrl: string, expiresAt: string, redirectUrl?: string | null, interval?: number | null, userCode?: string | null, step?: string | null, errorCode?: string | null, errorMessage?: string | null, result?: { __typename?: 'AuthResult', identifier: string, id: string, label?: string | null } | null } };
 
 export type GetMessageQueryVariables = Exact<{
   id: Scalars['ID']['input'];
@@ -1836,6 +1965,37 @@ export const MailboxFolderFragmentDoc = gql`
   name
   role
   unreadCount
+}
+    `;
+export const AuthSessionFragmentDoc = gql`
+    fragment AuthSession on AuthSession {
+  state
+  status
+  finish
+  openUrl
+  expiresAt
+  redirectUrl
+  interval
+  userCode
+  step
+  errorCode
+  errorMessage
+  result {
+    identifier
+    id
+    label
+  }
+}
+    `;
+export const MailPresetFragmentDoc = gql`
+    fragment MailPreset on MailPreset {
+  key
+  name
+  domains
+  provider
+  oauth
+  oauthConfigured
+  note
 }
     `;
 export const MessageStateFragmentDoc = gql`
@@ -2070,6 +2230,138 @@ export function useDeleteMessagesMutation(baseOptions?: ApolloReactHooks.Mutatio
 export type DeleteMessagesMutationHookResult = ReturnType<typeof useDeleteMessagesMutation>;
 export type DeleteMessagesMutationResult = Apollo.MutationResult<DeleteMessagesMutation>;
 export type DeleteMessagesMutationOptions = Apollo.BaseMutationOptions<DeleteMessagesMutation, DeleteMessagesMutationVariables>;
+export const StartOAuthLinkDocument = gql`
+    mutation StartOAuthLink($input: StartOAuthLinkInput!) {
+  startOAuthLink(input: $input) {
+    ...AuthSession
+  }
+}
+    ${AuthSessionFragmentDoc}`;
+export type StartOAuthLinkMutationFn = Apollo.MutationFunction<StartOAuthLinkMutation, StartOAuthLinkMutationVariables>;
+
+/**
+ * __useStartOAuthLinkMutation__
+ *
+ * To run a mutation, you first call `useStartOAuthLinkMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useStartOAuthLinkMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [startOAuthLinkMutation, { data, loading, error }] = useStartOAuthLinkMutation({
+ *   variables: {
+ *      input: // value for 'input'
+ *   },
+ * });
+ */
+export function useStartOAuthLinkMutation(baseOptions?: ApolloReactHooks.MutationHookOptions<StartOAuthLinkMutation, StartOAuthLinkMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return ApolloReactHooks.useMutation<StartOAuthLinkMutation, StartOAuthLinkMutationVariables>(StartOAuthLinkDocument, options);
+      }
+export type StartOAuthLinkMutationHookResult = ReturnType<typeof useStartOAuthLinkMutation>;
+export type StartOAuthLinkMutationResult = Apollo.MutationResult<StartOAuthLinkMutation>;
+export type StartOAuthLinkMutationOptions = Apollo.BaseMutationOptions<StartOAuthLinkMutation, StartOAuthLinkMutationVariables>;
+export const CompleteAuthDocument = gql`
+    mutation CompleteAuth($input: CompleteAuthInput!) {
+  completeAuth(input: $input) {
+    ...AuthSession
+  }
+}
+    ${AuthSessionFragmentDoc}`;
+export type CompleteAuthMutationFn = Apollo.MutationFunction<CompleteAuthMutation, CompleteAuthMutationVariables>;
+
+/**
+ * __useCompleteAuthMutation__
+ *
+ * To run a mutation, you first call `useCompleteAuthMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useCompleteAuthMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [completeAuthMutation, { data, loading, error }] = useCompleteAuthMutation({
+ *   variables: {
+ *      input: // value for 'input'
+ *   },
+ * });
+ */
+export function useCompleteAuthMutation(baseOptions?: ApolloReactHooks.MutationHookOptions<CompleteAuthMutation, CompleteAuthMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return ApolloReactHooks.useMutation<CompleteAuthMutation, CompleteAuthMutationVariables>(CompleteAuthDocument, options);
+      }
+export type CompleteAuthMutationHookResult = ReturnType<typeof useCompleteAuthMutation>;
+export type CompleteAuthMutationResult = Apollo.MutationResult<CompleteAuthMutation>;
+export type CompleteAuthMutationOptions = Apollo.BaseMutationOptions<CompleteAuthMutation, CompleteAuthMutationVariables>;
+export const ResumeAuthDocument = gql`
+    mutation ResumeAuth($state: String!) {
+  resumeAuth(state: $state) {
+    ...AuthSession
+  }
+}
+    ${AuthSessionFragmentDoc}`;
+export type ResumeAuthMutationFn = Apollo.MutationFunction<ResumeAuthMutation, ResumeAuthMutationVariables>;
+
+/**
+ * __useResumeAuthMutation__
+ *
+ * To run a mutation, you first call `useResumeAuthMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useResumeAuthMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [resumeAuthMutation, { data, loading, error }] = useResumeAuthMutation({
+ *   variables: {
+ *      state: // value for 'state'
+ *   },
+ * });
+ */
+export function useResumeAuthMutation(baseOptions?: ApolloReactHooks.MutationHookOptions<ResumeAuthMutation, ResumeAuthMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return ApolloReactHooks.useMutation<ResumeAuthMutation, ResumeAuthMutationVariables>(ResumeAuthDocument, options);
+      }
+export type ResumeAuthMutationHookResult = ReturnType<typeof useResumeAuthMutation>;
+export type ResumeAuthMutationResult = Apollo.MutationResult<ResumeAuthMutation>;
+export type ResumeAuthMutationOptions = Apollo.BaseMutationOptions<ResumeAuthMutation, ResumeAuthMutationVariables>;
+export const CancelAuthDocument = gql`
+    mutation CancelAuth($state: String!) {
+  cancelAuth(state: $state) {
+    ...AuthSession
+  }
+}
+    ${AuthSessionFragmentDoc}`;
+export type CancelAuthMutationFn = Apollo.MutationFunction<CancelAuthMutation, CancelAuthMutationVariables>;
+
+/**
+ * __useCancelAuthMutation__
+ *
+ * To run a mutation, you first call `useCancelAuthMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useCancelAuthMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [cancelAuthMutation, { data, loading, error }] = useCancelAuthMutation({
+ *   variables: {
+ *      state: // value for 'state'
+ *   },
+ * });
+ */
+export function useCancelAuthMutation(baseOptions?: ApolloReactHooks.MutationHookOptions<CancelAuthMutation, CancelAuthMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return ApolloReactHooks.useMutation<CancelAuthMutation, CancelAuthMutationVariables>(CancelAuthDocument, options);
+      }
+export type CancelAuthMutationHookResult = ReturnType<typeof useCancelAuthMutation>;
+export type CancelAuthMutationResult = Apollo.MutationResult<CancelAuthMutation>;
+export type CancelAuthMutationOptions = Apollo.BaseMutationOptions<CancelAuthMutation, CancelAuthMutationVariables>;
 export const MailboxTreeDocument = gql`
     query MailboxTree {
   mailAccounts {
@@ -2108,6 +2400,76 @@ export function useMailboxTreeLazyQuery(baseOptions?: ApolloReactHooks.LazyQuery
 export type MailboxTreeQueryHookResult = ReturnType<typeof useMailboxTreeQuery>;
 export type MailboxTreeLazyQueryHookResult = ReturnType<typeof useMailboxTreeLazyQuery>;
 export type MailboxTreeQueryResult = Apollo.QueryResult<MailboxTreeQuery, MailboxTreeQueryVariables>;
+export const MailPresetsDocument = gql`
+    query MailPresets($address: String) {
+  mailPresets(address: $address) {
+    ...MailPreset
+  }
+}
+    ${MailPresetFragmentDoc}`;
+
+/**
+ * __useMailPresetsQuery__
+ *
+ * To run a query within a React component, call `useMailPresetsQuery` and pass it any options that fit your needs.
+ * When your component renders, `useMailPresetsQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useMailPresetsQuery({
+ *   variables: {
+ *      address: // value for 'address'
+ *   },
+ * });
+ */
+export function useMailPresetsQuery(baseOptions?: ApolloReactHooks.QueryHookOptions<MailPresetsQuery, MailPresetsQueryVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return ApolloReactHooks.useQuery<MailPresetsQuery, MailPresetsQueryVariables>(MailPresetsDocument, options);
+      }
+export function useMailPresetsLazyQuery(baseOptions?: ApolloReactHooks.LazyQueryHookOptions<MailPresetsQuery, MailPresetsQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return ApolloReactHooks.useLazyQuery<MailPresetsQuery, MailPresetsQueryVariables>(MailPresetsDocument, options);
+        }
+export type MailPresetsQueryHookResult = ReturnType<typeof useMailPresetsQuery>;
+export type MailPresetsLazyQueryHookResult = ReturnType<typeof useMailPresetsLazyQuery>;
+export type MailPresetsQueryResult = Apollo.QueryResult<MailPresetsQuery, MailPresetsQueryVariables>;
+export const AuthSessionDocument = gql`
+    query AuthSession($state: String!) {
+  authSession(state: $state) {
+    ...AuthSession
+  }
+}
+    ${AuthSessionFragmentDoc}`;
+
+/**
+ * __useAuthSessionQuery__
+ *
+ * To run a query within a React component, call `useAuthSessionQuery` and pass it any options that fit your needs.
+ * When your component renders, `useAuthSessionQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useAuthSessionQuery({
+ *   variables: {
+ *      state: // value for 'state'
+ *   },
+ * });
+ */
+export function useAuthSessionQuery(baseOptions: ApolloReactHooks.QueryHookOptions<AuthSessionQuery, AuthSessionQueryVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return ApolloReactHooks.useQuery<AuthSessionQuery, AuthSessionQueryVariables>(AuthSessionDocument, options);
+      }
+export function useAuthSessionLazyQuery(baseOptions?: ApolloReactHooks.LazyQueryHookOptions<AuthSessionQuery, AuthSessionQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return ApolloReactHooks.useLazyQuery<AuthSessionQuery, AuthSessionQueryVariables>(AuthSessionDocument, options);
+        }
+export type AuthSessionQueryHookResult = ReturnType<typeof useAuthSessionQuery>;
+export type AuthSessionLazyQueryHookResult = ReturnType<typeof useAuthSessionLazyQuery>;
+export type AuthSessionQueryResult = Apollo.QueryResult<AuthSessionQuery, AuthSessionQueryVariables>;
 export const GetMessageDocument = gql`
     query GetMessage($id: ID!, $allowRemote: Boolean! = false) {
   message(id: $id) {

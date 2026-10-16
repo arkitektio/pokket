@@ -20,6 +20,10 @@ fragment ListBankAccount on BankAccount {
   connection {
     id
     aspspName
+    aspspCountry
     needsReauth
+    bankProvider {
+      id
+    }
   }
 }

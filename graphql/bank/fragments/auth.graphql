@@ -1,0 +1,18 @@
+fragment AuthSession on AuthSession {
+  state
+  status
+  finish
+  openUrl
+  expiresAt
+  redirectUrl
+  interval
+  userCode
+  step
+  errorCode
+  errorMessage
+  result {
+    identifier
+    id
+    label
+  }
+}

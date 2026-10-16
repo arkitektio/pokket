@@ -1,6 +1,8 @@
+import { LinkMailboxSheet } from '@/components/mail/LinkMailboxSheet';
 import { ThreadRow } from '@/components/mail/ThreadRow';
 import { KuvertUnavailable, MailEmptyState, MailLoadingState } from '@/components/mail/states';
 import { ModuleHome } from '@/components/navigation/ModuleHome';
+import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { Guard } from '@/lib/app/App';
 import { ListThreadFragment, useListThreadsQuery } from '@/lib/kuvert/api/graphql';
@@ -11,6 +13,7 @@ import { useThemeColors } from '@/lib/theme/BrandProvider';
 import * as React from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useTabTitle } from '@/lib/tabs/TabsProvider';
+import { Plus } from 'lucide-react-native';
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, ScrollView, View } from 'react-native';
 import { toast } from 'sonner-native';
 
@@ -23,6 +26,21 @@ const PAGE = 30;
 function MailboxSyncs() {
   useMailboxSyncs();
   return null;
+}
+
+/** Add a mailbox from the phone: a Google or Microsoft sign-in (`LinkMailboxSheet`). */
+function AddMailbox() {
+  const colors = useThemeColors();
+  const [open, setOpen] = React.useState(false);
+  return (
+    <View className="px-4">
+      <Button variant="outline" size="sm" className="flex-row gap-2 self-start" onPress={() => setOpen(true)}>
+        <Plus size={14} color={colors.foreground} />
+        <Text>Add mailbox</Text>
+      </Button>
+      <LinkMailboxSheet visible={open} onClose={() => setOpen(false)} />
+    </View>
+  );
 }
 
 function MailboxChips({ active, onSelect }: { active: SmartMailbox['key']; onSelect: (key: SmartMailbox['key']) => void }) {
@@ -116,7 +134,7 @@ function ThreadList({ mailbox, chips }: { mailbox: SmartMailbox; chips: React.Re
       onEndReached={onEndReached}
       onEndReachedThreshold={0.5}
       ListHeaderComponent={
-        <ModuleHome moduleKey="mail" className="pb-2">
+        <ModuleHome moduleKey="mail" className="pb-2" lead={<AddMailbox />}>
           <View className="gap-2">
             {chips}
             {error ? <Text className="px-4 text-sm text-destructive">Could not load mail: {error.message}</Text> : null}

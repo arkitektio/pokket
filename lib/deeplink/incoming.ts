@@ -1,4 +1,4 @@
-import { fromDesktopPath, NOT_HERE_PATH } from "./desktopPaths";
+import { fromDesktopPath } from "./desktopPaths";
 import { decodeQuery, decodeShareRequest, normalizeLinkPath, SHARE_GATE_PATH, ShareRequest } from "./shareScope";
 import { parseSmartPath, SMART_LINK_NAMESPACE, smartLinkPage } from "./smartLink";
 
@@ -25,11 +25,21 @@ const translated = (request: ShareRequest | null): ShareRequest | null => {
 const LEFT_TO_ROUTER = new Set(["mesh-selftest", "expo-development-client"]);
 
 /**
- * `<service>/auth/callback`: where the desktop's auth relay hands back a login
- * at an external provider (a bank, a mailbox). The phone starts none, so there
- * is nothing to finish here.
+ * `<namespace>/auth/callback`: where the auth relay hands back a login at an
+ * external provider (a bank, a mailbox). It becomes the callback page,
+ * `/auth/callback/<namespace>`, with the query exactly as the relay passed it
+ * (`lib/authflow`). Usually the sheet that started the login has taken it
+ * before then (`+native-intent`).
  */
-const RELAY_CALLBACK = /^\/[^/]+\/auth\/callback\/?$/;
+const RELAY_CALLBACK = /^\/([a-z0-9-]+)\/auth\/callback\/?$/;
+
+export const AUTH_CALLBACK_PATH = "/auth/callback";
+
+/** The callback page for a relay link's path and query, or null when it is not one. */
+export const authCallbackPath = (pathname: string, query: string): string | null => {
+  const match = RELAY_CALLBACK.exec(pathname);
+  return match ? `${AUTH_CALLBACK_PATH}/${match[1]}${query ? `?${query}` : ""}` : null;
+};
 
 /**
  * `/open?…` is the gate (its query is the request) and `/smart/…` a smartlink
@@ -45,10 +55,8 @@ const fromAppPath = (appPath: string): ShareRequest | null => {
     if (!link) return null;
     return { scope: null, digest: null, organization: { slug: link.org, hub: link.hub }, path: smartLinkPage(link, query) };
   }
-  // Without its query: the code and state are of no use here, and a tab keeps its path.
-  if (RELAY_CALLBACK.test(pathname)) {
-    return { scope: null, digest: null, path: `${NOT_HERE_PATH}?path=${encodeURIComponent(pathname)}` };
-  }
+  const callback = authCallbackPath(pathname, query);
+  if (callback) return { scope: null, digest: null, path: callback };
   const path = normalizeLinkPath(appPath);
   return path ? { scope: null, digest: null, path } : null;
 };
@@ -87,5 +95,7 @@ export const parseIncomingLink = (url: string): ShareRequest | null => {
   const first = appPath.split(/[/?]/)[0];
   if (!first || LEFT_TO_ROUTER.has(first)) return null;
   const request = fromAppPath("/" + appPath);
+  // The relay's callback is the same on both: not a desktop page to translate.
+  if (request?.path.startsWith(`${AUTH_CALLBACK_PATH}/`)) return request;
   return scheme === DESKTOP_SCHEME ? translated(request) : request;
 };

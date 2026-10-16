@@ -1,0 +1,11 @@
+query MailPresets($address: String) {
+  mailPresets(address: $address) {
+    ...MailPreset
+  }
+}
+
+query AuthSession($state: String!) {
+  authSession(state: $state) {
+    ...AuthSession
+  }
+}

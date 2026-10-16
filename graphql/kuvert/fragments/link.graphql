@@ -1,0 +1,9 @@
+fragment MailPreset on MailPreset {
+  key
+  name
+  domains
+  provider
+  oauth
+  oauthConfigured
+  note
+}

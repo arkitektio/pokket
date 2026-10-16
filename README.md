@@ -86,6 +86,14 @@ them as a form, and what you save there is used for every message from this phon
 to messages (tasks, datasets, threads) show as chips that open their page; attaching from the phone
 is not there yet. Without `rekuest` a room is a plain message board.
 
+### 🔑 Banks and mailboxes
+
+**Bank** links a bank from the phone: the *Link bank* card at the end of the account strip picks the
+provider and the bank, then signs in at the bank in the system browser. An account whose bank wants
+a new consent says *Re-authorize* and re-links on a tap. **Mail** adds a Google or Microsoft mailbox
+the same way (*Add mailbox*); a mailbox that signs in with a password is still added on the desktop.
+How the browser hands the login back is in [`docs/auth-flows.md`](docs/auth-flows.md).
+
 ### ▶️ Actions
 
 What the organisation's apps can do, to run from the phone. **Actions** (under Tasks, and in
