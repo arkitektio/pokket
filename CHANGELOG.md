@@ -1,3 +1,11 @@
+# [1.18.0](https://github.com/arkitektio/pokket/compare/v1.17.0...v1.18.0) (2026-10-16)
+
+
+### Features
+
+* agents and implementations pages, logo and lovekit bloks, module home pages ([4368fb1](https://github.com/arkitektio/pokket/commit/4368fb1367a2b768f2ea3414a9904d3337aa6514))
+* **bloks:** render 3D scene bloks with three.js on WebGPU ([9100400](https://github.com/arkitektio/pokket/commit/9100400fd852c5d9d96d1eb2342878c7aed4bd97))
+
 # [1.17.0](https://github.com/arkitektio/pokket/compare/v1.16.0...v1.17.0) (2026-10-15)
 
 
