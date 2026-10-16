@@ -91,7 +91,8 @@
       ],
       "expo-secure-store",
       "expo-sharing",
-      "@maplibre/maplibre-react-native"
+      "@maplibre/maplibre-react-native",
+      "react-native-webgpu"
     ],
     "experiments": {
       "typedRoutes": true

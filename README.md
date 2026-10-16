@@ -66,7 +66,8 @@ folders, files, scenes, tables, charts and annotations. Search finds datasets, l
 files. The paths are the desktop app's (`/mikro/arraydatasets/12`), so a link shared from either opens
 in the other.
 
-There is no viewer: the desktop app renders scenes with WebGPU, which a phone app cannot. What Orkestrator
+There is no image viewer yet: the desktop app's renderer needs data loading a phone does not have
+(workers, shared memory, WebAssembly codecs). What Orkestrator
 shows is a scene's last snapshot, where one has been taken (many datasets have none, and show a
 glyph). Pictures and file downloads come straight from the datalayer by a presigned URL that Orkestrator
 signs itself (`lib/datalayer/presign.ts`), also through the mesh. A file's **Download** fetches it
@@ -104,6 +105,19 @@ Not every kind of argument can be edited here yet: dictionaries, unions, quantit
 choices read from an agent's live state and files show as "Set this from the desktop app". Such an
 action still runs from Orkestrator when that argument is optional or has a value from an earlier run.
 The engine behind the form (`lib/ports`) is the desktop app's, ported with its tests.
+
+### 🧊 3D views
+
+A blok whose context is `SCENE` (a device drawn from its GLB models, moved by its agent's live
+state) opens full screen as a 3D view, with the desktop's blok vocabulary: `Scene`, `Model`,
+`Robot`, the bindings (`Move`, `Rotate`, `Show`, `Glow`, `Tint`, `Attach`, `Beam`, `Animate`) and
+`OnClick`/`Popout`. One finger turns the view, two move it, a pinch zooms; a tap uses a part.
+It draws with three.js on WebGPU (`react-native-webgpu`, `lib/gpu`) and only while something moves.
+
+A model is the agent's asset, checked against its SHA-256 and the phone's limits (no Draco or
+meshopt compression, which need Web Workers and WebAssembly), and kept on the phone under its
+hash, so it opens again without the network (`lib/scene`). There is no WebGL fallback: on a
+phone without WebGPU (on Android, without Vulkan) a 3D view says so.
 
 ### 🕸️ Organisation Mesh
 
@@ -272,6 +286,7 @@ workflow does nothing, because semantic-release finds no new version.
 - **Navigation**: Expo Router
 - **Data**: Apollo Client (GraphQL)
 - **BLE**: `react-native-ble-plx`
+- **3D**: three.js (WebGPU renderer), React Three Fiber, `react-native-webgpu`
 
 ## License
 

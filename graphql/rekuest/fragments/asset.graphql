@@ -1,0 +1,74 @@
+# Assets: the files an agent brings, stored once per organization under the SHA-256
+# of their exact bytes (orkestrator's fragments/asset.graphql). `file` is the media
+# store the bytes are read from; its grant is asked for with RequestMediaAccess.
+
+fragment MediaStore on MediaStore {
+  id
+  key
+  bucket
+}
+
+fragment MediaAccessGrant on MediaAccessGrant {
+  accessKey
+  secretKey
+  sessionToken
+  expiresIn
+  region
+  path
+  key
+  bucket
+}
+
+fragment StoredAsset on Asset {
+  id
+  ref
+  kind
+  size
+  nodes
+  stats {
+    nodes
+    triangles
+    textures
+    animations
+  }
+  width
+  height
+  file {
+    ...MediaStore
+  }
+}
+
+# A file under the name its agent's bloks call it by; `asset` is null until it was uploaded:
+# by the agent, or, for a file the agent only names a `source` for, by an admin.
+fragment AgentAsset on AgentAsset {
+  id
+  name
+  kind
+  ref
+  size
+  source
+  asset {
+    ...StoredAsset
+  }
+}
+
+fragment ModelPolicy on ModelPolicy {
+  maxSize
+  maxJson
+  maxNodes
+  maxTriangles
+  maxTextureSize
+  maxTextureMemory
+  maxAnimations
+  extensions
+}
+
+fragment ModelBlok on Blok {
+  id
+  name
+  description
+  forNode
+  materializedBloks {
+    ...ListMaterializedBlok
+  }
+}

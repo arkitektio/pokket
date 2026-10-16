@@ -1,0 +1,22 @@
+query AgentAssets($id: ID!) {
+  agent(id: $id) {
+    id
+    assets {
+      ...AgentAsset
+    }
+  }
+}
+
+query AssetPolicy {
+  assetPolicy {
+    model {
+      ...ModelPolicy
+    }
+  }
+}
+
+query BloksForModel($ref: String!) {
+  bloksForModel(ref: $ref) {
+    ...ModelBlok
+  }
+}

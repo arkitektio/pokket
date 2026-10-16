@@ -534,7 +534,7 @@ const decimalsOf = (step: number) => (String(step).split('.')[1] ?? '').length;
  * by the responder props of the whole bar. A touch anywhere jumps the thumb there
  * and the drag continues from it, as Radix's slider does.
  */
-const RangeSlider = (props: {
+export const RangeSlider = (props: {
   value: number;
   min: number;
   max: number;

@@ -2,6 +2,7 @@ import * as React from 'react';
 import {View} from 'react-native';
 import {toast} from 'sonner-native';
 import {Text} from '@/components/ui/text';
+import {cn} from '@/lib/utils';
 import {
   BlokNode,
   BlokRuntimeProvider,
@@ -32,12 +33,14 @@ type BlokRendererProps = {
    * card for an empty or unparseable payload. For a drawing in a box, a logo's.
    */
   chrome?: 'default' | 'none';
+  /** The roots take the height they are given instead of their own: a screen that is one 3D view. */
+  fill?: boolean;
 };
 
 /**
  * Orkestrator's `BlokRenderer`, for the phone: the same runtime store and
- * tree, without the 3D scene, the embedded mode or the debug inspector. The
- * caller scrolls; the roots stack at their own heights.
+ * tree, without the embedded mode or the debug inspector. The caller scrolls;
+ * the roots stack at their own heights, unless they `fill` the caller.
  */
 export default function BlokRenderer({
   uiComponents,
@@ -48,6 +51,7 @@ export default function BlokRenderer({
   refuseAction,
   children,
   chrome = 'default',
+  fill = false,
 }: BlokRendererProps) {
   const preflight = React.useMemo(
     () => preflightBlokDocument(uiComponents, catalog),
@@ -142,7 +146,7 @@ export default function BlokRenderer({
     <BlokRuntimeProvider store={runtimeStore}>
       <BlokTreeProvider tree={tree}>
         {children}
-        <View className="gap-3">
+        <View className={cn('gap-3', fill && 'flex-1')}>
           {documentErrors.length > 0 && (
             <View className="rounded-xl border border-destructive/30 bg-card p-4">
               <Text className="text-sm font-semibold text-destructive">
@@ -163,7 +167,7 @@ export default function BlokRenderer({
           )}
 
           {renderableRootIds.map(rootId => (
-            <View key={rootId} className="min-w-0">
+            <View key={rootId} className={cn('min-w-0', fill && 'flex-1')}>
               <BlokNode id={rootId} />
             </View>
           ))}

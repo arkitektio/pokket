@@ -7,10 +7,12 @@ import {
   type BlokTaskObserver,
   type BlokTaskRecord,
 } from '@/lib/ports/blok/runtime';
-import type {MaterializedBlokFragment} from '@/lib/rekuest/api/graphql';
+import {ComponentContext, type MaterializedBlokFragment} from '@/lib/rekuest/api/graphql';
 import {useAssign} from '@/lib/rekuest/assign/useAssignAction';
+import {RekuestAssetHost} from '@/lib/rekuest/blok/assets';
 import {collectDemandedLatestTasks, collectDemandedStateInterfaces} from '@/lib/rekuest/blok/blokDemands';
 import {taskUpdateFromEvent} from '@/lib/rekuest/blok/blokTaskUpdates';
+import {RekuestSceneHost} from '@/lib/rekuest/blok/sceneHost';
 import {LATEST_SEGMENT} from '@/lib/rekuest/blok/segments';
 import {useAgentLiveState, useLatestTask} from '@/lib/rekuest/blok/useAgentLiveState';
 import {isTerminalKind} from '@/lib/rekuest/taskStatus';
@@ -19,14 +21,16 @@ import BlokRenderer from './BlokRenderer';
 
 /**
  * A materialized blok, live: orkestrator's `MaterializedBlokRenderer` without
- * time travel, assets or the 3D scene.
+ * time travel.
  *
  * - `<dependency>/<interface>` paths hold the bound agent's live state
  *   (`WatchState`, one shared subscription per agent and state);
  * - `<dependency>/<action>/latest` holds the task the action last ran as,
  *   whoever started it (`latestTask`);
  * - an agent call assigns the operation on the agent bound to its dependency
- *   and reports the task back, so a bound `Button` shows it running.
+ *   and reports the task back, so a bound `Button` shows it running;
+ * - `@<dependency>.assets.<name>` is a file the bound agent registered (a 3D
+ *   model), and a scene blok is held to the server's model policy.
  */
 
 type Mapping = MaterializedBlokFragment['agentMappings'][number];
@@ -247,18 +251,38 @@ const useMaterializedDispatchAction = (agentMappings: readonly Mapping[]) => {
   );
 };
 
-export const MaterializedBlokRenderer = ({materializedBlok}: {materializedBlok: MaterializedBlokFragment}) => {
+export const MaterializedBlokRenderer = ({
+  materializedBlok,
+  fill,
+}: {
+  materializedBlok: MaterializedBlokFragment;
+  /** The blok takes the height it is given: a screen that is one 3D view. */
+  fill?: boolean;
+}) => {
   const dispatchAction = useMaterializedDispatchAction(materializedBlok.agentMappings);
   const {roots} = React.useMemo(
     () => normalizeBlokComponentTree(materializedBlok.blok.componentTree as unknown[] | null),
     [materializedBlok.blok.componentTree],
   );
 
-  return (
-    <BlokRenderer uiComponents={roots} initialState={materializedBlok.blok.demoState} dispatchAction={dispatchAction}>
-      <RuntimeSync agentMappings={materializedBlok.agentMappings} roots={roots} />
-    </BlokRenderer>
+  const agents = React.useMemo(
+    () => new Map(materializedBlok.agentMappings.map(mapping => [mapping.key, mapping.agent.id])),
+    [materializedBlok.agentMappings],
   );
+
+  const rendered = (
+    <RekuestAssetHost agents={agents}>
+      <BlokRenderer
+        uiComponents={roots}
+        initialState={materializedBlok.blok.demoState}
+        dispatchAction={dispatchAction}
+        fill={fill}
+      >
+        <RuntimeSync agentMappings={materializedBlok.agentMappings} roots={roots} />
+      </BlokRenderer>
+    </RekuestAssetHost>
+  );
+  return materializedBlok.blok.context === ComponentContext.Scene ? <RekuestSceneHost>{rendered}</RekuestSceneHost> : rendered;
 };
 
 export default MaterializedBlokRenderer;
