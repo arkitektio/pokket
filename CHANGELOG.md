@@ -1,3 +1,17 @@
+# [1.20.0](https://github.com/arkitektio/pokket/compare/v1.19.0...v1.20.0) (2026-10-16)
+
+
+### Bug Fixes
+
+* **ble:** no Bluetooth background modes ([c20fd68](https://github.com/arkitektio/pokket/commit/c20fd689d7c7820c9f80814c0a473e743190e1a6))
+* **ios:** ignore the Dawn copy react-native-webgpu makes at pod install ([9f17d0c](https://github.com/arkitektio/pokket/commit/9f17d0cdddab85222f9cae925b7168de0b0fed27))
+
+
+### Features
+
+* **release:** build an app bundle for Google Play ([9d4ad7a](https://github.com/arkitektio/pokket/commit/9d4ad7abf6821aa35d26eb296c20c023d174c5af))
+* **timeline:** say what background location is for before asking ([547195c](https://github.com/arkitektio/pokket/commit/547195cbf71696156d800a5f116018dd1feffa95))
+
 # [1.19.0](https://github.com/arkitektio/pokket/compare/v1.18.2...v1.19.0) (2026-10-16)
 
 
