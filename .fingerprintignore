@@ -9,3 +9,11 @@ modules/pokket-mesh/ios/Meshmobile.xcframework/**/*
 
 # Tests of the Go sources change nothing that ships.
 modules/pokket-mesh/go/**/*_test.go
+
+# react-native-webgpu's podspec copies Dawn's xcframework into its own package
+# directory at `pod install` (libs/apple), so the fingerprint taken before a
+# build and the one the build takes after installing pods would differ, and the
+# iOS build fails with "runtime version mismatch". The copy is
+# react-native-webgpu-dawn's, whose version react-native-webgpu's package.json
+# (fingerprinted) pins.
+node_modules/react-native-webgpu/libs/**/*
