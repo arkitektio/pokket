@@ -42,14 +42,14 @@ export const DEFAULT_MODEL_POLICY: ModelPolicy = {
 };
 
 /**
- * What a phone holds a model to: tighter than the desktop's, and without the
- * two compressions it cannot decode. Draco's decoder runs in Web Workers and
- * meshopt's is WebAssembly; Hermes offers neither. A model that needs one is
- * refused with a reason, before anything is decoded.
+ * What a phone holds a model to: tighter textures than the desktop's (the
+ * triangle budget is the same), and without the two compressions it cannot
+ * decode. Draco's decoder runs in Web Workers and meshopt's is WebAssembly;
+ * Hermes offers neither. A model that needs one is refused with a reason,
+ * before anything is decoded.
  */
 export const PHONE_MODEL_POLICY: ModelPolicy = {
   ...DEFAULT_MODEL_POLICY,
-  maxTriangles: 1_000_000,
   maxTextureSize: 2048,
   maxTextureMemory: 128 * 1024 * 1024,
   extensions: DEFAULT_MODEL_POLICY.extensions.filter(
