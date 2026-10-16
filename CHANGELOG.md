@@ -1,3 +1,10 @@
+## [1.18.1](https://github.com/arkitektio/pokket/compare/v1.18.0...v1.18.1) (2026-10-16)
+
+
+### Bug Fixes
+
+* **android:** build for Android 8.0 (API 26) and up ([7539b72](https://github.com/arkitektio/pokket/commit/7539b722af9c2d5b5d591c29c3f323a96b23abc4))
+
 # [1.18.0](https://github.com/arkitektio/pokket/compare/v1.17.0...v1.18.0) (2026-10-16)
 
 
