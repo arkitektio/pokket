@@ -314,6 +314,18 @@ export function TimelineSettings() {
     }
   };
   const apply = (patch: Partial<Settings>) => void run(() => applyTimelineSettings(patch));
+  // Said before the system asks for "always": Google Play requires the app
+  // itself to say that location is collected in the background and what for,
+  // and to have the user agree, before the permission prompt.
+  const turnOn = () =>
+    dialog.show(
+      'Record your timeline in the background?',
+      'Orkestrator collects your location in the background, also when the app is closed or not in use, to build your timeline of where you stayed and how you got there. It is kept on this phone only and never uploaded. You can turn it off here at any time.',
+      [
+        { label: 'Not now', variant: 'cancel' },
+        { label: 'Continue', variant: 'default', onPress: () => void run(enableTimeline) },
+      ],
+    );
 
   if (Platform.OS === 'web') return null;
 
@@ -336,7 +348,7 @@ export function TimelineSettings() {
             <Switch
               value={settings.enabled}
               disabled={!loaded}
-              onValueChange={(on) => void run(on ? enableTimeline : disableTimeline)}
+              onValueChange={(on) => (on ? turnOn() : void run(disableTimeline))}
               trackColor={{ true: colors.primary, false: colors.muted }}
             />
           )}
