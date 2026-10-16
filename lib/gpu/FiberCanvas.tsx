@@ -8,6 +8,7 @@ import * as THREE from 'three/webgpu';
 import {
   createRoot,
   events as pointerEvents,
+  extend,
   unmountComponentAtNode,
   type ReconcilerRoot,
   type RootState,
@@ -35,6 +36,10 @@ import {disposeWebGPURenderer} from './dispose';
  * changes, so an idle view costs no GPU time. A component that animates calls
  * `invalidate()` for as long as it moves.
  */
+
+// R3F's own <Canvas> registers three's classes as JSX elements (<mesh>, <color>, …);
+// this root is made with `createRoot`, so it does so itself.
+extend(THREE as unknown as Parameters<typeof extend>[0]);
 
 /** What the camera controls in the scene do with the touches on the canvas. */
 export type CameraInput = {
