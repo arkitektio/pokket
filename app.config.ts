@@ -7,6 +7,9 @@ import pkg from "./package.json";
  * - `version` comes from package.json, which semantic-release bumps on every
  *   release — app.json's own number was never updated, so every build
  *   claimed to be 1.0.0.
+ * - Android's `versionCode` is that version as one number (1.19.0 is
+ *   1019000). Google Play refuses an upload whose versionCode is not higher
+ *   than the last one's, and semantic-release only ever counts up.
  * - Over-the-air updates (EAS Update): a release publishes its JS to the
  *   channel its builds were made for (eas.json). The runtime version is the
  *   native fingerprint, so an update only ever reaches binaries whose native
@@ -16,11 +19,13 @@ import pkg from "./package.json";
  */
 export default ({ config }: ConfigContext): ExpoConfig => {
   const projectId = config.extra?.eas?.projectId as string;
+  const [major, minor, patch] = pkg.version.split(".").map(Number);
   return {
     ...config,
     name: config.name ?? "pokket",
     slug: config.slug ?? "pokket",
     version: pkg.version,
+    android: { ...config.android, versionCode: major * 1_000_000 + minor * 1_000 + patch },
     runtimeVersion: { policy: "fingerprint" },
     updates: {
       url: `https://u.expo.dev/${projectId}`,

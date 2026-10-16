@@ -1,4 +1,4 @@
-name: Release (Android APK, iOS TestFlight, over-the-air)
+name: Release (Android APK and Play bundle, iOS TestFlight, over-the-air)
 
 # On every push to main, semantic-release decides whether the commits since
 # the last release make a new version (feat → minor, fix → patch). If they do:
@@ -185,6 +185,97 @@ jobs:
         run: >
           eas update --channel production --environment production --platform android
           --message "v$VERSION" --non-interactive
+
+  # Google Play: the same native build as an app bundle (AAB), which is what
+  # Play takes; it cannot install an APK. Built whenever the native side has
+  # no bundle yet (tag `aab/android/<runtime version>`), next to the APK, and
+  # signed with the same key from EAS. Attached to the release as pokket.aab,
+  # for uploading by hand: Play takes an app's first bundle only through its
+  # console. Once that is done, set the repository variable PLAY_SUBMIT to
+  # `true` and store a Play service account key on EAS (`eas credentials`,
+  # Android, "Google Service Account"): each bundle is then submitted as a draft
+  # on the internal track (eas.json), to roll out from the Play Console. Play
+  # installs get the same over-the-air updates as the APK (channel production).
+  android-play:
+    name: Android (Google Play)
+    needs: release
+    if: needs.release.outputs.published == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      GH_TOKEN: ${{ github.token }}
+      VERSION: ${{ needs.release.outputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: v${{ needs.release.outputs.version }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "pnpm"
+
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Setup Expo
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Does this release need a new bundle?
+        id: native
+        run: scripts/ci/native-build.sh check android aab
+
+      - name: Setup Java
+        if: steps.native.outputs.needed == 'true'
+        uses: actions/setup-java@v4
+        with:
+          java-version: "17"
+          distribution: "temurin"
+
+      - name: Setup Go
+        if: steps.native.outputs.needed == 'true'
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: modules/pokket-mesh/go/go.mod
+          cache-dependency-path: modules/pokket-mesh/go/go.sum
+
+      - name: Restore Mesh Sidecar
+        id: mesh
+        if: steps.native.outputs.needed == 'true'
+        uses: actions/cache@v4
+        with:
+          path: |
+            modules/pokket-mesh/android/libs
+            modules/pokket-mesh/android/src/main/jniLibs
+          key: mesh-android-${{ hashFiles('modules/pokket-mesh/go/**', 'scripts/build-mesh-mobile.sh') }}
+
+      - name: Build Mesh Sidecar
+        if: steps.native.outputs.needed == 'true' && steps.mesh.outputs.cache-hit != 'true'
+        run: pnpm build:mesh:android
+
+      - name: Build AAB
+        if: steps.native.outputs.needed == 'true'
+        run: eas build --platform android --profile production --non-interactive --local --output=./pokket.aab
+
+      - name: Attach the bundle to the release
+        if: steps.native.outputs.needed == 'true'
+        run: gh release upload "v$VERSION" "pokket.aab#Orkestrator $VERSION for Google Play (upload to the Play Console; phones cannot install this file)" --clobber
+
+      - name: Submit to Google Play
+        if: steps.native.outputs.needed == 'true' && vars.PLAY_SUBMIT == 'true'
+        run: eas submit --platform android --profile production --path ./pokket.aab --non-interactive --no-wait
+
+      - name: Record the build
+        if: steps.native.outputs.needed == 'true'
+        run: scripts/ci/native-build.sh mark "${{ steps.native.outputs.tag }}"
 
   # iOS: the same, on a Mac. A new build is signed with the credentials stored
   # on EAS (the arkitektio account: distribution certificate, provisioning

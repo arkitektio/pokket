@@ -181,7 +181,7 @@ Everything builds on GitHub's runners, never in the EAS build queue.
 | Workflow | When | What it does |
 |---|---|---|
 | **Checks** (`checks.yaml`) | Every pull request, pushes to `main` | Runs the tests and publishes the pull request preview. A few minutes, on Linux. |
-| **Release** (`release.yaml`) | Every push to `main` | semantic-release picks the version: patch by default, minor if a commit starts with `feat:`, major for a `BREAKING CHANGE:`. Commit prefixes are optional. Each platform then checks whether its native side changed (see below). If it didn't, it publishes an over-the-air update only, in minutes. If it did, it also builds the APK or the iOS build (uploaded to TestFlight), and then publishes the update. Every release carries `pokket.apk` (a copy of the newest one if nothing native changed), and its notes list what to install and every commit. |
+| **Release** (`release.yaml`) | Every push to `main` | semantic-release picks the version: patch by default, minor if a commit starts with `feat:`, major for a `BREAKING CHANGE:`. Commit prefixes are optional. Each platform then checks whether its native side changed (see below). If it didn't, it publishes an over-the-air update only, in minutes. If it did, it also builds the APK and the Play bundle (see [Google Play](#google-play)) or the iOS build (uploaded to TestFlight), and then publishes the update. Every release carries `pokket.apk` (a copy of the newest one if nothing native changed), and its notes list what to install and every commit. |
 | **Dev client** (`dev-client.yaml`) | Every push to `main` and pull request, or by hand | Checks whether the native side has a dev client yet, recorded as tag `dev-build/<platform>/<runtime version>`. If not, it builds one. `main`'s builds go to the Dev client release; a pull request's go to its run's artifacts (Android only). By hand, with `force`, it rebuilds regardless. |
 | **Mesh sidecar** (`mesh.yaml`) | Changes to the mesh | End-to-end mesh tests on an emulator and a simulator. |
 
@@ -193,6 +193,30 @@ changed only JS. To force a new binary, delete the tag
 (`git push origin :refs/tags/native/android/<runtime version>`), then re-run just that platform's job
 (**Android** or **iOS**) of the latest release run in the Actions tab. Re-running the whole
 workflow does nothing, because semantic-release finds no new version.
+
+### Google Play
+
+Alongside the APK, the release workflow builds the same native side as an app bundle,
+`pokket.aab` (job **Android (Google Play)**, tag `aab/android/<runtime version>`), and attaches it
+to the release. Phones cannot install it; it is what Google Play takes. Both are signed with the
+same key, stored on EAS, and the version code is the version as one number (1.19.0 is 1019000), so
+every release's is higher than the last.
+
+To go on Play:
+
+1. **Signing.** When the Play Console asks how to sign the app, choose to use your own key and
+   upload the one EAS signs with (`eas credentials` → Android → download the keystore). With a key
+   Google makes instead, the Play app and `pokket.apk` cannot update each other, and switching
+   means reinstalling and signing in again.
+2. **The first bundle by hand.** Upload `pokket.aab` from the newest release that has one, in the
+   Play Console. Play takes an app's first bundle only there.
+3. **Then automatically.** Store a Play service account key on EAS (`eas credentials` → Android →
+   Google Service Account) and set the repository variable `PLAY_SUBMIT` to `true`. Each new bundle
+   is then submitted to the internal track as a draft (`eas.json`), to roll out from the Play
+   Console. Once the app is past review, `releaseStatus: "completed"` there releases it without
+   the click.
+
+Installs from Play get the same over-the-air updates as the APK.
 
 ## Devlopment Setup
 

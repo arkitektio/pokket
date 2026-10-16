@@ -11,8 +11,8 @@
 #   scripts/ci/native-build.sh check <android|ios> [kind]  # writes runtime_version, tag, needed to $GITHUB_OUTPUT
 #   scripts/ci/native-build.sh mark  <tag>                  # records the tag on HEAD
 #
-# `kind` names what was built, `native` (the default: the release's binaries)
-# or `dev-client`; each has its own tags.
+# `kind` names what was built, `native` (the default: the release's binaries),
+# `aab` (the Google Play bundle) or `dev-client`; each has its own tags.
 #
 # To force a rebuild, delete the tag (git push origin :refs/tags/native/...)
 # and re-run that platform's job (Android or iOS) of the latest release run.
