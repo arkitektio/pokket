@@ -3,14 +3,40 @@ import { RekuestUnavailable, TasksEmptyState, TasksLoadingState } from '@/compon
 import { Text } from '@/components/ui/text';
 import { Guard } from '@/lib/app/App';
 import { Ordering, useListMaterializedBloksQuery } from '@/lib/rekuest/api/graphql';
+import { BLOK_VIEWS, type BlokView, blokView, blokViewContexts } from '@/lib/rekuest/blok/views';
+import { useTabTitle } from '@/lib/tabs/TabsProvider';
 import { useThemeColors } from '@/lib/theme/BrandProvider';
+import { router, useLocalSearchParams } from 'expo-router';
 import { Search, X } from 'lucide-react-native';
 import * as React from 'react';
-import { ActivityIndicator, FlatList, Pressable, RefreshControl, TextInput, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, RefreshControl, ScrollView, TextInput, View } from 'react-native';
 
 const PAGE = 30;
 
-function BlokList({ search }: { search: string }) {
+function ViewChips({ active, onSelect }: { active: BlokView['key']; onSelect: (key: BlokView['key']) => void }) {
+  return (
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} className="grow-0 border-b border-border">
+      <View className="flex-row gap-2 px-4 py-2">
+        {BLOK_VIEWS.map((view) => {
+          const selected = view.key === active;
+          return (
+            <Pressable
+              key={view.key}
+              onPress={() => onSelect(view.key)}
+              className={`rounded-full border px-4 py-1.5 ${selected ? 'border-primary bg-primary' : 'border-border bg-card'}`}
+            >
+              <Text className={`text-sm font-medium ${selected ? 'text-primary-foreground' : 'text-foreground'}`}>
+                {view.label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    </ScrollView>
+  );
+}
+
+function BlokList({ search, view }: { search: string; view: BlokView }) {
   const colors = useThemeColors();
   const [refreshing, setRefreshing] = React.useState(false);
   const [exhausted, setExhausted] = React.useState(false);
@@ -19,7 +45,7 @@ function BlokList({ search }: { search: string }) {
   // With a search the server ranks; an ordering would replace that ranking.
   const { data, loading, error, refetch, fetchMore } = useListMaterializedBloksQuery({
     variables: {
-      filters: search ? { search } : undefined,
+      filters: { search: search || undefined, contexts: blokViewContexts(view) },
       ordering: search ? undefined : [{ createdAt: Ordering.Desc }],
       pagination: { limit: PAGE, offset: 0 },
     },
@@ -78,12 +104,8 @@ function BlokList({ search }: { search: string }) {
       ListEmptyComponent={
         error ? null : (
           <TasksEmptyState
-            title={search ? 'Nothing matches' : 'No bloks'}
-            description={
-              search
-                ? `No blok matches “${search}”.`
-                : 'Bloks show up here once one is materialized for your agents, e.g. in orkestrator.'
-            }
+            title={search ? 'Nothing matches' : view.key === 'all' ? 'No bloks' : `No ${view.label.toLowerCase()}`}
+            description={search ? `No ${view.key === 'all' ? 'blok' : view.label.toLowerCase()} matches “${search}”.` : view.empty}
           />
         )
       }
@@ -93,7 +115,7 @@ function BlokList({ search }: { search: string }) {
 }
 
 /** The organization's materialized bloks: interfaces bound to agents, to open and use. */
-function BloksContent() {
+function BloksContent({ view, onView }: { view: BlokView; onView: (key: BlokView['key']) => void }) {
   const colors = useThemeColors();
   const [term, setTerm] = React.useState('');
   const [search, setSearch] = React.useState('');
@@ -122,17 +144,24 @@ function BloksContent() {
           </Pressable>
         ) : null}
       </View>
-      <BlokList key={search} search={search} />
+      <ViewChips active={view.key} onSelect={onView} />
+      <BlokList key={`${search}:${view.key}`} search={search} view={view} />
     </>
   );
 }
 
 export default function BloksScreen() {
+  // The view is in the URL, so the tab and these chips name the same page.
+  const { view: key } = useLocalSearchParams<{ view?: string }>();
+  const view = blokView(key);
+  const setView = (next: BlokView['key']) => router.setParams({ view: next === BLOK_VIEWS[0].key ? undefined : next });
+  useTabTitle(view.key === BLOK_VIEWS[0].key ? 'Bloks' : `Bloks · ${view.label}`);
+
   return (
     <View className="flex-1 bg-background">
       <Guard.Lok connectingFallback={<TasksLoadingState message="Connecting…" />}>
         <Guard.Rekuest fallback={<RekuestUnavailable />}>
-          <BloksContent />
+          <BloksContent view={view} onView={setView} />
         </Guard.Rekuest>
       </Guard.Lok>
     </View>

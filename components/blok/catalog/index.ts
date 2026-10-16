@@ -7,6 +7,8 @@ import {formBlokComponents} from './forms';
 import {htmlBlokComponents} from './html';
 import {iconBlokComponents} from './icons';
 import {layoutBlokComponents} from './layout';
+import {logoBlokComponents} from './logo';
+import {lovekitBlokComponents} from './lovekit';
 import {navigationBlokComponents} from './navigation';
 import {typographyBlokComponents} from './typography';
 
@@ -16,6 +18,8 @@ import {typographyBlokComponents} from './typography';
  * A blok naming a component left out here (the 3D scene, charts, overlays,
  * resizable panels…) still renders, with an "Unknown component" card in
  * that node's place.
+ *
+ * The SVG components (`logo.tsx`) draw logo bloks: an agent's, an action's.
  */
 export const pokketBlokCatalog = createBlokCatalog(
   'https://arkitekt.live/catalogs/v1.json',
@@ -29,6 +33,8 @@ export const pokketBlokCatalog = createBlokCatalog(
     ...dataBlokComponents,
     ...iconBlokComponents,
     ...controlBlokComponents,
+    ...logoBlokComponents,
+    ...lovekitBlokComponents,
   ],
   standardBlokFunctions,
 );

@@ -27,11 +27,15 @@ export type ModuleDecl = {
   key: string;
   label: string;
   icon: string;
+  /** One line on what it holds, under its name on its home page. */
+  description?: string;
   /** The fakts service it needs; absent for modules of the device itself. */
   serviceKey?: string;
   /** Where "Open ›" goes when no link is marked `home`. */
   route: string;
   navLinks: NavLinkDecl[];
+  /** Pages that belong to it though no link names them: details reached from inside it (`/implementations`). */
+  detailRoutes?: readonly string[];
 };
 
 const MAILBOX_ICONS: Record<string, string> = { inbox: "inbox", unread: "mail-open", flagged: "flag", sent: "send" };
@@ -43,6 +47,7 @@ export const MODULE_CATALOG: ModuleDecl[] = [
     key: "mail",
     label: "Mail",
     icon: "mail",
+    description: "Your mail and the tasks it brings, across every mailbox.",
     serviceKey: "kuvert",
     route: "/mail",
     navLinks: [
@@ -60,6 +65,7 @@ export const MODULE_CATALOG: ModuleDecl[] = [
     key: "bank",
     label: "Bank",
     icon: "landmark",
+    description: "Your accounts, bookings and budgets, synced read-only from your banks.",
     serviceKey: "bank",
     route: "/bank",
     navLinks: [
@@ -78,8 +84,10 @@ export const MODULE_CATALOG: ModuleDecl[] = [
     key: "tasks",
     label: "Tasks",
     icon: "list-checks",
+    description: "Run what your apps can do, and follow what they are doing.",
     serviceKey: "rekuest",
     route: "/tasks",
+    detailRoutes: ["/implementations"],
     navLinks: [
       { label: "Tasks", route: "/tasks", home: true, keywords: ["rekuest", "jobs", "assignations"] },
       {
@@ -89,6 +97,14 @@ export const MODULE_CATALOG: ModuleDecl[] = [
         icon: "play",
         description: "What the organization's apps can do",
         keywords: ["rekuest", "run", "assign", "functions", "start"],
+      },
+      {
+        label: "Agents",
+        route: "/agents",
+        group: "Run",
+        icon: "bot",
+        description: "The apps that run actions, and what each offers",
+        keywords: ["rekuest", "apps", "workers", "implementations", "clients"],
       },
       {
         label: "Bloks",
@@ -104,6 +120,7 @@ export const MODULE_CATALOG: ModuleDecl[] = [
     key: "broadcasts",
     label: "Broadcasts",
     icon: "radio",
+    description: "Live video: what your organization streams, and this phone's camera.",
     serviceKey: "lovekit",
     route: "/broadcasts",
     navLinks: [
@@ -122,6 +139,7 @@ export const MODULE_CATALOG: ModuleDecl[] = [
     key: "calls",
     label: "Calls",
     icon: "phone",
+    description: "Calls in your organization, and the invitations to them.",
     serviceKey: "lovekit",
     route: "/calls",
     navLinks: [{ label: "Calls", route: "/calls", home: true, keywords: ["call", "video", "meeting", "lovekit"] }],
@@ -130,6 +148,7 @@ export const MODULE_CATALOG: ModuleDecl[] = [
     key: "chat",
     label: "Chat",
     icon: "message-circle",
+    description: "Chat with agents about your data, experiments or anything else.",
     serviceKey: "alpaka",
     route: "/alpaka",
     navLinks: [{ label: "Chat", route: "/alpaka", home: true, keywords: ["alpaka", "assistant", "llm", "ai", "rooms", "messages"] }],
@@ -138,6 +157,7 @@ export const MODULE_CATALOG: ModuleDecl[] = [
     key: "mikro",
     label: "Mikro",
     icon: "microscope",
+    description: "Your images, tables, meshes and annotations in one place.",
     serviceKey: "mikro",
     route: "/mikro",
     navLinks: [
@@ -212,6 +232,7 @@ export const MODULE_CATALOG: ModuleDecl[] = [
     key: "lokate",
     label: "Lokate",
     icon: "map-pinned",
+    description: "A copy of your location timeline on your organization's server, readable by you alone.",
     serviceKey: "lokate",
     route: "/lokate",
     navLinks: [
@@ -229,6 +250,7 @@ export const MODULE_CATALOG: ModuleDecl[] = [
     key: "phone",
     label: "Phone",
     icon: "smartphone",
+    description: "Everything of this phone itself: its timeline, Wi-Fi, device setup and the app's settings.",
     route: "/phone",
     navLinks: [
       { label: "Phone", route: "/phone", home: true, keywords: ["device", "this phone"] },
@@ -324,7 +346,7 @@ export const moduleForPath = <M extends ModuleDecl>(pathname: string, modules: r
   let best: M | undefined;
   let bestLength = -1;
   for (const module of modules) {
-    for (const route of [module.route, ...module.navLinks.map((l) => l.route)]) {
+    for (const route of [module.route, ...module.navLinks.map((l) => l.route), ...(module.detailRoutes ?? [])]) {
       const path = pathOf(route);
       const matches = path === "/" ? pathname === "/" : pathname === path || pathname.startsWith(`${path}/`);
       if (matches && path.length > bestLength) {

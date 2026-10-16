@@ -1,3 +1,4 @@
+import { ActionLogo } from '@/components/actions/ActionLogo';
 import { Text } from '@/components/ui/text';
 import type { ListActionFragment } from '@/lib/rekuest/api/graphql';
 import { actionRoute } from '@/lib/rekuest/assign/runOrAsk';
@@ -18,7 +19,11 @@ export function ActionRow({ action }: { action: ListActionFragment }) {
     <Link href={actionRoute(action.id) as Href} asChild>
       <Pressable className="flex-row items-center gap-3 border-b border-border bg-background px-4 py-3 active:bg-muted">
         <View className={`h-9 w-9 items-center justify-center rounded-full ${agents ? 'bg-primary/10' : 'bg-muted'}`}>
-          <Play size={15} color={agents ? colors.primary : colors.mutedForeground} />
+          {action.logo ? (
+            <ActionLogo action={action} className="h-6 w-6" />
+          ) : (
+            <Play size={15} color={agents ? colors.primary : colors.mutedForeground} />
+          )}
         </View>
         <View className="flex-1 gap-0.5">
           <Text numberOfLines={1} className="text-base font-medium text-foreground">

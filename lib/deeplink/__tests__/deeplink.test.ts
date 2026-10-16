@@ -88,6 +88,8 @@ describe("links from the desktop app", () => {
   it("name the phone's page for what both apps show", () => {
     expect(fromDesktopPath("/rekuest/tasks/5")).toBe("/tasks/5");
     expect(fromDesktopPath("/rekuest/actions/5")).toBe("/actions/5");
+    expect(fromDesktopPath("/rekuest/agents/3")).toBe("/agents/3");
+    expect(fromDesktopPath("/rekuest/implementations/8")).toBe("/implementations/8");
     expect(fromDesktopPath("/kuvert/threads/9")).toBe("/mail/thread/9");
     expect(fromDesktopPath("/bank/transactions/3")).toBe("/bank/transaction/3");
     expect(fromDesktopPath("/lovekit/solobroadcasts/2")).toBe("/solo-broadcast/2");
@@ -105,7 +107,7 @@ describe("links from the desktop app", () => {
     expect(fromDesktopPath("/kuvert")).toBe("/mail");
   });
   it("say so when the phone has no such page", () => {
-    expect(fromDesktopPath("/rekuest/agents/3")).toBe("/not-here?path=%2Frekuest%2Fagents%2F3");
+    expect(fromDesktopPath("/rekuest/wiregrams/3")).toBe("/not-here?path=%2Frekuest%2Fwiregrams%2F3");
     expect(fromDesktopPath("/mikro/coordinatesystems/3")).toBe("/not-here?path=%2Fmikro%2Fcoordinatesystems%2F3");
     expect(fromDesktopPath("/bank/accounts/3")).toBe("/not-here?path=%2Fbank%2Faccounts%2F3");
     expect(fromDesktopPath("/kabinet")).toBe("/not-here?path=%2Fkabinet");

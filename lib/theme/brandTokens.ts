@@ -158,3 +158,35 @@ export function buildThemeColors(
     destructiveForeground: color('--destructive-foreground'),
   };
 }
+
+/**
+ * What an action logo paints with (bloks `logo.tsx`), keyed by the palette
+ * token a shape names. orkestrator's `.dark` `--logo-*` block (index.css):
+ * three brand shades a logo can tell apart, plus the text and card colors.
+ * Complete `hsl(...)` colors, since react-native-svg takes a color string.
+ */
+export type LogoPalette = {
+  ink: string;
+  muted: string;
+  brand: string;
+  'brand-strong': string;
+  'brand-soft': string;
+  surface: string;
+};
+
+export function buildLogoPalette(
+  hue: number = DEFAULT_BRAND.hue,
+  chroma: number = DEFAULT_BRAND.chroma,
+): LogoPalette {
+  const colors = buildThemeColors(hue, chroma);
+  const shade = (l: number, c: number) => `hsl(${oklchToHslTriplet(l, c, hue)})`;
+
+  return {
+    ink: colors.foreground,
+    muted: colors.mutedForeground,
+    brand: shade(0.72, chroma),
+    'brand-strong': shade(0.87, chroma * 0.75),
+    'brand-soft': shade(0.42, chroma * 0.6),
+    surface: colors.card,
+  };
+}

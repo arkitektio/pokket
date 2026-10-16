@@ -1,0 +1,17 @@
+query Agents($filters: AgentFilter, $pagination: OffsetPaginationInput, $ordering: [AgentOrder!]) {
+  agents(filters: $filters, pagination: $pagination, ordering: $ordering) {
+    ...ListAgent
+  }
+}
+
+query DetailAgent($id: ID!) {
+  agent(id: $id) {
+    ...DetailAgent
+  }
+}
+
+query DetailImplementation($id: ID!) {
+  implementation(id: $id) {
+    ...DetailImplementation
+  }
+}

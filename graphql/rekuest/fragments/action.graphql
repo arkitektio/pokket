@@ -8,6 +8,9 @@ fragment ListAction on Action {
   app {
     identifier
   }
+  logo {
+    ...BlokLogo
+  }
   implementations {
     id
     agent {
@@ -28,6 +31,9 @@ fragment AssignAction on Action {
   kind
   app {
     identifier
+  }
+  logo {
+    ...BlokLogo
   }
   ...Ports
   latestTask {

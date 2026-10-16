@@ -1,12 +1,12 @@
 import { ServiceInfo } from '@/components/navigation/ModuleGrid';
+import { HomeSection, ModuleHome, PageTile } from '@/components/navigation/ModuleHome';
 import { TimelineBackup } from '@/components/timeline/TimelineBackup';
 import { Card, CardContent } from '@/components/ui/card';
 import { Text } from '@/components/ui/text';
 import { useArkitektActions, useServiceState } from '@/lib/arkitekt/hooks';
-import { showPage } from '@/lib/navigation';
-import { useThemeColors } from '@/lib/theme/BrandProvider';
-import { ChevronRight, Route } from 'lucide-react-native';
 import { Pressable, ScrollView, View } from 'react-native';
+
+const TIMELINE = { label: 'Timeline', route: '/timeline', description: 'What this phone records, and its settings' };
 
 /** When lokate is not connected: what the connection check found, and a retry. */
 function Unreachable() {
@@ -32,32 +32,26 @@ function Unreachable() {
 /**
  * The organization's lokate: the timeline backup — on or off, how often, and
  * how it went. The timeline itself (recording, places, the map) is this
- * phone's, under Phone.
+ * phone's, under Phone, and linked from here.
  */
 export default function LokateScreen() {
-  const colors = useThemeColors();
   return (
-    <ScrollView className="flex-1 bg-background">
-      <View className="gap-4 px-4 py-6">
-        <Text className="px-1 text-sm text-muted-foreground">
-          Lokate keeps a copy of your location timeline on your organization&apos;s server, readable by you alone.
-        </Text>
-        <Unreachable />
-        <TimelineBackup />
-        <Pressable
-          onPress={() => showPage('/timeline')}
-          className="flex-row items-center gap-3 rounded-xl border border-border bg-card px-3 py-3 active:bg-muted"
-        >
-          <View className="h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
-            <Route size={18} color={colors.primary} />
+    <ScrollView className="flex-1 bg-background" contentContainerClassName="pb-10">
+      <ModuleHome
+        moduleKey="lokate"
+        lead={
+          <View className="gap-4 px-4">
+            <Unreachable />
+            <TimelineBackup />
           </View>
-          <View className="flex-1">
-            <Text className="text-base font-medium text-card-foreground">Timeline</Text>
-            <Text className="text-xs text-muted-foreground">What this phone records, and its settings</Text>
+        }
+      >
+        <HomeSection title="On this phone">
+          <View className="px-4">
+            <PageTile link={TIMELINE} icon="route" />
           </View>
-          <ChevronRight size={16} color={colors.mutedForeground} />
-        </Pressable>
-      </View>
+        </HomeSection>
+      </ModuleHome>
     </ScrollView>
   );
 }

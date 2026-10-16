@@ -1,0 +1,74 @@
+# The logo an agent declared as its default for the LOGO context.
+fragment AgentLogo on Agent {
+  logo: defaultBlok(context: LOGO) {
+    id
+    blok {
+      ...BlokLogo
+    }
+  }
+}
+
+# An agent in a list: who it is, which app it runs, and whether it is there.
+fragment ListAgent on Agent {
+  id
+  name
+  kind
+  active
+  connected
+  blocked
+  pinned
+  lastSeen
+  app {
+    identifier
+  }
+  release {
+    version
+  }
+  ...AgentLogo
+}
+
+# What an agent offers: one implementation per action it can run.
+fragment AgentImplementation on Implementation {
+  id
+  interface
+  action {
+    id
+    name
+    description
+    logo {
+      ...BlokLogo
+    }
+  }
+}
+
+# An agent's page: the list fields, where it runs, and what it offers.
+fragment DetailAgent on Agent {
+  ...ListAgent
+  installedAt
+  device {
+    deviceId
+  }
+  implementations {
+    ...AgentImplementation
+  }
+}
+
+# One agent's implementation of an action: the action as the assign form needs
+# it, and the agent it runs on.
+fragment DetailImplementation on Implementation {
+  id
+  interface
+  agent {
+    id
+    name
+    active
+    connected
+    blocked
+    app {
+      identifier
+    }
+  }
+  action {
+    ...AssignAction
+  }
+}

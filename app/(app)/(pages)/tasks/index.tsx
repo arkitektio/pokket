@@ -1,5 +1,6 @@
 import { TaskRow } from '@/components/tasks/TaskRow';
 import { RekuestUnavailable, TasksEmptyState, TasksLoadingState } from '@/components/tasks/states';
+import { ModuleHome } from '@/components/navigation/ModuleHome';
 import { Text } from '@/components/ui/text';
 import { Guard } from '@/lib/app/App';
 import { Ordering, TaskFilter, useListTasksQuery } from '@/lib/rekuest/api/graphql';
@@ -52,7 +53,7 @@ function ViewChips({ active, onSelect }: { active: View_['key']; onSelect: (key:
   );
 }
 
-function TaskList({ view }: { view: View_ }) {
+function TaskList({ view, chips }: { view: View_; chips: React.ReactNode }) {
   const colors = useThemeColors();
   const [refreshing, setRefreshing] = React.useState(false);
   const [exhausted, setExhausted] = React.useState(false);
@@ -97,8 +98,6 @@ function TaskList({ view }: { view: View_ }) {
     }
   }, [exhausted, loadingMore, loading, tasks.length, fetchMore]);
 
-  if (loading && tasks.length === 0) return <TasksLoadingState message="Loading tasks…" />;
-
   return (
     <FlatList
       data={tasks}
@@ -108,10 +107,15 @@ function TaskList({ view }: { view: View_ }) {
       onEndReached={onEndReached}
       onEndReachedThreshold={0.5}
       ListHeaderComponent={
-        error ? <Text className="px-4 py-2 text-sm text-destructive">Could not load tasks: {error.message}</Text> : null
+        <ModuleHome moduleKey="tasks" className="pb-2">
+          <View className="gap-2">
+            {chips}
+            {error ? <Text className="px-4 text-sm text-destructive">Could not load tasks: {error.message}</Text> : null}
+          </View>
+        </ModuleHome>
       }
       ListEmptyComponent={
-        <TasksEmptyState title="No tasks" description={view.empty} />
+        loading ? <TasksLoadingState message="Loading tasks…" /> : <TasksEmptyState title="No tasks" description={view.empty} />
       }
       ListFooterComponent={loadingMore ? <ActivityIndicator className="py-4" color={colors.primary} /> : null}
     />
@@ -130,8 +134,7 @@ export default function TasksScreen() {
       <Guard.Lok connectingFallback={<TasksLoadingState message="Connecting…" />}>
         <Guard.Rekuest fallback={<RekuestUnavailable />}>
           <TaskStream />
-          <ViewChips active={view.key} onSelect={setView} />
-          <TaskList key={view.key} view={view} />
+          <TaskList key={view.key} view={view} chips={<ViewChips active={view.key} onSelect={setView} />} />
         </Guard.Rekuest>
       </Guard.Lok>
     </View>

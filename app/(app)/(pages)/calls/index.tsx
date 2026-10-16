@@ -1,7 +1,7 @@
 import { CallRow } from '@/components/calls/CallRow';
 import { InviteRow } from '@/components/calls/InviteRow';
-import { CallsEmptyState, CallsLoadingState, CallsUnavailable } from '@/components/calls/states';
-import { Text } from '@/components/ui/text';
+import { CallsLoadingState, CallsUnavailable } from '@/components/calls/states';
+import { HomeEmpty, HomeError, HomeSectionHeading, ModuleHome } from '@/components/navigation/ModuleHome';
 import { Guard } from '@/lib/app/App';
 import { useListCallsQuery } from '@/lib/lovekit/api/graphql';
 import { useCallInvites } from '@/lib/lovekit/call/invites';
@@ -9,8 +9,12 @@ import { useThemeColors } from '@/lib/theme/BrandProvider';
 import * as React from 'react';
 import { FlatList, RefreshControl, View } from 'react-native';
 
+/** A section's heading over the rows that follow it in the list. */
 const SectionTitle = ({ title }: { title: string }) => (
-  <Text className="px-4 pb-2 pt-4 text-xs font-semibold uppercase text-muted-foreground">{title}</Text>
+  <View>
+    <HomeSectionHeading>{title}</HomeSectionHeading>
+    <View className="border-t border-border" />
+  </View>
 );
 
 /** The organization's calls in progress — orkestrator's `Calls` page. */
@@ -44,25 +48,32 @@ function CallsContent() {
       data={calls ?? []}
       keyExtractor={(call) => call.id}
       renderItem={({ item }) => <CallRow call={item} />}
+      contentContainerClassName="pb-10"
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} tintColor={colors.primary} />}
       ListHeaderComponent={
-        <>
-          {invites.length > 0 ? <SectionTitle title="Invitations" /> : null}
-          {invites.map((invite) => (
-            <InviteRow key={invite.id} invite={invite} />
-          ))}
-          <SectionTitle title="In progress" />
-        </>
+        <ModuleHome moduleKey="calls" className="pb-2">
+          {invites.length > 0 ? (
+            <View>
+              <SectionTitle title="Invitations" />
+              {invites.map((invite) => (
+                <InviteRow key={invite.id} invite={invite} />
+              ))}
+            </View>
+          ) : null}
+          {calls?.length ? <SectionTitle title="In progress" /> : null}
+        </ModuleHome>
       }
       ListEmptyComponent={
-        error ? (
-          <Text className="p-4 text-sm text-destructive">{error.message}</Text>
-        ) : (
-          <CallsEmptyState
-            title="No calls in progress"
-            description="Calls your organization starts are listed here, and anyone in it can join. Start one from a task, a transaction, a conversation or a broadcast."
-          />
-        )
+        <View className="pt-6">
+          {error ? (
+            <HomeError what="calls" error={error} onRetry={() => void refetch().catch(() => undefined)} />
+          ) : (
+            <HomeEmpty title="No calls in progress">
+              Calls your organization starts are listed here, and anyone in it can join. Start one from a task, a
+              transaction, a conversation or a broadcast.
+            </HomeEmpty>
+          )}
+        </View>
       }
     />
   );

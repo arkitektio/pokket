@@ -1,5 +1,6 @@
 import { ThreadRow } from '@/components/mail/ThreadRow';
 import { KuvertUnavailable, MailEmptyState, MailLoadingState } from '@/components/mail/states';
+import { ModuleHome } from '@/components/navigation/ModuleHome';
 import { Text } from '@/components/ui/text';
 import { Guard } from '@/lib/app/App';
 import { ListThreadFragment, useListThreadsQuery } from '@/lib/kuvert/api/graphql';
@@ -47,7 +48,7 @@ function MailboxChips({ active, onSelect }: { active: SmartMailbox['key']; onSel
   );
 }
 
-function ThreadList({ mailbox }: { mailbox: SmartMailbox }) {
+function ThreadList({ mailbox, chips }: { mailbox: SmartMailbox; chips: React.ReactNode }) {
   const colors = useThemeColors();
   const client = useKuvertClient();
   const [refreshing, setRefreshing] = React.useState(false);
@@ -106,8 +107,6 @@ function ThreadList({ mailbox }: { mailbox: SmartMailbox }) {
     [client],
   );
 
-  if (loading && threads.length === 0) return <MailLoadingState message="Loading mail…" />;
-
   return (
     <FlatList
       data={threads}
@@ -117,9 +116,20 @@ function ThreadList({ mailbox }: { mailbox: SmartMailbox }) {
       onEndReached={onEndReached}
       onEndReachedThreshold={0.5}
       ListHeaderComponent={
-        error ? <Text className="px-4 py-2 text-sm text-destructive">Could not load mail: {error.message}</Text> : null
+        <ModuleHome moduleKey="mail" className="pb-2">
+          <View className="gap-2">
+            {chips}
+            {error ? <Text className="px-4 text-sm text-destructive">Could not load mail: {error.message}</Text> : null}
+          </View>
+        </ModuleHome>
       }
-      ListEmptyComponent={<MailEmptyState title={mailbox.empty.title} description={mailbox.empty.description} />}
+      ListEmptyComponent={
+        loading ? (
+          <MailLoadingState message="Loading mail…" />
+        ) : (
+          <MailEmptyState title={mailbox.empty.title} description={mailbox.empty.description} />
+        )
+      }
       ListFooterComponent={loadingMore ? <ActivityIndicator className="py-4" color={colors.primary} /> : null}
     />
   );
@@ -139,8 +149,7 @@ export default function MailScreen() {
       <Guard.Lok connectingFallback={<MailLoadingState message="Connecting…" />}>
         <Guard.Kuvert fallback={<KuvertUnavailable />}>
           <MailboxSyncs />
-          <MailboxChips active={active} onSelect={setActive} />
-          <ThreadList key={mailbox.key} mailbox={mailbox} />
+          <ThreadList key={mailbox.key} mailbox={mailbox} chips={<MailboxChips active={active} onSelect={setActive} />} />
         </Guard.Kuvert>
       </Guard.Lok>
     </View>

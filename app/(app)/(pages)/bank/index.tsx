@@ -1,6 +1,7 @@
 import { AccountStrip } from '@/components/bank/AccountStrip';
 import { BankEmptyState, BankLoadingState, BankUnavailable } from '@/components/bank/states';
 import { TransactionRow } from '@/components/bank/TransactionRow';
+import { ModuleHomeHeader } from '@/components/navigation/ModuleHome';
 import { Text } from '@/components/ui/text';
 import { Guard } from '@/lib/app/App';
 import { useListBankAccountsQuery, useListTransactionsQuery } from '@/lib/bank/api/graphql';
@@ -134,7 +135,9 @@ function BankContent() {
       onEndReached={onEndReached}
       onEndReachedThreshold={0.5}
       ListHeaderComponent={
-        <View className="border-b border-border">
+        <View className="border-b border-border pt-5">
+          <ModuleHomeHeader moduleKey="bank" />
+          <View className="h-6" />
           <AccountStrip accounts={accounts.data?.bankAccounts ?? []} />
           <ViewChips active={active} onSelect={select} />
           {scope ? (

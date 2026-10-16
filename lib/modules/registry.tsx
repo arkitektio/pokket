@@ -12,6 +12,7 @@ import {
   Shapes,
   Table2,
   Bluetooth,
+  Bot,
   Bug,
   Circle,
   Flag,
@@ -42,6 +43,7 @@ import {
 const ICONS: Record<string, LucideIcon> = {
   bell: Bell,
   bluetooth: Bluetooth,
+  bot: Bot,
   bug: Bug,
   "chart-line": ChartLine,
   file: File,

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 import { isRouteActive, labelForRoute, linkParams, MODULE_CATALOG, moduleByKey, moduleForPath as forPath, routeOf } from "../catalog";
-import { layoutModuleNav } from "../layout";
+import { homePageLinks, layoutModuleNav } from "../layout";
 
 const moduleForPath = (path: string) => forPath(path, MODULE_CATALOG)!;
 
@@ -23,7 +23,22 @@ describe("module links", () => {
     ]);
   });
 
+  it("leaves the home page's own views out of its page links", () => {
+    const links = homePageLinks({
+      navLinks: [
+        { label: "All", route: "/x", home: true },
+        { label: "Unread", route: "/x?box=unread", group: "Views" },
+        { label: "Other", route: "/x/other", group: "Pages", description: "o" },
+      ],
+    });
+    expect(links.map((g) => [g.title, g.links.map((l) => l.label)])).toEqual([["Pages", ["Other"]]]);
+    expect(homePageLinks(moduleByKey("mail")!)).toEqual([]);
+    expect(homePageLinks(moduleByKey("tasks")!).flatMap((g) => g.links.map((l) => l.label))).toEqual(["Actions", "Agents", "Bloks"]);
+  });
+
   it("finds a page's module by the longest route prefix", () => {
+    expect(moduleForPath("/agents/3").key).toBe("tasks");
+    expect(moduleForPath("/implementations/8").key).toBe("tasks");
     expect(moduleForPath("/mail/thread/12").key).toBe("mail");
     expect(moduleForPath("/wifi/eduroam").key).toBe("phone");
     expect(moduleForPath("/timeline/place/3").key).toBe("phone");

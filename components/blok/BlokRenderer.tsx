@@ -27,6 +27,11 @@ type BlokRendererProps = {
   refuseAction?: BlokRefuseActionHandler;
   /** Mounted inside the runtime: what syncs agent state into it. */
   children?: React.ReactNode;
+  /**
+   * `none` draws the roots and nothing else: no spacing between them, and no
+   * card for an empty or unparseable payload. For a drawing in a box, a logo's.
+   */
+  chrome?: 'default' | 'none';
 };
 
 /**
@@ -42,6 +47,7 @@ export default function BlokRenderer({
   dispatchAction,
   refuseAction,
   children,
+  chrome = 'default',
 }: BlokRendererProps) {
   const preflight = React.useMemo(
     () => preflightBlokDocument(uiComponents, catalog),
@@ -118,6 +124,19 @@ export default function BlokRenderer({
   const renderableRootIds = preflight.rootIds.filter(
     rootId => preflight.nodes.has(rootId) || preflight.invalidNodes.has(rootId),
   );
+
+  if (chrome === 'none') {
+    return (
+      <BlokRuntimeProvider store={runtimeStore}>
+        <BlokTreeProvider tree={tree}>
+          {children}
+          {renderableRootIds.map(rootId => (
+            <BlokNode key={rootId} id={rootId} />
+          ))}
+        </BlokTreeProvider>
+      </BlokRuntimeProvider>
+    );
+  }
 
   return (
     <BlokRuntimeProvider store={runtimeStore}>

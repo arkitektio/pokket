@@ -20,6 +20,8 @@ type StructureKind = {
 const KINDS: readonly StructureKind[] = [
   { identifier: "@rekuest/task", name: "Task", prefix: "/tasks/", callable: true, desktop: "/rekuest/tasks/" },
   { identifier: "@rekuest/action", name: "Action", prefix: "/actions/", callable: false, desktop: "/rekuest/actions/" },
+  { identifier: "@rekuest/agent", name: "Agent", prefix: "/agents/", callable: false, desktop: "/rekuest/agents/" },
+  { identifier: "@rekuest/implementation", name: "Implementation", prefix: "/implementations/", callable: false, desktop: "/rekuest/implementations/" },
   { identifier: "@bank/transaction", name: "Transaction", prefix: "/bank/transaction/", callable: true, desktop: "/bank/transactions/" },
   { identifier: "@kuvert/thread", name: "Thread", prefix: "/mail/thread/", callable: true, desktop: "/kuvert/threads/" },
   { identifier: "@lovekit/solo_broadcast", name: "Broadcast", prefix: "/solo-broadcast/", callable: true, desktop: "/lovekit/solobroadcasts/" },

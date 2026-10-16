@@ -62,3 +62,10 @@ fragment ListMaterializedBlok on MaterializedBlok {
     ...BlokAgentMapping
   }
 }
+
+# A logo blok as a list carries it: enough to know which drawing, and whether
+# a kept one is still current.
+fragment BlokLogo on Blok {
+  id
+  hash
+}

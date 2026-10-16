@@ -1,6 +1,7 @@
 import { Composer } from '@/components/alpaka/Composer';
 import { RoomRow, roomRoute } from '@/components/alpaka/RoomRow';
 import { ChatEmptyState, ChatLoadingState, ChatUnavailable } from '@/components/alpaka/states';
+import { HomeSectionHeading, ModuleHome } from '@/components/navigation/ModuleHome';
 import { Text } from '@/components/ui/text';
 import { useCreateRoomMutation, useRecentRoomsQuery } from '@/lib/alpaka/api/graphql';
 import { leaveFirstMessage } from '@/lib/alpaka/chat/firstMessage';
@@ -69,21 +70,23 @@ function HomeContent() {
           keyExtractor={(room) => room.id}
           renderItem={({ item }) => <RoomRow room={item} />}
           renderSectionHeader={({ section }) => (
-            <Text className="bg-background px-4 pb-2 pt-4 text-xs font-semibold uppercase text-muted-foreground">{section.title}</Text>
+            <View className="bg-background pt-4">
+              <HomeSectionHeading>{section.title}</HomeSectionHeading>
+            </View>
           )}
           stickySectionHeadersEnabled={false}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} tintColor={colors.primary} />}
           ListHeaderComponent={
-            <View className="gap-1 px-4 pb-2 pt-6">
-              <Text className="text-2xl font-semibold text-foreground">
-                {greeting()}
-                {name ? `, ${name}` : ''}
-              </Text>
-              <Text className="text-sm text-muted-foreground">Write below to start a chat.</Text>
-              {error ? <Text className="pt-2 text-sm text-destructive">Could not load chats: {error.message}</Text> : null}
-            </View>
+            <ModuleHome
+              moduleKey="chat"
+              title={`${greeting()}${name ? `, ${name}` : ''}`}
+              description="Write below to start a chat."
+              className="pb-2"
+            >
+              {error ? <Text className="px-4 text-sm text-destructive">Could not load chats: {error.message}</Text> : null}
+            </ModuleHome>
           }
           ListEmptyComponent={
             !data && loading ? (

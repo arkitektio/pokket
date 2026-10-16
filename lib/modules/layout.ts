@@ -1,4 +1,4 @@
-import type { ModuleDecl, NavLinkDecl } from "./catalog";
+import { pathOf, type ModuleDecl, type NavLinkDecl } from "./catalog";
 
 export type ModuleNavGroup = {
   title: string;
@@ -29,4 +29,19 @@ export const layoutModuleNav = (module: Pick<ModuleDecl, "navLinks">): ModuleNav
     if (link.description) group.chips = false;
   }
   return { home, groups };
+};
+
+/**
+ * The links a module's home page lists — `layoutModuleNav` less the ones
+ * that are the home page itself under another query (mail's mailboxes,
+ * bank's views): the page already switches between those with its own chips.
+ * Groups left empty go.
+ */
+export const homePageLinks = (module: Pick<ModuleDecl, "navLinks">): ModuleNavGroup[] => {
+  const { home, groups } = layoutModuleNav(module);
+  if (!home) return groups;
+  const homePath = pathOf(home.route);
+  return groups
+    .map((group) => ({ ...group, links: group.links.filter((link) => pathOf(link.route) !== homePath) }))
+    .filter((group) => group.links.length > 0);
 };
