@@ -165,9 +165,29 @@ const FiberCanvasInner = ({
       () => {
         if (disposed) return;
         const draw = renderer.render.bind(renderer);
+        // TEMP(perf): what a frame costs on the JS thread, logged every 60 frames drawn.
+        const perf = {frames: 0, total: 0, worst: 0, first: 0};
         renderer.render = (scene: THREE.Object3D, frameCamera: THREE.Camera) => {
+          const start = performance.now();
           draw(scene, frameCamera);
           context.present();
+          const took = performance.now() - start;
+          if (perf.frames === 0) perf.first = start;
+          perf.frames += 1;
+          perf.total += took;
+          perf.worst = Math.max(perf.worst, took);
+          if (perf.frames === 60) {
+            const fps = (59 * 1000) / Math.max(start - perf.first, 1);
+            const {drawCalls, triangles} = renderer.info.render;
+            console.log(
+              `[gpu] render ${(perf.total / 60).toFixed(1)} ms avg, ${perf.worst.toFixed(1)} ms worst, ` +
+                `${fps.toFixed(0)} fps while drawing, ${drawCalls} draw calls, ${triangles} triangles, ` +
+                `${__DEV__ ? 'dev' : 'release'} build`,
+            );
+            perf.frames = 0;
+            perf.total = 0;
+            perf.worst = 0;
+          }
         };
         live.current = {renderer, canvas, root: createRoot(canvas)};
         setCreated(count => count + 1);
