@@ -52,8 +52,6 @@
       [
         "react-native-ble-plx",
         {
-          "isBackgroundEnabled": true,
-          "modes": ["peripheral", "central"],
           "bluetoothAlwaysPermission": "Allow Orkestrator to connect to bluetooth devices"
         }
       ],
