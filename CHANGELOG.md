@@ -1,3 +1,10 @@
+# [1.19.0](https://github.com/arkitektio/pokket/compare/v1.18.2...v1.19.0) (2026-10-16)
+
+
+### Features
+
+* **authflow:** link banks and mailboxes from the phone ([de2406f](https://github.com/arkitektio/pokket/commit/de2406f347ff2941d6df462d3fcd5e424cebfdd0))
+
 ## [1.18.2](https://github.com/arkitektio/pokket/compare/v1.18.1...v1.18.2) (2026-10-16)
 
 
