@@ -1,3 +1,11 @@
+## [1.18.2](https://github.com/arkitektio/pokket/compare/v1.18.1...v1.18.2) (2026-10-16)
+
+
+### Bug Fixes
+
+* **gpu:** register three's classes with R3F on the WebGPU canvas ([14b6916](https://github.com/arkitektio/pokket/commit/14b6916e6a7abc584335beade08481813c77c76c))
+* **scene:** allow phones the desktop's 2M triangle budget ([e07edeb](https://github.com/arkitektio/pokket/commit/e07edeb7cccbffe04b6e2ef7590e0dff08b22a26))
+
 ## [1.18.1](https://github.com/arkitektio/pokket/compare/v1.18.0...v1.18.1) (2026-10-16)
 
 
