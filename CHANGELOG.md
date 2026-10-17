@@ -1,3 +1,16 @@
+# [1.21.0](https://github.com/arkitektio/pokket/compare/v1.20.0...v1.21.0) (2026-10-17)
+
+
+### Bug Fixes
+
+* **preview:** publish pull request previews to updates.arkitekt.live ([3865e2c](https://github.com/arkitektio/pokket/commit/3865e2c2329b2ac83d7214079ce6c2fc899f98a4))
+
+
+### Features
+
+* **updates:** a proper card for "update ready" ([380949e](https://github.com/arkitektio/pokket/commit/380949e7b8ad648d82e89d3f0b3e4818beb57613))
+* **updates:** serve over-the-air updates from updates.arkitekt.live ([346ec90](https://github.com/arkitektio/pokket/commit/346ec90dd26a2be9ad949b1c257e2f33040788a2))
+
 # [1.20.0](https://github.com/arkitektio/pokket/compare/v1.19.0...v1.20.0) (2026-10-16)
 
 
