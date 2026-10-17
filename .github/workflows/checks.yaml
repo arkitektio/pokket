@@ -2,10 +2,10 @@ name: Checks
 
 # Fast feedback on pull requests, all on Linux, no native build:
 #  - tests: jest.
-#  - preview: the pull request's JS as an over-the-air update on the EAS
-#    branch `pr-<number>`. Open it in the development client (README,
-#    "Install") to try the change on a phone within minutes. Only for
-#    branches of this repository: forks get no EXPO_TOKEN.
+#  - preview: the pull request's JS as an over-the-air update on the channel
+#    `pr-<number>` of updates.arkitekt.live. Open it in the development client
+#    (README, "Install") to try the change on a phone within minutes. Only for
+#    branches of this repository: forks get no UPDATES_TOKEN or EXPO_TOKEN.
 
 on:
   pull_request:
@@ -60,29 +60,57 @@ jobs:
       - name: Publish the preview update
         id: update
         env:
+          UPDATES_TOKEN: ${{ secrets.UPDATES_TOKEN }}
           # Through the environment, never spliced into the script: a title is
           # whatever the author typed.
           TITLE: ${{ github.event.pull_request.title }}
         run: |
-          eas update --branch "pr-$PR" --environment preview --non-interactive --json \
-            --message "#$PR: $TITLE" > update.json
-          echo "group=$(jq -r '.[0].group' update.json)" >> "$GITHUB_OUTPUT"
-          echo "runtime=$(jq -r '[.[] | "\(.platform): `\(.runtimeVersion)`"] | join(", ")' update.json)" >> "$GITHUB_OUTPUT"
+          # The EXPO_PUBLIC_* values `eas update --environment preview` used to inject.
+          eas env:pull --environment preview --non-interactive
+          # A development client sends no channel header (expo-dev-launcher
+          # replaces the request headers), so the channel goes in the URL.
+          manifest="https://updates.arkitekt.live/api/manifest?channel=pr-$PR"
+          runtimes=()
+          for platform in android ios; do
+            rv="$(npx expo-updates runtimeversion:resolve --platform "$platform" | jq -r .runtimeVersion)"
+            published="$(scripts/ci/publish-update.sh "$platform" "$rv" "pr-$PR" "#$PR: $TITLE")"
+            echo "$platform: $published"
+            # What a dev client on this runtime gets from that URL must be this update.
+            served="$(curl -fsS -H "expo-platform: $platform" -H "expo-runtime-version: $rv" \
+              -H "expo-protocol-version: 1" -H "accept: multipart/mixed" "$manifest" \
+              | grep -o '"id": *"[^"]*"' | sed 's/.*"\([^"]*\)"$/\1/' || true)"
+            match=false
+            for id in $served; do [[ "$published" == *"$id"* ]] && match=true; done
+            if [ "$match" != true ]; then
+              echo "::error::$manifest does not serve the update just published to $platform $rv"
+              exit 1
+            fi
+            runtimes+=("$platform: \`$rv\`")
+          done
+          echo "manifest=$manifest" >> "$GITHUB_OUTPUT"
+          echo "runtime=${runtimes[0]}, ${runtimes[1]}" >> "$GITHUB_OUTPUT"
 
       # One comment per pull request, updated on every push.
       - name: Comment on the pull request
         env:
-          GROUP: ${{ steps.update.outputs.group }}
+          MANIFEST: ${{ steps.update.outputs.manifest }}
           RUNTIME: ${{ steps.update.outputs.runtime }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
+          # What the camera opens: the development client, told to load MANIFEST.
+          link="pokket://expo-development-client/?url=$(jq -rn --arg u "$MANIFEST" '$u|@uri')"
+          qr="https://api.qrserver.com/v1/create-qr-code/?size=240x240&margin=8&data=$(jq -rn --arg u "$link" '$u|@uri')"
           marker="<!-- pokket-preview -->"
           body="$marker
           ### Preview on your phone
 
-          This pull request's JS is published as an over-the-air update on the EAS branch \`pr-$PR\`.
-          Open **[its update page](https://expo.dev/accounts/arkitektio/projects/pokket/updates/$GROUP)** and scan
-          the QR code with the camera, with the [development client](https://github.com/$GITHUB_REPOSITORY/releases/tag/dev-client) installed.
+          This pull request's JS is published as an over-the-air update on the channel \`pr-$PR\` of updates.arkitekt.live.
+          With the [development client](https://github.com/$GITHUB_REPOSITORY/releases/tag/dev-client) installed, scan
+          this with the camera:
+
+          <img src=\"$qr\" width=\"240\" height=\"240\" alt=\"QR code opening the preview in the development client\">
+
+          Or, in the development client, enter this URL by hand: \`$MANIFEST\`
 
           It only runs on a development client with the same native side (runtime ${RUNTIME}). If this pull request
           changes native code, the published one will not do: the \"Dev client\" run of this pull request builds an

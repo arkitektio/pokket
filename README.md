@@ -172,9 +172,9 @@ published one. A development build you make yourself only has the mesh if you ra
 `pnpm build:mesh:<platform>` first (see below).
 
 **Pull request previews.** Every pull request from a branch of this repository publishes its JS
-as an over-the-air update on the EAS branch `pr-<number>`. A comment on the pull request links
-to its update page. Scan the QR code there with the development client installed to run the
-pull request on your phone. This takes a few minutes, with no build.
+as an over-the-air update on the channel `pr-<number>` of updates.arkitekt.live. A comment on
+the pull request has a QR code: scan it with the development client installed to run the pull
+request on your phone. This takes a few minutes, with no build.
 
 ### How releases are made
 
