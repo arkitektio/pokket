@@ -82,7 +82,7 @@ jobs:
             match=false
             for id in $served; do [[ "$published" == *"$id"* ]] && match=true; done
             if [ "$match" != true ]; then
-              echo "::error::$manifest does not serve the update just published to $platform $rv"
+              echo "::error::$manifest does not serve the update just published to $platform $rv: the server has to take the channel from ?channel= when there is no expo-channel-name header"
               exit 1
             fi
             runtimes+=("$platform: \`$rv\`")
