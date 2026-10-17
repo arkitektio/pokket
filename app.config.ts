@@ -10,15 +10,18 @@ import pkg from "./package.json";
  * - Android's `versionCode` is that version as one number (1.19.0 is
  *   1019000). Google Play refuses an upload whose versionCode is not higher
  *   than the last one's, and semantic-release only ever counts up.
- * - Over-the-air updates (EAS Update): a release publishes its JS to the
- *   channel its builds were made for (eas.json). The runtime version is the
+ * - Over-the-air updates come from our own Expo Updates server,
+ *   updates.arkitekt.live (scripts/ci/publish-update.sh publishes them). A
+ *   release publishes its JS to the channel its builds were made for
+ *   (eas.json). Updates are code-signed: the app takes only those that verify
+ *   against certs/certificate.pem, whose private key stays on the server; a
+ *   new certificate means a new binary. The runtime version is the
  *   native fingerprint, so an update only ever reaches binaries whose native
  *   side it was built against; a release that changes native code (a new
  *   module, the mesh's Go sources) needs a new build, and older apps simply
  *   keep what they have.
  */
 export default ({ config }: ConfigContext): ExpoConfig => {
-  const projectId = config.extra?.eas?.projectId as string;
   const [major, minor, patch] = pkg.version.split(".").map(Number);
   return {
     ...config,
@@ -28,11 +31,14 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     android: { ...config.android, versionCode: major * 1_000_000 + minor * 1_000 + patch },
     runtimeVersion: { policy: "fingerprint" },
     updates: {
-      url: `https://u.expo.dev/${projectId}`,
+      url: "https://updates.arkitekt.live/api/manifest",
       // Check on every launch, apply on the next one (or at once, from the
       // prompt in lib/updates) — never block startup on the network.
       checkAutomatically: "ON_LOAD",
       fallbackToCacheTimeout: 0,
+      // Updates are signed; the app refuses any that don't verify against this.
+      codeSigningCertificate: "./certs/certificate.pem",
+      codeSigningMetadata: { keyid: "main", alg: "rsa-v1_5-sha256" },
     },
   };
 };

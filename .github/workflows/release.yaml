@@ -182,9 +182,12 @@ jobs:
       # their next launch. After a native build it only reaches the new APK;
       # older installs keep what they have until they install it.
       - name: Publish Over-the-Air Update
-        run: >
-          eas update --channel production --environment production --platform android
-          --message "v$VERSION" --non-interactive
+        env:
+          UPDATES_TOKEN: ${{ secrets.UPDATES_TOKEN }}
+        run: |
+          # The EXPO_PUBLIC_* values `eas update --environment production` used to inject.
+          eas env:pull --environment production --non-interactive
+          scripts/ci/publish-update.sh android "${{ steps.native.outputs.runtime_version }}" production "v$VERSION"
 
   # Google Play: the same native build as an app bundle (AAB), which is what
   # Play takes; it cannot install an APK. Built whenever the native side has
@@ -370,9 +373,12 @@ jobs:
         run: scripts/ci/native-build.sh mark "${{ steps.native.outputs.tag }}"
 
       - name: Publish Over-the-Air Update
-        run: >
-          eas update --channel production --environment production --platform ios
-          --message "v$VERSION" --non-interactive
+        env:
+          UPDATES_TOKEN: ${{ secrets.UPDATES_TOKEN }}
+        run: |
+          # The EXPO_PUBLIC_* values `eas update --environment production` used to inject.
+          eas env:pull --environment production --non-interactive
+          scripts/ci/publish-update.sh ios "${{ steps.native.outputs.runtime_version }}" production "v$VERSION"
 
   # The release's notes: what to install from where, and what changed. Runs
   # after both platforms, also when one failed, so the notes say so.

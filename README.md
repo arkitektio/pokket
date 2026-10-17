@@ -149,6 +149,8 @@ delivered over the air: Orkestrator downloads them on launch and offers a restar
 a new APK or TestFlight build when a release changes the native app. TestFlight tells you
 when that happens; for Android, the release notes say "A new app", and the same link has it.
 
+Installs from before v1.21.0 no longer receive updates; install the latest build once.
+
 ### Developing pokket
 
 A **development client** is pokket with its native side (including the mesh) and no

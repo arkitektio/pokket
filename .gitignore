@@ -36,6 +36,8 @@ yarn-error.*
 # macOS
 .DS_Store
 *.pem
+# The public half of the over-the-air updates signing certificate (app.config.ts).
+!certs/certificate.pem
 
 # local env files
 .env*.local
