@@ -1,3 +1,10 @@
+## [1.21.1](https://github.com/arkitektio/pokket/compare/v1.21.0...v1.21.1) (2026-10-17)
+
+
+### Bug Fixes
+
+* **release:** build the Play bundle for ARM only ([5b1a3ba](https://github.com/arkitektio/pokket/commit/5b1a3bad49f581b8b0a6dbf373d14bf298347d0d))
+
 # [1.21.0](https://github.com/arkitektio/pokket/compare/v1.20.0...v1.21.0) (2026-10-17)
 
 
