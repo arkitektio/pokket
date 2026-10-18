@@ -264,15 +264,26 @@ jobs:
         if: steps.native.outputs.needed == 'true' && steps.mesh.outputs.cache-hit != 'true'
         run: pnpm build:mesh:android
 
-      # ARM only: Play's phones are ARM, and compiling the native code (Dawn,
-      # the app's C++) for x86 and x86_64 as well ran the runner out of
-      # resources halfway through, every time. Set for Gradle here, not in
+      # The runner dies half-way through this build ("received a shutdown
+      # signal", no Gradle error), every time; the APK, on the same runner,
+      # gets through. So: ARM only (Play's phones are ARM), at most two Gradle
+      # workers at once, and memory and disk in the log every minute, to show
+      # what runs out if it still does. All set for Gradle here, not in
       # eas.json or the app config, which are part of the native fingerprint.
       - name: Build AAB
         if: steps.native.outputs.needed == 'true'
         env:
           ORG_GRADLE_PROJECT_reactNativeArchitectures: arm64-v8a,armeabi-v7a
-        run: eas build --platform android --profile production --non-interactive --local --output=./pokket.aab
+        run: |
+          # A build-environment setting, so not an ORG_GRADLE_PROJECT_ one: the
+          # user's gradle.properties overrides the project's.
+          mkdir -p ~/.gradle && echo "org.gradle.workers.max=2" >> ~/.gradle/gradle.properties
+          while sleep 60; do
+            echo "[resources] $(free -m | awk '/^Mem/ {printf "mem %s/%s MB used, %s available;", $3, $2, $7} /^Swap/ {printf " swap %s/%s MB;", $3, $2}')" \
+              "disk $(df -h / | awk 'NR==2 {print $4}') free;" \
+              "top: $(ps -eo rss=,comm= --sort=-rss | head -n3 | awk '{printf "%s %d MB, ", $2, $1/1024}')"
+          done &
+          eas build --platform android --profile production --non-interactive --local --output=./pokket.aab
 
       - name: Attach the bundle to the release
         if: steps.native.outputs.needed == 'true'
