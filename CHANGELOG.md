@@ -1,3 +1,10 @@
+## [1.21.2](https://github.com/arkitektio/pokket/compare/v1.21.1...v1.21.2) (2026-10-18)
+
+
+### Bug Fixes
+
+* **release:** two Gradle workers for the Play bundle, and log what it uses ([5104f3e](https://github.com/arkitektio/pokket/commit/5104f3effa83494d58397624f7e5b2a0edcaa058))
+
 ## [1.21.1](https://github.com/arkitektio/pokket/compare/v1.21.0...v1.21.1) (2026-10-17)
 
 
