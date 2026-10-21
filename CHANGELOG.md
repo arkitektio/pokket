@@ -1,3 +1,10 @@
+# [1.22.0](https://github.com/arkitektio/pokket/compare/v1.21.2...v1.22.0) (2026-10-21)
+
+
+### Features
+
+* **alpaka:** "Talk about this" — a chat about the item on show ([10db4cc](https://github.com/arkitektio/pokket/commit/10db4cc17672cc50243d6cbd673fe19f2d321b3e))
+
 ## [1.21.2](https://github.com/arkitektio/pokket/compare/v1.21.1...v1.21.2) (2026-10-18)
 
 
