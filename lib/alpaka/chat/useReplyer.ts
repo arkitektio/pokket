@@ -22,8 +22,10 @@ import {
 } from "./activeTasks";
 import { argsFor, useRememberedArgs } from "@/lib/rekuest/assign/rememberedArgs";
 import type { ReplyerActionFragment } from "@/lib/rekuest/api/graphql";
-import { chooseReplyer, NO_REPLYER, replyerArgs, replyerBlocker } from "./replyer";
+import type { StructureInput } from "../api/graphql";
+import { bySubject, chooseReplyer, isSpecific, NO_REPLYER, replyerArgs, replyerBlocker } from "./replyer";
 import { loadChoice, saveChoice } from "./replyerChoice";
+import { sameSubject } from "./replyerSubject";
 
 /** A message landing while a pill still spins may mean its replyer is done: ask once, a moment later. */
 const RECHECK_AFTER_MESSAGE_MS = 5000;
@@ -31,7 +33,13 @@ const RECHECK_AFTER_MESSAGE_MS = 5000;
 export type ReplyerController = {
   /** The replyers and this room's choice are known: before that, `run` has nothing to run. */
   ready: boolean;
+  /** The specific replyers first: those that take the subject beside the message. */
   replyers: readonly ReplyerActionFragment[];
+  /** What the room's replies are about, if anything: the room sets it from its messages. */
+  subject: StructureInput | null;
+  setSubject: (subject: StructureInput | null) => void;
+  /** Does it take the subject: one made for this kind of structure? */
+  isSpecific: (replyer: ReplyerActionFragment) => boolean;
   /** The replyer this room runs after each message; null for none. */
   chosen: ReplyerActionFragment | null;
   /** Why the chosen replyer cannot run as it stands, if it cannot. */
@@ -43,8 +51,11 @@ export type ReplyerController = {
   settingsOf: (replyer: ReplyerActionFragment) => Record<string, unknown> | null;
   saveSettings: (replyer: ReplyerActionFragment, args: Record<string, unknown>) => void;
   tasks: readonly ActiveTask[];
-  /** Assign the chosen replyer to a message. Does nothing without a runnable replyer. */
-  run: (messageId: string) => Promise<void>;
+  /**
+   * Assign the chosen replyer to a message, about `about` (what the message
+   * carried) or else the subject. Does nothing without a runnable replyer.
+   */
+  run: (messageId: string, about?: StructureInput | null) => Promise<void>;
   cancel: (task: ActiveTask) => void;
   /** Ask the server about the tasks still running, a moment from now: call it when a message lands. */
   recheckSoon: () => void;
@@ -59,10 +70,21 @@ export type ReplyerController = {
 export const useReplyer = (roomId: string): ReplyerController => {
   const client = useRekuestClient();
   const { data, error } = useReplyerActionsQuery({ fetchPolicy: "cache-and-network" });
-  const replyers: readonly ReplyerActionFragment[] = React.useMemo(() => data?.actions ?? [], [data]);
+  const [subject, setSubjectState] = React.useState<StructureInput | null>(null);
+  const setSubject = React.useCallback(
+    (next: StructureInput | null) => setSubjectState((current) => (sameSubject(current, next) ? current : next)),
+    [],
+  );
+  // The specific ones are among them: they take a message too. Listed first, so with
+  // nothing chosen for the room the first that runs is made for what it is about.
+  const replyers: readonly ReplyerActionFragment[] = React.useMemo(() => bySubject(data?.actions ?? [], subject), [data, subject]);
+  const specific = React.useCallback((replyer: ReplyerActionFragment) => isSpecific(replyer, subject), [subject]);
   const { all: remembered, remember } = useRememberedArgs();
   const settingsOf = React.useCallback((replyer: ReplyerActionFragment) => argsFor(remembered, replyer.id), [remembered]);
-  const blockerOf = React.useCallback((replyer: ReplyerActionFragment) => replyerBlocker(replyer, settingsOf(replyer)), [settingsOf]);
+  const blockerOf = React.useCallback(
+    (replyer: ReplyerActionFragment) => replyerBlocker(replyer, settingsOf(replyer), subject),
+    [settingsOf, subject],
+  );
   const saveSettings = React.useCallback(
     (replyer: ReplyerActionFragment, args: Record<string, unknown>) => remember(replyer.id, args),
     [remember],
@@ -158,14 +180,19 @@ export const useReplyer = (roomId: string): ReplyerController => {
   const [cancelTask] = useCancelTaskMutation();
 
   const run = React.useCallback(
-    async (messageId: string) => {
+    async (messageId: string, about?: StructureInput | null) => {
       if (!chosen || blockerOf(chosen)) return;
       const reference = Crypto.randomUUID();
       setTasks((prev) => startTask(prev, reference, chosen.name));
       try {
         const result = await assign({
           variables: {
-            input: { action: chosen.id, args: replyerArgs(chosen, messageId, settingsOf(chosen)), reference, capture: false },
+            input: {
+              action: chosen.id,
+              args: replyerArgs(chosen, messageId, settingsOf(chosen), about ?? subject),
+              reference,
+              capture: false,
+            },
           },
         });
         const task = result.data?.assign;
@@ -175,7 +202,7 @@ export const useReplyer = (roomId: string): ReplyerController => {
         setTasks((prev) => failTask(prev, reference, e instanceof Error ? e.message : String(e)));
       }
     },
-    [chosen, assign, blockerOf, settingsOf],
+    [chosen, assign, blockerOf, settingsOf, subject],
   );
 
   const cancel = React.useCallback(
@@ -195,7 +222,24 @@ export const useReplyer = (roomId: string): ReplyerController => {
   );
 
   const ready = (!!data || !!error) && choice?.room === roomId && remembered !== null;
-  return { ready, replyers, chosen, blocker, choose, blockerOf, settingsOf, saveSettings, tasks, run, cancel, recheckSoon, dismiss };
+  return {
+    ready,
+    replyers,
+    subject,
+    setSubject,
+    isSpecific: specific,
+    chosen,
+    blocker,
+    choose,
+    blockerOf,
+    settingsOf,
+    saveSettings,
+    tasks,
+    run,
+    cancel,
+    recheckSoon,
+    dismiss,
+  };
 };
 
 export { NO_REPLYER };

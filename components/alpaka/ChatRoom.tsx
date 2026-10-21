@@ -3,6 +3,7 @@ import { SearchButton, ShareButton } from '@/components/navigation/HeaderButtons
 import { Text } from '@/components/ui/text';
 import {
   type ListMessageFragment,
+  type StructureInput,
   useGetRoomQuery,
   useSendMessageMutation,
   WatchMessagesDocument,
@@ -10,7 +11,7 @@ import {
   type WatchMessagesSubscriptionVariables,
 } from '@/lib/alpaka/api/graphql';
 import { agentDisplayName, DEFAULT_AGENT_NAME, displayInitials } from '@/lib/alpaka/chat/agentName';
-import { takeFirstMessage } from '@/lib/alpaka/chat/firstMessage';
+import { takeDraft, takeFirstMessage } from '@/lib/alpaka/chat/firstMessage';
 import { byCreation, isOwnMessage } from '@/lib/alpaka/chat/ownership';
 import {
   confirmPending,
@@ -20,6 +21,8 @@ import {
   settlePending,
   startPending,
 } from '@/lib/alpaka/chat/pendingMessages';
+import { replyerSubject } from '@/lib/alpaka/chat/replyerSubject';
+import { firstMessageAttachments, loadTalkingAbout } from '@/lib/alpaka/chat/talkingAbout';
 import type { ReplyerController } from '@/lib/alpaka/chat/useReplyer';
 import { useMeQuery } from '@/lib/lok/api/graphql';
 import { replacePage } from '@/lib/navigation';
@@ -90,17 +93,53 @@ export function ChatRoom({ id, replyer }: { id: string; replyer: ReplyerControll
   const [pendings, setPendings] = React.useState<PendingMessage[]>([]);
   const waiting = React.useMemo(() => settlePending(pendings, messages), [pendings, messages]);
 
+  // What the room was started about ("Talk about this"): staged on its first
+  // message until removed or sent, and what its replyers are asked about.
+  const [about, setAbout] = React.useState<StructureInput[]>([]);
+  React.useEffect(() => {
+    let live = true;
+    loadTalkingAbout(id).then(
+      (structures) => live && setAbout(structures),
+      () => undefined,
+    );
+    return () => {
+      live = false;
+    };
+  }, [id]);
+  // Null until the user removes one: until then, what the first message carries.
+  // Nothing while a message is on its way; should it fail, it is staged again.
+  const [picked, setPicked] = React.useState<StructureInput[] | null>(null);
+  const staged = React.useMemo(
+    () => (waiting.length > 0 ? [] : (picked ?? firstMessageAttachments(messages, about))),
+    [waiting.length, picked, messages, about],
+  );
+  const stagedRef = React.useRef(staged);
+  React.useEffect(() => {
+    stagedRef.current = staged;
+  });
+  const [draft] = React.useState(() => takeDraft(id));
+
+  const subject = React.useMemo(() => replyerSubject({ staged, messages, about }), [staged, messages, about]);
+  const setSubject = replyer?.setSubject;
+  React.useEffect(() => setSubject?.(subject), [setSubject, subject]);
+
   const run = replyer?.run;
   const sendMessage = React.useCallback(
     async (text: string) => {
       const localId = Crypto.randomUUID();
-      setPendings((prev) => startPending(settlePending(prev, messagesRef.current), localId, text, [], new Date().toISOString()));
+      const attached = stagedRef.current;
+      setPendings((prev) => startPending(settlePending(prev, messagesRef.current), localId, text, attached, new Date().toISOString()));
       try {
-        const result = await send({ variables: { input: { text, room: id, agentId: AGENT_ID } } });
+        const result = await send({
+          variables: {
+            input: { text, room: id, agentId: AGENT_ID, attachStructures: attached.length > 0 ? attached : undefined },
+          },
+        });
         const created = result.data?.send;
         if (!created) throw new Error('The message was not accepted');
         setPendings((prev) => confirmPending(prev, localId, created.id));
-        await run?.(created.id);
+        setPicked(null);
+        await run?.(created.id, attached[0]);
       } catch (e) {
         setPendings((prev) => dropPending(prev, localId));
         toast.error(`Could not send: ${e instanceof Error ? e.message : String(e)}`);
@@ -137,7 +176,7 @@ export function ChatRoom({ id, replyer }: { id: string; replyer: ReplyerControll
     }));
     const sent: Row[] = waiting.map((pending) => ({
       key: pending.localId,
-      message: { id: pending.localId, text: pending.text, createdAt: pending.createdAt, attachedStructures: [] },
+      message: { id: pending.localId, text: pending.text, createdAt: pending.createdAt, attachedStructures: pending.attachedStructures },
       own: true,
       name: 'You',
       pending: isUnconfirmed(pending),
@@ -205,6 +244,8 @@ export function ChatRoom({ id, replyer }: { id: string; replyer: ReplyerControll
         {replyer ? <TaskPills tasks={replyer.tasks} onCancel={replyer.cancel} onDismiss={replyer.dismiss} /> : null}
         <Composer
           onSend={(text) => void sendMessage(text)}
+          initialText={draft}
+          attachments={{ structures: staged, onRemove: (index) => setPicked(staged.filter((_, i) => i !== index)) }}
           replyer={
             replyer
               ? {

@@ -1,8 +1,10 @@
 import { Text } from '@/components/ui/text';
 import { CALL_BAR_HEIGHT } from '@/components/calls/CallBar';
+import type { StructureInput } from '@/lib/alpaka/api/graphql';
 import { useCallState } from '@/lib/lovekit/call/store';
+import { structureLabel } from '@/lib/lovekit/call/structures';
 import { useThemeColors } from '@/lib/theme/BrandProvider';
-import { Bot, Send } from 'lucide-react-native';
+import { Bot, Paperclip, Send, X } from 'lucide-react-native';
 import * as React from 'react';
 import { Keyboard, Platform, Pressable, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -25,17 +27,23 @@ const useKeyboardUp = () => {
 /**
  * Where a message is written. The chip names the replyer that will answer;
  * tapping it changes that. Without rekuest there is no replyer and no chip.
+ * What the next message carries (the thing a chat was started about) sits
+ * beside it, each removable before sending.
  */
 export function Composer({
   onSend,
   placeholder = 'Message',
   replyer,
+  attachments,
+  initialText,
   disabled,
   autoFocus,
 }: {
   onSend: (text: string) => void;
   placeholder?: string;
   replyer?: { label: string; warning: boolean; onPress: () => void };
+  attachments?: { structures: readonly StructureInput[]; onRemove: (index: number) => void };
+  initialText?: string | null;
   disabled?: boolean;
   autoFocus?: boolean;
 }) {
@@ -43,7 +51,8 @@ export function Composer({
   const insets = useSafeAreaInsets();
   const keyboardUp = useKeyboardUp();
   const inCall = useCallState((state) => !!state.call);
-  const [text, setText] = React.useState('');
+  const [text, setText] = React.useState(initialText ?? '');
+  const attached = attachments?.structures ?? [];
   // At rest the composer clears the home indicator, and the call's bar when one floats there.
   const rest = insets.bottom + 8 + (inCall ? CALL_BAR_HEIGHT + 8 : 0);
   const ready = text.trim().length > 0 && !disabled;
@@ -56,17 +65,41 @@ export function Composer({
 
   return (
     <View style={{ paddingBottom: keyboardUp ? 8 : rest }} className="gap-1.5 border-t border-border bg-background px-3 pt-2">
-      {replyer ? (
-        <Pressable
-          onPress={replyer.onPress}
-          hitSlop={6}
-          className="flex-row items-center gap-1.5 self-start rounded-full border border-border bg-card px-2.5 py-1 active:bg-muted"
-        >
-          <Bot size={13} color={replyer.warning ? colors.destructive : colors.mutedForeground} />
-          <Text numberOfLines={1} className={`max-w-[220px] text-xs ${replyer.warning ? 'text-destructive' : 'text-muted-foreground'}`}>
-            {replyer.label}
-          </Text>
-        </Pressable>
+      {replyer || attached.length > 0 ? (
+        <View className="flex-row flex-wrap items-center gap-1.5">
+          {replyer ? (
+            <Pressable
+              onPress={replyer.onPress}
+              hitSlop={6}
+              className="flex-row items-center gap-1.5 rounded-full border border-border bg-card px-2.5 py-1 active:bg-muted"
+            >
+              <Bot size={13} color={replyer.warning ? colors.destructive : colors.mutedForeground} />
+              <Text numberOfLines={1} className={`max-w-[220px] text-xs ${replyer.warning ? 'text-destructive' : 'text-muted-foreground'}`}>
+                {replyer.label}
+              </Text>
+            </Pressable>
+          ) : null}
+          {attached.map((structure, index) => (
+            <View
+              key={`${structure.identifier}:${structure.object}`}
+              className="flex-row items-center gap-1 rounded-full border border-primary/40 bg-primary/10 py-1 pl-2.5 pr-1.5"
+            >
+              <Paperclip size={12} color={colors.primary} />
+              <Text numberOfLines={1} className="max-w-[180px] text-xs text-primary">
+                {structureLabel(structure)}
+              </Text>
+              <Pressable
+                onPress={() => attachments?.onRemove(index)}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel={`Remove ${structureLabel(structure)}`}
+                className="active:opacity-60"
+              >
+                <X size={13} color={colors.primary} />
+              </Pressable>
+            </View>
+          ))}
+        </View>
       ) : null}
       <View className="flex-row items-end gap-2">
         <TextInput

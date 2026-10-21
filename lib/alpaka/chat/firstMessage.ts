@@ -15,3 +15,20 @@ export const takeFirstMessage = (roomId: string): string | null => {
   waiting.delete(roomId);
   return text;
 };
+
+/**
+ * The words a room opened from "Talk about this" waits with in its composer:
+ * a question about the thing, there to send or rewrite. Not sent for the
+ * user, as orkestrator prefills its composer. Taken once, as above.
+ */
+const drafts = new Map<string, string>();
+
+export const leaveDraft = (roomId: string, text: string) => {
+  drafts.set(roomId, text);
+};
+
+export const takeDraft = (roomId: string): string | null => {
+  const text = drafts.get(roomId) ?? null;
+  drafts.delete(roomId);
+  return text;
+};

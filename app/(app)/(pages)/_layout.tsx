@@ -1,4 +1,5 @@
 import { RunOnButton } from '@/components/actions/RunOnButton';
+import { TalkAboutButton } from '@/components/alpaka/TalkAboutButton';
 import { CallAboutButton } from '@/components/calls/CallAboutButton';
 import { ExitGuard } from '@/components/navigation/ExitGuard';
 import { BackButton, MenuButton, SearchButton, ShareButton } from '@/components/navigation/HeaderButtons';
@@ -102,6 +103,7 @@ const screenOptions = ({ route, navigation }: Screen) => {
         <CallAboutButton />
         <RunOnButton />
         <ShareButton />
+        <TalkAboutButton />
         <SearchButton />
       </View>
     ),

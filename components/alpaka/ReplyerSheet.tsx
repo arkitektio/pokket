@@ -1,8 +1,9 @@
 import { ActionForm } from '@/components/actions/ActionForm';
 import { PickerRow, PickerSheet } from '@/components/bank/PickerSheet';
 import { Text } from '@/components/ui/text';
-import { hasSettings, messageKey, NO_REPLYER } from '@/lib/alpaka/chat/replyer';
+import { hasSettings, messageKey, NO_REPLYER, subjectKey } from '@/lib/alpaka/chat/replyer';
 import type { ReplyerController } from '@/lib/alpaka/chat/useReplyer';
+import { structureKindName } from '@/lib/lovekit/call/structures';
 import { notEmpty } from '@/lib/ports/kinds';
 import { prefill } from '@/lib/ports/prefill';
 import type { FormPort } from '@/lib/ports/types';
@@ -13,8 +14,9 @@ import * as React from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 
 /**
- * A replyer's settings: the form of its action without the message, which
- * the chat fills in. Saved on the phone and used for every message from then.
+ * A replyer's settings: the form of its action without the message and the
+ * subject, which the chat fills in. Saved on the phone and used for every
+ * message from then.
  */
 function ReplyerSettings({
   option,
@@ -30,8 +32,9 @@ function ReplyerSettings({
   const colors = useThemeColors();
   const ports = React.useMemo(() => {
     const message = messageKey(option);
-    return (option.args.filter(notEmpty) as FormPort[]).filter((port) => port.key !== message);
-  }, [option]);
+    const about = subjectKey(option, replyer.subject);
+    return (option.args.filter(notEmpty) as FormPort[]).filter((port) => port.key !== message && port.key !== about);
+  }, [option, replyer.subject]);
   const saved = replyer.settingsOf(option);
   const start = React.useMemo(() => prefill(ports, saved, option.latestTask?.args), [ports, saved, option.latestTask?.args]);
 
@@ -81,6 +84,7 @@ export function ReplyerSheet({
   };
   const inSettings = replyer.replyers.find((option) => option.id === settingUp);
   const chosen = replyer.chosen;
+  const subject = replyer.subject;
 
   return (
     <PickerSheet visible={visible} title={inSettings ? 'Settings' : 'Who replies'} onClose={close}>
@@ -92,7 +96,7 @@ export function ReplyerSheet({
             A replyer runs after each message you send and writes its answer into the room.
           </Text>
           <ScrollView>
-            {chosen && hasSettings(chosen) ? (
+            {chosen && hasSettings(chosen, subject) ? (
               <PickerRow
                 leading={<Settings2 size={18} color={colors.primary} />}
                 title={`Settings for ${chosen.name}`}
@@ -111,12 +115,15 @@ export function ReplyerSheet({
               const blocker = replyer.blockerOf(option);
               // One that takes no message cannot be set up into working; one that lacks settings can.
               const unusable = !messageKey(option);
+              // Made for what the room is about: it is handed that beside each message.
+              const about =
+                subject && replyer.isSpecific(option) ? `About this ${structureKindName(subject.identifier).toLowerCase()}` : null;
               return (
                 <PickerRow
                   key={option.id}
                   leading={<Bot size={18} color={blocker ? colors.mutedForeground : colors.primary} />}
                   title={option.name}
-                  detail={blocker ?? option.description}
+                  detail={blocker ?? ([about, option.description].filter(Boolean).join(' · ') || undefined)}
                   selected={chosen?.id === option.id}
                   disabled={unusable}
                   onPress={() => (blocker ? setSettingUp(option.id) : pick(option.id))}

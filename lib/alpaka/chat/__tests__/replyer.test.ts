@@ -1,5 +1,17 @@
 import { describe, expect, it } from "@jest/globals";
-import { chooseReplyer, hasSettings, messageKey, missingArgs, NO_REPLYER, Replyer, replyerArgs, replyerBlocker } from "../replyer";
+import {
+  bySubject,
+  chooseReplyer,
+  hasSettings,
+  isSpecific,
+  messageKey,
+  missingArgs,
+  NO_REPLYER,
+  Replyer,
+  replyerArgs,
+  replyerBlocker,
+  subjectKey,
+} from "../replyer";
 
 const message = { key: "message", kind: "STRUCTURE", identifier: "@alpaka/message", nullable: false };
 const model = { key: "model", kind: "STRUCTURE", identifier: "@alpaka/llmmodel", nullable: false };
@@ -89,5 +101,46 @@ describe("choosing a room's replyer", () => {
   });
   it("respects choosing none", () => {
     expect(chooseReplyer([ready], NO_REPLYER)).toBeNull();
+  });
+});
+
+describe("a replyer about a structure", () => {
+  const image = { key: "image", kind: "STRUCTURE", identifier: "@mikro/image", nullable: false };
+  const subject = { identifier: "@mikro/image", object: 5 };
+  const specific = replyer({ id: "s", args: [message, image] });
+  const generic = replyer({ id: "g", args: [message] });
+
+  it("takes the subject in the argument of its kind", () => {
+    expect(subjectKey(specific, subject)).toBe("image");
+    expect(subjectKey(specific, { identifier: "@rekuest/task" })).toBeNull();
+    expect(subjectKey(specific, null)).toBeNull();
+  });
+
+  it("never takes the subject in its message", () => {
+    const messages = { identifier: "@alpaka/message" };
+    expect(subjectKey(replyer({ args: [message] }), messages)).toBeNull();
+  });
+
+  it("does not need the subject set, the chat fills it", () => {
+    expect(replyerBlocker(specific, null, subject)).toBeNull();
+    expect(missingArgs(specific)).toEqual(["image"]);
+    expect(hasSettings(specific, subject)).toBe(false);
+  });
+
+  it("is handed the subject beside the message", () => {
+    expect(replyerArgs(specific, "42", null, subject)).toEqual({
+      message: { __identifier: "@alpaka/message", object: "42" },
+      image: { __identifier: "@mikro/image", object: "5" },
+    });
+    expect(replyerArgs(generic, "42", null, subject)).toEqual({
+      message: { __identifier: "@alpaka/message", object: "42" },
+    });
+  });
+
+  it("comes first among the replyers, so a room about it picks it", () => {
+    expect(isSpecific(specific, subject)).toBe(true);
+    expect(bySubject([generic, specific], subject).map((r) => r.id)).toEqual(["s", "g"]);
+    expect(bySubject([generic, specific], null).map((r) => r.id)).toEqual(["g", "s"]);
+    expect(chooseReplyer(bySubject([generic, specific], subject), null, (r) => replyerBlocker(r, null, subject))?.id).toBe("s");
   });
 });

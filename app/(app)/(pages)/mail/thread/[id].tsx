@@ -1,4 +1,5 @@
 import { RunOnButton } from '@/components/actions/RunOnButton';
+import { TalkAboutButton } from '@/components/alpaka/TalkAboutButton';
 import { CallAboutButton } from '@/components/calls/CallAboutButton';
 import { MessageCard } from '@/components/mail/MessageCard';
 import { KuvertUnavailable, MailLoadingState } from '@/components/mail/states';
@@ -78,6 +79,7 @@ function ThreadContent({ id }: { id: string }) {
       </Pressable>
       <CallAboutButton />
       <RunOnButton />
+      <TalkAboutButton />
       <SearchButton />
     </View>
   );
