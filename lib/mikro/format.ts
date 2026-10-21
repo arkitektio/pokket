@@ -74,9 +74,9 @@ export const lensSubjectName = (lens: ListLensFragment): string => {
     case "AnnotationLens":
       return lens.annotationCollection.name;
     case "MeshLens":
-      return `Mesh collection v${lens.meshCollection.version}`;
+      return lens.meshCollection.name || `Mesh collection ${lens.meshCollection.id}`;
     case "NetworkLens":
-      return `Network collection v${lens.networkCollection.version}`;
+      return lens.networkCollection.name || `Network collection ${lens.networkCollection.id}`;
     default:
       return "";
   }

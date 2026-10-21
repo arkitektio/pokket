@@ -643,6 +643,8 @@ export type AgentFilter = {
   /** Agents that can receive work now: a webhook agent, or a connected one with a fresh heartbeat (takt's rule). */
   available?: InputMaybe<Scalars['Boolean']['input']>;
   blokDependency?: InputMaybe<Scalars['ID']['input']>;
+  /** The agents that called this task, nearest first: its ancestors' agents, then the agent of the app its run was started from. Never the task's own agent. How an app finds what its caller offers (with actionDemands) and calls it. */
+  callerOf?: InputMaybe<Scalars['ID']['input']>;
   /** Filter by client ID of the app the agent is registered to */
   clientId?: InputMaybe<Scalars['String']['input']>;
   dependency?: InputMaybe<Scalars['ID']['input']>;
@@ -655,6 +657,8 @@ export type AgentFilter = {
   hasStates?: InputMaybe<Array<Scalars['String']['input']>>;
   /** Filter by IDs of the agents */
   ids?: InputMaybe<Array<Scalars['ID']['input']>>;
+  /** The agents with at least one implementation listed under any of these protocols, declared as a hint (`on_scene_annotation`) or inferred. Each agent once, however many of its actions match. */
+  implementsProtocols?: InputMaybe<Array<Scalars['String']['input']>>;
   /** Filter by pinned agents */
   pinned?: InputMaybe<Scalars['Boolean']['input']>;
   /** Agents meeting a port's descriptor constraints (a picker hands them in as $requires). The only descriptor of @rekuest/agent is @rekuest/supervisor; any other key is refused. */
@@ -888,10 +892,14 @@ export type AssignInput = {
   interface?: InputMaybe<Scalars['String']['input']>;
   /** Hold the task back until then: it is persisted now but only dispatched once due. A time in the past (or none) dispatches immediately. */
   notBefore?: InputMaybe<Scalars['DateTime']['input']>;
+  /** Whether the work the agents ask for under this task waits for a person: ASK (the default) holds every child an agent assigns until someone approves it, AUTO runs it without asking (auto-mode). Honoured on a root only: a child always takes its parent's. */
+  policy?: InputMaybe<TaskPolicy>;
   /** The reference of the task. This is used to identify the task in the system. */
   reference?: InputMaybe<Scalars['String']['input']>;
   /** The resolution ID to assign to when assining to a implementation with dependencies */
   resolution?: InputMaybe<Scalars['ID']['input']>;
+  /** What the agent's state must hold for the task to run. Refused unless the agent says it tests them, and for a state or path its declaration does not have. */
+  stateRequires?: InputMaybe<Array<StateRequirementInput>>;
   /** Whether the task should step. Ie. go to the next breakpoint */
   step?: InputMaybe<Scalars['Boolean']['input']>;
 };
@@ -985,6 +993,10 @@ export type BlockInput = {
 
 export type Blok = {
   __typename?: 'Blok';
+  /** The app whose agents provide this blok; null for a custom blok a user made. A provided blok changes and goes with its agents' registrations and cannot be edited or materialized by hand: fork it. */
+  app?: Maybe<App>;
+  /** The items this blok is opened for, declared like an action's args and read under `@args.<key>`; empty for a blok that is opened on its own. */
+  args: Array<ArgPort>;
   catalog: UiCatalog;
   /** The whole component tree as one JSON value, in the wire spelling (snake_case keys). Unlike `components` it has no depth limit, which a selection set always has. */
   componentTree: Scalars['AnyDefault']['output'];
@@ -1006,10 +1018,22 @@ export type Blok = {
   forNode?: Maybe<Scalars['String']['output']>;
   /** A SHA-256 of what the blok renders: its component tree, demo state and context. Two bloks with the same hash draw the same thing, so a client may cache what it rendered under it. */
   hash: Scalars['String']['output'];
+  /** The revision this custom blok is at: what an edit names as its `base`. Null for a provided blok, which changes with its agents' registrations instead. */
+  head?: Maybe<BlokRevision>;
   id: Scalars['ID']['output'];
   /** Materialized bloks that are instances of this blok. */
   materializedBloks: Array<MaterializedBlok>;
   name: Scalars['String']['output'];
+  /** Where this custom blok was installed from (e.g. kabinet's `RepoBlok.origin`); null for one made here. */
+  origin?: Maybe<Scalars['String']['output']>;
+  /** The hash its origin gave what it draws when it was installed. When the origin's hash differs now, it has an update. */
+  originHash?: Maybe<Scalars['String']['output']>;
+  /** Whether an app's agents provide this blok (see `app`). */
+  provided: Scalars['Boolean']['output'];
+  /** The agents that currently provide this blok, each through its own materialization. */
+  providers: Array<Agent>;
+  /** The revisions of this custom blok, newest first. An undo is a revision too, so history only grows. */
+  revisions: Array<BlokRevision>;
 };
 
 
@@ -1023,6 +1047,12 @@ export type BlokMaterializedBloksArgs = {
   filters?: InputMaybe<MaterializedBlokFilter>;
   ordering?: Array<MaterializedBlokOrder>;
   pagination?: InputMaybe<OffsetPaginationInput>;
+};
+
+
+export type BlokRevisionsArgs = {
+  limit?: Scalars['Int']['input'];
+  offset?: Scalars['Int']['input'];
 };
 
 export type BlokAgentMapping = {
@@ -1080,8 +1110,45 @@ export type BlokDependencyFilter = {
   ids?: InputMaybe<Array<Scalars['ID']['input']>>;
 };
 
+/** What an edit of a blok did, or with `dryRun` would do. */
+export type BlokEdit = {
+  __typename?: 'BlokEdit';
+  /** Whether anything was written; false for a dry run. */
+  applied: Scalars['Boolean']['output'];
+  /** The blok the edit landed on: the one edited, or the custom copy of a provided one. An editor of the blok follows it here. */
+  blok: Blok;
+  /** Non-fatal findings about the new content, e.g. util calls no catalog provides. */
+  diagnostics: Array<Diagnostic>;
+  /** Whether the blok was provided and the edit made a custom copy of it to land on: `blok` is the copy, and an edit made through a materialization has a new one of it. */
+  forked: Scalars['Boolean']['output'];
+  /** The materialization that shows the edit: the one it was made through, or the fork's new one. Null for an edit of the blok itself. */
+  materializedBlok?: Maybe<MaterializedBlok>;
+  /** The revision the blok is at after the edit; null for a dry run. */
+  revision?: Maybe<BlokRevision>;
+};
+
+/** A way to filter bloks */
+export type BlokFilter = {
+  AND?: InputMaybe<BlokFilter>;
+  DISTINCT?: InputMaybe<Scalars['Boolean']['input']>;
+  NOT?: InputMaybe<BlokFilter>;
+  OR?: InputMaybe<BlokFilter>;
+  /** Only bloks whose args accept these demands: the bloks an item opens in. Same matching as `ActionFilter.demands`, so a match's `descriptors` are checked against each arg's `requires`. Only `ARGS` demands; a blok without args matches none. */
+  demands?: InputMaybe<Array<PortDemandInput>>;
+  /** Only bloks installed from an origin (true) or only ones made here (false). */
+  hasOrigin?: InputMaybe<Scalars['Boolean']['input']>;
+  /** Only bloks installed from one of these origins. */
+  origins?: InputMaybe<Array<Scalars['String']['input']>>;
+  /** Only bloks an app provides (true) or only custom bloks users made (false). */
+  provided?: InputMaybe<Scalars['Boolean']['input']>;
+  /** Search by name */
+  search?: InputMaybe<Scalars['String']['input']>;
+};
+
 /** Which locks does the agent provide in general */
 export type BlokImplementationInput = {
+  /** The items this Blok is opened for, declared like an action's args and read under `@args.<key>`. A UI offers the Blok on any item its args accept (`MaterializedBlokFilter.demands`). HTML bloks only. */
+  args?: Array<ArgPortInput>;
   /** The optional catalog name if this Blok should be registered inside a specific namespace in your Electron app's UI component registry. */
   catalog?: InputMaybe<Scalars['String']['input']>;
   /** The UI component tree blueprint for this Blok, unless it is sent as its `source`. */
@@ -1104,6 +1171,39 @@ export type BlokImplementationInput = {
   key: Scalars['String']['input'];
   /** The Blok as BSX, parsed by the server into its component tree: three times fewer bytes than the tree. Exactly one of `components` and `source` is sent. */
   source?: InputMaybe<Scalars['String']['input']>;
+};
+
+/** One state of a custom blok, never changed once written. Every write to a custom blok commits one; the blok is a copy of its head. */
+export type BlokRevision = {
+  __typename?: 'BlokRevision';
+  /** The user it was written as. */
+  author?: Maybe<User>;
+  blok: Blok;
+  catalog: UiCatalog;
+  /** The whole component tree as one JSON value, in the wire spelling (snake_case keys). */
+  componentTree: Scalars['AnyDefault']['output'];
+  /** The typed component tree of this revision. */
+  components: Array<ComponentNode>;
+  /** sha256 of everything this revision holds, its dependencies included (unlike `hash`). */
+  contentHash: Scalars['String']['output'];
+  /** The renderer for this revision's root. */
+  context: ComponentContext;
+  createdAt: Scalars['DateTime']['output'];
+  /** The local state of this revision. */
+  demoState: Scalars['Props']['output'];
+  /** The agent dependencies of this revision. */
+  dependencies: Array<RevisionDependency>;
+  /** A SHA-256 of what this revision renders, as `Blok.hash` is of the head. */
+  hash: Scalars['String']['output'];
+  id: Scalars['ID']['output'];
+  /** What changed and why, in a sentence. */
+  message?: Maybe<Scalars['String']['output']>;
+  /** The place of this revision in its blok's history, from 1. */
+  number: Scalars['Int']['output'];
+  /** The revision this one was made from; null for the first. */
+  parent?: Maybe<BlokRevision>;
+  /** The task that wrote it, e.g. the assistant turn that designed it. */
+  task?: Maybe<Task>;
 };
 
 /** The input for bouncing an agent. */
@@ -1453,6 +1553,10 @@ export type CreateBlokInput = {
   forNode?: InputMaybe<Scalars['String']['input']>;
   /** The name of the Blok, used for identification in the system. */
   name: Scalars['String']['input'];
+  /** Where the blok is installed from (kabinet's `RepoBlok.origin`). A blok of the same origin is updated in place instead of matched by name. */
+  origin?: InputMaybe<Scalars['String']['input']>;
+  /** The hash its origin gives what it draws, kept to tell when the origin has an update. */
+  originHash?: InputMaybe<Scalars['String']['input']>;
   /** The blok as BSX, which the server parses into `components`: send one of the two. */
   source?: InputMaybe<Scalars['String']['input']>;
 };
@@ -1515,6 +1619,8 @@ export type CreateScheduleInput = {
   name: Scalars['String']['input'];
   /** Whether a run may start while the previous one is open. */
   overlap?: ScheduleOverlap;
+  /** The policy of every run it creates: ASK (the default) holds a child an agent asks for until a person approves it; AUTO runs it unattended. */
+  policy?: TaskPolicy;
   timezone?: Scalars['String']['input'];
 };
 
@@ -1602,6 +1708,8 @@ export type CreateTriggerInput = {
   /** Nothing fires once it created this many runs. */
   maxRuns?: InputMaybe<Scalars['Int']['input']>;
   name: Scalars['String']['input'];
+  /** The policy of every run it fires: ASK (the default) holds a child an agent asks for until a person approves it; AUTO runs it unattended. */
+  policy?: TaskPolicy;
   port: Scalars['String']['input'];
 };
 
@@ -1703,6 +1811,16 @@ export type DashboardPlacementOrder =
   { createdAt: Ordering; role?: never; }
   |  { createdAt?: never; role: Ordering; };
 
+/** The input for deciding a held task. */
+export type DecideInput = {
+  /** What the person says with the decision. A child gets it as its Assign's message; a task's own hold gets it back. */
+  answer?: InputMaybe<Scalars['String']['input']>;
+  /** Approve (the child runs; a task's own hold carries on approved) or deny (the child ends DENIED without running; a task's own hold carries on denied) */
+  approved: Scalars['Boolean']['input'];
+  /** The held task: a child an agent asked for, or a task that holds itself */
+  task: Scalars['ID']['input'];
+};
+
 /**
  * A definition
  *
@@ -1741,6 +1859,8 @@ export type DefinitionInput = {
   name: Scalars['String']['input'];
   /** The port groups of the definition. This is used to group ports together in the UI */
   portGroups?: Array<PortGroupInput>;
+  /** Where the action means to hook in (`on_scene_annotation`): hints a caller filters on, stored beside the protocols the server infers. Not a contract, and not part of the action's hash. */
+  protocols?: Array<Scalars['String']['input']>;
   /** Whether the action is pure: same args always produce the same result and no side effects — its results are replayable/cacheable. Implies idempotent. Incompatible with stateful and with IRREVERSIBLE effects. */
   pure?: Scalars['Boolean']['input'];
   /** The returns of the definition. This is the output ports of the definition */
@@ -1924,6 +2044,34 @@ export type DynamicValueInput = {
   path?: InputMaybe<Scalars['String']['input']>;
 };
 
+/** Edit a blok, on it or through a materialization of it (and its bindings there), as one new revision. */
+export type EditBlokInput = {
+  /** Bindings on `materialized_blok`, by dependency key, over the ones it has. Bindings of keys the edit removes go. Refused with `blok`: a blok binds no agents, its materializations do. */
+  agentMappings?: InputMaybe<Array<MappedAgentInput>>;
+  /** The revision the edit starts from. It must still be the blok's head, or the edit is refused. Required for a custom blok; a provided blok has no revisions and is forked. */
+  base?: InputMaybe<Scalars['ID']['input']>;
+  /** The blok to edit, as an editor of the blok itself does. Send it or `materialized_blok`, not both. */
+  blok?: InputMaybe<Scalars['ID']['input']>;
+  /** Name of the UI catalog (in the caller's organization) the blok renders against. Kept when omitted. */
+  catalog?: InputMaybe<Scalars['String']['input']>;
+  /** The full component tree. Kept when omitted. */
+  components?: InputMaybe<Array<ComponentNodeInput>>;
+  /** The full local state. Kept when omitted. */
+  demoState?: InputMaybe<Scalars['Args']['input']>;
+  /** The full list of agent dependencies. Kept when omitted; keys not listed are removed. */
+  dependencies?: InputMaybe<Array<AgentDependencyInput>>;
+  /** Check everything and return the findings, keeping nothing. Off when omitted. */
+  dryRun?: InputMaybe<Scalars['Boolean']['input']>;
+  /** The materialization the edit is made through, which also takes `agent_mappings`. Send it or `blok`, not both. */
+  materializedBlok?: InputMaybe<Scalars['ID']['input']>;
+  /** What changed and why, in a sentence; kept with the revision. */
+  message?: InputMaybe<Scalars['String']['input']>;
+  /** The full component tree as BSX, which the server parses: send it or `components`, not both. */
+  source?: InputMaybe<Scalars['String']['input']>;
+  /** The task making the edit (one the caller's agent runs), kept with the revision. */
+  task?: InputMaybe<Scalars['ID']['input']>;
+};
+
 export type Effect = {
   call: UtilCall;
   /** The full call tree as raw JSON, so deep trees are not truncated by fragment depth. */
@@ -2048,6 +2196,14 @@ export enum FiringOutcome {
   Rejected = 'REJECTED'
 }
 
+/** Copy a blok an app provides into a custom blok of the caller's organization, to edit it or bind other agents to it. */
+export type ForkBlokInput = {
+  /** The provided blok to fork. */
+  id: Scalars['ID']['input'];
+  /** The custom blok's name. Defaults to the provided blok's. */
+  name?: InputMaybe<Scalars['String']['input']>;
+};
+
 export enum Granularity {
   Day = 'DAY',
   Hour = 'HOUR',
@@ -2128,7 +2284,7 @@ export type HostedStructureFilter = {
   ids?: InputMaybe<Array<Scalars['ID']['input']>>;
   /** Keep the structures of this package, e.g. 'mikro' */
   package?: InputMaybe<Scalars['String']['input']>;
-  /** Keep structures whose identifier, label or description contains this text */
+  /** Keep structures whose identifier, label or description contains this text, or whose label and description mean something close to it. Substring matches rank first, then by similarity; an explicit `ordering` replaces that ranking. */
   search?: InputMaybe<Scalars['String']['input']>;
   /** Keep the structures this service hosts, by its name */
   service?: InputMaybe<Scalars['String']['input']>;
@@ -2260,10 +2416,13 @@ export type ImplementationAgentFilter = {
   DISTINCT?: InputMaybe<Scalars['Boolean']['input']>;
   NOT?: InputMaybe<ImplementationAgentFilter>;
   OR?: InputMaybe<ImplementationAgentFilter>;
+  /** Implementations of the agents that called this task, nearest first: its ancestors' agents, then the agent of the app its run was started from. Never the task's own agent. How an app finds what its caller offers (with actionDemand) and calls it. */
+  callerOf?: InputMaybe<Scalars['ID']['input']>;
   clientId?: InputMaybe<Scalars['String']['input']>;
   hasImplementations?: InputMaybe<Array<Scalars['String']['input']>>;
   hasStates?: InputMaybe<Array<Scalars['String']['input']>>;
   ids?: InputMaybe<Array<Scalars['ID']['input']>>;
+  implementsProtocols?: InputMaybe<Array<Scalars['String']['input']>>;
 };
 
 export type ImplementationFilter = {
@@ -2482,13 +2641,21 @@ export type MaterializedBlok = {
   createdAt: Scalars['DateTime']['output'];
   /** Placements of this materialized blok on dashboards. */
   dashboardPlacements: Array<DashboardPlacement>;
+  /** The agent this materialization belongs to, for a blok its app provides; null when a user made it. An agent's materialization follows its registrations. */
+  declaredBy?: Maybe<Agent>;
   description?: Maybe<Scalars['String']['output']>;
   id: Scalars['ID']['output'];
   /** Whether this is its declaring agent's default blok for the blok's context. */
   isDefault: Scalars['Boolean']['output'];
   name?: Maybe<Scalars['String']['output']>;
+  /** The revision this materialization stays at; null when it follows its blok's head. */
+  pinnedRevision?: Maybe<BlokRevision>;
   /** Placements of this materialized blok. */
   placements: Array<Placement>;
+  /** The revision this materialization shows: the pinned one, else its blok's head. Null for a provided blok, which has none. */
+  revision?: Maybe<BlokRevision>;
+  /** The required dependencies of the revision shown that no agent is bound to here. An edit made elsewhere can add one: bind it with updateMaterializedBlok. */
+  unboundDependencies: Array<Scalars['String']['output']>;
   updatedAt: Scalars['DateTime']['output'];
 };
 
@@ -2518,8 +2685,12 @@ export type MaterializedBlokFilter = {
   agent?: InputMaybe<Scalars['ID']['input']>;
   /** Only bloks that render in one of these contexts: HTML and SCENE are interfaces to open, LOGO and ACTION_LOGO draw an agent or an action. */
   contexts?: InputMaybe<Array<ComponentContext>>;
+  /** Only materialized bloks whose blok's args accept these demands: what an item opens in. See `BlokFilter.demands`. */
+  demands?: InputMaybe<Array<PortDemandInput>>;
   /** Filter by IDs */
   ids?: InputMaybe<Array<Scalars['ID']['input']>>;
+  /** Only agents' own materializations of the bloks they provide (true) or only ones users made (false). */
+  provided?: InputMaybe<Scalars['Boolean']['input']>;
   /** Search by name */
   search?: InputMaybe<Scalars['String']['input']>;
 };
@@ -2730,6 +2901,8 @@ export type Mutation = {
   createThreedModel: ThreeDModel;
   /** Create a trigger: run an action when a service signals a matching object. */
   createTrigger: Trigger;
+  /** Answer a held task. A child an agent asked for runs once approved, or ends DENIED without running; a task that holds itself carries on with the decision. Only the user the task runs for may decide, and never from the client of the agent that asked. */
+  decide: Task;
   /** Delete an agent record. */
   deleteAgent: Scalars['ID']['output'];
   /** Delete a blok by ID. */
@@ -2754,6 +2927,8 @@ export type Mutation = {
   deleteTrigger: Scalars['ID']['output'];
   /** Delete a wiregram and the rules it owns. */
   deleteWiregram: Scalars['ID']['output'];
+  /** Edit a blok as one new revision on top of the head the editor read: on the blok itself (an editor of the blok), or through a materialization, with its bindings there (an assistant at a dashboard). A provided blok is forked first. With dryRun, every check runs and nothing is kept. */
+  editBlok: BlokEdit;
   /** Ensure agent record exists or is up to date. */
   ensureAgent: Agent;
   /** Write existing schedules and triggers down as a wiregram document, to import elsewhere. Changes nothing. */
@@ -2762,6 +2937,8 @@ export type Mutation = {
   finishMediaUpload: MediaStore;
   /** Fire a trigger on a stored signal by hand (a replay). The run is created whether or not the signal satisfies the trigger, and logged as a firing of its own. */
   fireTrigger: Firing;
+  /** Copy a blok an app provides into a custom blok, to edit it or bind other agents to it. The copy lives on whatever the providing agents do. */
+  forkBlok: Blok;
   /** Implement an agent with given states and implementations. This is used to set up an agent with its initial configuration and capabilities. */
   implementAgent: Agent;
   /** Import a wiregram: one document of schedules and triggers. All or nothing; importing the same key again updates what it created and removes what it no longer lists. */
@@ -2778,6 +2955,8 @@ export type Mutation = {
   pauseProbe: Probe;
   /** Pin an agent to the user. */
   pinAgent: Agent;
+  /** Keep a materialization at one revision of its blok, or let it follow the head again. */
+  pinMaterializedBlok: MaterializedBlok;
   /** Fire a probe at an agent — zero persistence, redis-held state under a TTL, never appears in task history. For high-frequency interactive work (previews, live parameter tweaks). */
   probe: Probe;
   /** Register the components and operations a UI app can render and evaluate (upsert by name in the caller's organization). Bloks and definitions that name the catalog are validated against it. */
@@ -2792,6 +2971,8 @@ export type Mutation = {
   resume: Task;
   /** Resume a paused probe. Idempotent on finished probes; the agent's Resumed report settles the state. */
   resumeProbe: Probe;
+  /** Make an earlier revision's content a custom blok's head again, as a new revision. */
+  revertBlok: BlokRevision;
   /** Shelve data into a memory drawer. */
   shelveInMemoryDrawer: MemoryDrawer;
   /** Run a schedule now: its waiting run is moved to now. Refused while a run is executing. */
@@ -2942,6 +3123,12 @@ export type MutationCreateTriggerArgs = {
 
 
 /** Root mutation type for executing write operations on the API. */
+export type MutationDecideArgs = {
+  input: DecideInput;
+};
+
+
+/** Root mutation type for executing write operations on the API. */
 export type MutationDeleteAgentArgs = {
   input: DeleteAgentInput;
 };
@@ -3014,6 +3201,12 @@ export type MutationDeleteWiregramArgs = {
 
 
 /** Root mutation type for executing write operations on the API. */
+export type MutationEditBlokArgs = {
+  input: EditBlokInput;
+};
+
+
+/** Root mutation type for executing write operations on the API. */
 export type MutationEnsureAgentArgs = {
   input: AgentInput;
 };
@@ -3034,6 +3227,12 @@ export type MutationFinishMediaUploadArgs = {
 /** Root mutation type for executing write operations on the API. */
 export type MutationFireTriggerArgs = {
   input: FireTriggerInput;
+};
+
+
+/** Root mutation type for executing write operations on the API. */
+export type MutationForkBlokArgs = {
+  input: ForkBlokInput;
 };
 
 
@@ -3086,6 +3285,12 @@ export type MutationPinAgentArgs = {
 
 
 /** Root mutation type for executing write operations on the API. */
+export type MutationPinMaterializedBlokArgs = {
+  input: PinMaterializedBlokInput;
+};
+
+
+/** Root mutation type for executing write operations on the API. */
 export type MutationProbeArgs = {
   input: ProbeInput;
 };
@@ -3124,6 +3329,12 @@ export type MutationResumeArgs = {
 /** Root mutation type for executing write operations on the API. */
 export type MutationResumeProbeArgs = {
   input: ResumeProbeInput;
+};
+
+
+/** Root mutation type for executing write operations on the API. */
+export type MutationRevertBlokArgs = {
+  input: RevertBlokInput;
 };
 
 
@@ -3292,6 +3503,14 @@ export type PinInput = {
   id: Scalars['ID']['input'];
   /** Boolean flag indicating whether to pin or unpin. */
   pin: Scalars['Boolean']['input'];
+};
+
+/** Keep a materialization at one revision of its blok, or let it follow the head. */
+export type PinMaterializedBlokInput = {
+  /** The materialization. */
+  id: Scalars['ID']['input'];
+  /** The revision to stay at; null follows the head again. */
+  revision?: InputMaybe<Scalars['ID']['input']>;
 };
 
 /** A placement of an agent in a space. */
@@ -3839,6 +4058,12 @@ export type QueryBlokArgs = {
 };
 
 
+export type QueryBloksArgs = {
+  filters?: InputMaybe<BlokFilter>;
+  pagination?: InputMaybe<OffsetPaginationInput>;
+};
+
+
 export type QueryBloksForModelArgs = {
   ref: Scalars['String']['input'];
 };
@@ -4129,6 +4354,7 @@ export type QuerySignalArgs = {
 
 export type QuerySignalDeclarationsArgs = {
   identifier?: InputMaybe<Scalars['String']['input']>;
+  search?: InputMaybe<Scalars['String']['input']>;
 };
 
 
@@ -4538,6 +4764,32 @@ export enum ReturnWidgetKind {
   Custom = 'CUSTOM'
 }
 
+/** Make an earlier revision's content a blok's head again. */
+export type RevertBlokInput = {
+  /** The revision the caller saw as the head; refused when the head moved since. */
+  base: Scalars['ID']['input'];
+  /** The custom blok. */
+  blok: Scalars['ID']['input'];
+  /** Why, in a sentence. Defaults to 'Back to revision <n>'. */
+  message?: InputMaybe<Scalars['String']['input']>;
+  /** The task making the change (one the caller's agent runs). */
+  task?: InputMaybe<Scalars['ID']['input']>;
+  /** The revision whose content comes back. */
+  to: Scalars['ID']['input'];
+};
+
+/** A dependency as a blok revision declares it. */
+export type RevisionDependency = {
+  __typename?: 'RevisionDependency';
+  /** Only agents of this app may be bound to it. */
+  app?: Maybe<Scalars['String']['output']>;
+  description?: Maybe<Scalars['String']['output']>;
+  key: Scalars['String']['output'];
+  optional: Scalars['Boolean']['output'];
+  /** Only agents of this version may be bound to it. */
+  version?: Maybe<Scalars['String']['output']>;
+};
+
 /** Slim snapshot of a schedule or trigger for the change feeds. */
 export type RuleChange = {
   __typename?: 'RuleChange';
@@ -4610,6 +4862,8 @@ export type Schedule = {
   nextRun?: Maybe<Task>;
   /** Whether a run may start while the previous one is open. */
   overlap: ScheduleOverlap;
+  /** The policy of every run it creates: ASK holds a child an agent asks for until a person approves it, AUTO runs it unattended. */
+  policy: TaskPolicy;
   /** Runs it created so far. */
   runCount: Scalars['Int']['output'];
   /** The most recent runs, newest first. */
@@ -5166,6 +5420,18 @@ export type StatePatchEvent = {
   value: Scalars['Args']['output'];
 };
 
+/** What the agent's state must hold for the task to run: the value at `path` (an RFC 6901 pointer into the state `state`) compared with `value` by `operator`. The agent tests it with the task's locks held; on a mismatch the task ends FAILED with code STATE_PRECONDITION and nothing of it runs. */
+export type StateRequirementInput = {
+  /** How the value at `path` is compared with `value`. */
+  operator: DescriptorOperator;
+  /** An RFC 6901 pointer into the state's value, e.g. '/busy' or '/stage/position/0'. */
+  path: Scalars['String']['input'];
+  /** The state's interface on the agent. */
+  state: Scalars['String']['input'];
+  /** What the value is compared with: IN/NOT_IN take a list, LTE/GTE a number, EXISTS true or false. */
+  value?: InputMaybe<Scalars['Arg']['input']>;
+};
+
 /** A plain snapshot of a state's current value. */
 export type StateSnapshotEvent = {
   __typename?: 'StateSnapshotEvent';
@@ -5294,7 +5560,7 @@ export type StructureDescriptorFilter = {
   key?: InputMaybe<Scalars['String']['input']>;
   /** Keep the descriptors of structures in this package, e.g. 'mikro' */
   package?: InputMaybe<Scalars['String']['input']>;
-  /** Keep descriptors whose key or description contains this text */
+  /** Keep descriptors whose key or description contains this text, or whose description means something close to it. Substring matches rank first, then by similarity; an explicit `ordering` replaces that ranking. */
   search?: InputMaybe<Scalars['String']['input']>;
   /** Keep the descriptors declared by this service, by its name */
   service?: InputMaybe<Scalars['String']['input']>;
@@ -5474,6 +5740,8 @@ export type Task = {
   parent?: Maybe<Task>;
   /** The parent's step this child took; null for roots and for children of agents without numbering. */
   parentStep?: Maybe<Scalars['Int']['output']>;
+  /** Whether the work agents ask for under this task waits for a person (ASK) or runs without asking (AUTO, auto-mode). A root's is set on its assign; a child takes its parent's. */
+  policy: TaskPolicy;
   /** Optional external reference for tracking. */
   reference?: Maybe<Scalars['String']['output']>;
   /** Resolution used to resolve dependencies for this task. */
@@ -5584,7 +5852,7 @@ export type TaskEvent = {
   step?: Maybe<Scalars['Int']['output']>;
   /** Associated task. */
   task: Task;
-  /** EFFECT events: the value the task took (NOW: epoch seconds, RANDOM: hex, SLEEP: deadline). */
+  /** EFFECT events: the value the task took (NOW: epoch seconds, RANDOM: hex, SLEEP: deadline). HELD: what waits for a decision ({kind: "assign", prompt, action, agent, args, caller_task, caller_agent} for a child an agent asked for, with held: the child's id on its parent and root; {kind: "self", prompt, details} for a task's own hold). DECIDED: the decision ({approved, answer, auto, user}). DENIED: {answer, user}. FAILED: {code} when the failure has one the protocol names (STATE_PRECONDITION: the agent's state did not match the task's stateRequires, and nothing of it ran). LOST: what is known about the lost run. */
   value?: Maybe<Scalars['AnyDefault']['output']>;
 };
 
@@ -5621,9 +5889,12 @@ export enum TaskEventKind {
   Cancelling = 'CANCELLING',
   Completed = 'COMPLETED',
   Critical = 'CRITICAL',
+  Decided = 'DECIDED',
   Delegate = 'DELEGATE',
+  Denied = 'DENIED',
   Effect = 'EFFECT',
   Failed = 'FAILED',
+  Held = 'HELD',
   Interrupted = 'INTERRUPTED',
   Interrupting = 'INTERRUPTING',
   LateReport = 'LATE_REPORT',
@@ -5722,6 +5993,12 @@ export enum TaskInstructKind {
 export type TaskOrder =
   { createdAt: Ordering; finishedAt?: never; }
   |  { createdAt?: never; finishedAt: Ordering; };
+
+/** Whether the work an agent asks for waits for a person. ASK: a child an agent assigns is held until a person approves it, and the task's own holds wait for a decision. AUTO: they are approved without asking (auto-mode). Set on a root assign; every child inherits its parent's. */
+export enum TaskPolicy {
+  Ask = 'ASK',
+  Auto = 'AUTO'
+}
 
 export type TaskStats = {
   __typename?: 'TaskStats';
@@ -6017,6 +6294,8 @@ export type Trigger = {
   maxRuns?: Maybe<Scalars['Int']['output']>;
   /** Human-readable name. */
   name: Scalars['String']['output'];
+  /** The policy of every run it fires: ASK holds a child an agent asks for until a person approves it, AUTO runs it unattended. */
+  policy: TaskPolicy;
   /** The STRUCTURE argument that receives the signalled object. */
   port: Scalars['String']['output'];
   /** Runs it created so far. */
@@ -6101,6 +6380,13 @@ export type UiCatalog = {
   widgetDefaults: Array<WidgetDefault>;
 };
 
+
+/** A UI catalog: the components a UI app can render and the pure operations it can evaluate for UtilCalls, registered per organization. */
+export type UiCatalogBloksArgs = {
+  filters?: InputMaybe<BlokFilter>;
+  pagination?: InputMaybe<OffsetPaginationInput>;
+};
+
 /** The input for bouncing an agent. */
 export type UnblockInput = {
   /** The agent ID to unblock. */
@@ -6122,13 +6408,25 @@ export type UpdateAgentInput = {
 
 /** The input for updating a blok. Omitted (null) fields are left unchanged; list fields replace wholesale. */
 export type UpdateBlokInput = {
-  /** Name of the UI catalog (in the caller's organization) this blok renders against. Created if missing. */
+  /**
+   * Name of the UI catalog (in the caller's organization) this blok renders against. Created if missing.
+   * @deprecated Use editBlok: it checks the write is made on the head you read, keeps a message with the revision, and has a dry run. updateBlok keeps name and description.
+   */
   catalog?: InputMaybe<Scalars['String']['input']>;
-  /** The full component tree of the blok. Replaces the existing tree when provided. */
+  /**
+   * The full component tree of the blok. Replaces the existing tree when provided.
+   * @deprecated Use editBlok: it checks the write is made on the head you read, keeps a message with the revision, and has a dry run. updateBlok keeps name and description.
+   */
   components?: InputMaybe<Array<ComponentNodeInput>>;
-  /** The demo state used to preview this blok. Replaces the existing demo state when provided. */
+  /**
+   * The demo state used to preview this blok. Replaces the existing demo state when provided.
+   * @deprecated Use editBlok: it checks the write is made on the head you read, keeps a message with the revision, and has a dry run. updateBlok keeps name and description.
+   */
   demoState?: InputMaybe<Scalars['Args']['input']>;
-  /** The full list of agent dependencies. When provided it replaces the existing set: keys not listed are deleted and their agent mappings on materialized bloks lose their dependency reference. */
+  /**
+   * The full list of agent dependencies. When provided it replaces the existing set: keys not listed are deleted and their agent mappings on materialized bloks lose their dependency reference.
+   * @deprecated Use editBlok: it checks the write is made on the head you read, keeps a message with the revision, and has a dry run. updateBlok keeps name and description.
+   */
   dependencies?: InputMaybe<Array<AgentDependencyInput>>;
   /** The description of the blok and its purpose. */
   description?: InputMaybe<Scalars['String']['input']>;
@@ -6136,7 +6434,10 @@ export type UpdateBlokInput = {
   id: Scalars['ID']['input'];
   /** The name of the blok, used for identification in the system. */
   name?: InputMaybe<Scalars['String']['input']>;
-  /** The blok as BSX, which the server parses into the tree it replaces the existing one with: send it or `components`, not both. */
+  /**
+   * The blok as BSX, which the server parses into the tree it replaces the existing one with: send it or `components`, not both.
+   * @deprecated Use editBlok: it checks the write is made on the head you read, keeps a message with the revision, and has a dry run. updateBlok keeps name and description.
+   */
   source?: InputMaybe<Scalars['String']['input']>;
 };
 
@@ -6187,6 +6488,8 @@ export type UpdateScheduleInput = {
   maxRuns?: InputMaybe<Scalars['Int']['input']>;
   name?: InputMaybe<Scalars['String']['input']>;
   overlap?: InputMaybe<ScheduleOverlap>;
+  /** The policy of every run it creates: ASK (the default) holds a child an agent asks for until a person approves it; AUTO runs it unattended. A waiting run is re-planned with it. */
+  policy?: InputMaybe<TaskPolicy>;
   timezone?: InputMaybe<Scalars['String']['input']>;
 };
 
@@ -6232,6 +6535,8 @@ export type UpdateTriggerInput = {
   kind?: InputMaybe<SignalKind>;
   maxRuns?: InputMaybe<Scalars['Int']['input']>;
   name?: InputMaybe<Scalars['String']['input']>;
+  /** The policy of every run it fires: ASK (the default) holds a child an agent asks for until a person approves it; AUTO runs it unattended. */
+  policy?: InputMaybe<TaskPolicy>;
   port?: InputMaybe<Scalars['String']['input']>;
 };
 
@@ -6369,6 +6674,8 @@ export type WireScheduleInput = {
   name: Scalars['String']['input'];
   /** Whether a run may start while the previous one is open. */
   overlap?: ScheduleOverlap;
+  /** The policy of every run the rule creates: ASK holds a child an agent asks for until a person approves it, AUTO runs it unattended. */
+  policy?: TaskPolicy;
   /** The IANA zone the cron line is read in. */
   timezone?: Scalars['String']['input'];
 };
@@ -6401,6 +6708,8 @@ export type WireTriggerInput = {
   maxRuns?: InputMaybe<Scalars['Int']['input']>;
   /** A human-readable name. */
   name: Scalars['String']['input'];
+  /** The policy of every run the rule creates: ASK holds a child an agent asks for until a person approves it, AUTO runs it unattended. */
+  policy?: TaskPolicy;
   /** The STRUCTURE argument that receives the signalled object. */
   port: Scalars['String']['input'];
 };
