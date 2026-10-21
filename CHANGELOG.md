@@ -1,3 +1,10 @@
+## [1.22.1](https://github.com/arkitektio/pokket/compare/v1.22.0...v1.22.1) (2026-10-21)
+
+
+### Bug Fixes
+
+* **graphql:** regenerate mikro and rekuest against the live schemas ([eb225d6](https://github.com/arkitektio/pokket/commit/eb225d6e0db1340d30f062a693b3b34ec0e92c91))
+
 # [1.22.0](https://github.com/arkitektio/pokket/compare/v1.21.2...v1.22.0) (2026-10-21)
 
 
