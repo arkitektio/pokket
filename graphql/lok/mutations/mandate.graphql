@@ -1,0 +1,24 @@
+# The standing agent mandate this app issues device keys under, created on
+# first use per firmware app (lib/ble/provisioning/standing.ts).
+mutation CreateMandate($input: CreateMandateInput!) {
+  createMandate(input: $input) {
+    ...ProvisioningMandate
+  }
+}
+
+mutation RevokeMandate($id: ID!) {
+  revokeMandate(input: { id: $id }) {
+    id
+  }
+}
+
+# One device's key under the standing mandate; the key is shown only in this
+# answer (lok keeps its hash). Sent to the device over Bluetooth.
+mutation IssueChildMandateKey($input: IssueChildMandateKeyInput!) {
+  issueChildMandateKey(input: $input) {
+    key
+    mandate {
+      id
+    }
+  }
+}

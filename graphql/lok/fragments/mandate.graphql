@@ -1,0 +1,14 @@
+# What provisioning needs of a mandate (lib/ble/provisioning).
+fragment ProvisioningMandate on Mandate {
+  id
+  agentIdentifier
+  claimant
+  allowMesh
+  subject {
+    identifier
+    version
+  }
+  parent {
+    id
+  }
+}

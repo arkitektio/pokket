@@ -1,0 +1,7 @@
+# The live mandates, to find the standing one this app issues device keys
+# under (matched by agent, subject app, mesh permission and having no parent).
+query StandingMandates {
+  mandates(filters: { live: true }) {
+    ...ProvisioningMandate
+  }
+}
