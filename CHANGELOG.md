@@ -1,3 +1,10 @@
+# [1.23.0](https://github.com/arkitektio/pokket/compare/v1.22.1...v1.23.0) (2026-10-27)
+
+
+### Features
+
+* **ble:** provisioning v2, the flow orkestrator has: GATT v2 and a mandate key ([bf4df7e](https://github.com/arkitektio/pokket/commit/bf4df7e2081f90abc3d05d0fa979bab6ed72816b))
+
 ## [1.22.1](https://github.com/arkitektio/pokket/compare/v1.22.0...v1.22.1) (2026-10-21)
 
 
