@@ -1586,6 +1586,22 @@
             "deprecationReason": null
           },
           {
+            "name": "allowMesh",
+            "description": "Whether a client logging in with a key issued under the mandate may ask for a mesh key. Every child key inherits it.",
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "Boolean",
+                "kind": "SCALAR",
+                "ofType": null
+              }
+            },
+            "defaultValue": "false",
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
             "name": "attestation",
             "description": "Opaque binding for the approving service (e.g. a release digest).",
             "type": {
@@ -3061,7 +3077,7 @@
       {
         "kind": "INPUT_OBJECT",
         "name": "HubFilter",
-        "description": "Hub(id, name, organization, identifier, description, creator, client, token, uid, auth_key, last_seen_at, last_healthy, version, mesh_connected, mesh_host)",
+        "description": "Hub(id, name, organization, identifier, description, creator, client, token, uid, auth_key, tls_certificate, last_seen_at, last_healthy, version, mesh_connected, mesh_host)",
         "isOneOf": false,
         "fields": null,
         "inputFields": [

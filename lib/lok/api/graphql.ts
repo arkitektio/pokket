@@ -265,6 +265,8 @@ export type CreateMandateInput = {
   agentDeviceId?: InputMaybe<Scalars['String']['input']>;
   /** Only an agent acting as this user may issue. */
   agentUser?: InputMaybe<Scalars['ID']['input']>;
+  /** Whether a client logging in with a key issued under the mandate may ask for a mesh key. Every child key inherits it. */
+  allowMesh?: Scalars['Boolean']['input'];
   /** Opaque binding for the approving service (e.g. a release digest). */
   attestation?: InputMaybe<Scalars['String']['input']>;
   /** The mandate (and every key issued under it) stops working after this many days (1–365). Null: as long as your app. */
@@ -464,7 +466,7 @@ export type Hub = {
   version: Scalars['String']['output'];
 };
 
-/** Hub(id, name, organization, identifier, description, creator, client, token, uid, auth_key, last_seen_at, last_healthy, version, mesh_connected, mesh_host) */
+/** Hub(id, name, organization, identifier, description, creator, client, token, uid, auth_key, tls_certificate, last_seen_at, last_healthy, version, mesh_connected, mesh_host) */
 export type HubFilter = {
   AND?: InputMaybe<HubFilter>;
   DISTINCT?: InputMaybe<Scalars['Boolean']['input']>;

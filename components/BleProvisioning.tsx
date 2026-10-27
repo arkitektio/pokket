@@ -25,7 +25,7 @@ import {
 import { useThemeColors } from '@/lib/theme/BrandProvider';
 import { Link } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, Switch, Text, View } from 'react-native';
 import { Device } from 'react-native-ble-plx';
 import { IconSymbol } from './ui/IconSymbol';
 
@@ -127,6 +127,8 @@ export function BleProvisioning() {
     const [progress, setProgress] = useState<ProvisionProgress | null>(null);
     /** The mandate whose key the device holds once a run committed it: a retry sends no new key. */
     const [heldMandate, setHeldMandate] = useState<string | null>(null);
+    /** Whether the device's key may ask lok for a mesh key (the standing mandate's `allowMesh`). */
+    const [allowMesh, setAllowMesh] = useState(true);
     const connectedRef = useRef<Connected | null>(null);
 
     const connection = App.useConnection();
@@ -239,11 +241,11 @@ export function BleProvisioning() {
                     if (p.mandateId) setHeldMandate(p.mandateId);
                 },
                 issueKey: async ({ manifest }) => {
-                    // The standing mandate this app holds for the firmware's app, made on first use.
-                    // (go.arkitekt.live's lok has no mesh permission on mandates yet: they are made, and found, without.)
+                    // The standing mandate this app holds for the firmware's app and this mesh
+                    // permission, made on first use.
                     const { data: live, error } = await loadMandates();
                     if (error) throw error;
-                    let parentId = findStandingMandate(live?.mandates ?? [], appManifest.identifier, manifest.identifier, false)?.id;
+                    let parentId = findStandingMandate(live?.mandates ?? [], appManifest.identifier, manifest.identifier, allowMesh)?.id;
                     if (!parentId) {
                         const { data } = await createMandate({
                             variables: {
@@ -263,6 +265,8 @@ export function BleProvisioning() {
                                     },
                                     // As long as this app's sign-in lasts.
                                     expiresInDays: null,
+                                    // Every device key under it inherits this: its login brings a mesh key.
+                                    allowMesh,
                                 },
                             },
                         });
@@ -287,7 +291,7 @@ export function BleProvisioning() {
             if (error instanceof ProvisionError && error.mandateId) setHeldMandate(error.mandateId);
             // The progress carries the failure; the step shows it, with a retry.
         }
-    }, [connected, selectedProfile, origin, heldMandate, alert, loadMandates, createMandate, issueChildMandateKey, revokeMandate]);
+    }, [connected, selectedProfile, origin, heldMandate, allowMesh, alert, loadMandates, createMandate, issueChildMandateKey, revokeMandate]);
 
     const renderScanningStep = () => (
         <View className="flex-1">
@@ -438,6 +442,18 @@ export function BleProvisioning() {
                     </View>
                 </Button>
             </Link>
+
+            <View className="flex-row items-center justify-between p-4 bg-card rounded-xl border border-border mb-3">
+                <View className="flex-1 pr-3">
+                    <Text className="text-card-foreground text-sm font-medium">Join the mesh</Text>
+                    <Text className="text-xs text-muted-foreground mt-0.5">
+                        {heldMandate
+                            ? 'Decided when the device got its key.'
+                            : "The device's sign-in brings a mesh key, so it reaches the hub's mesh-only services."}
+                    </Text>
+                </View>
+                <Switch value={allowMesh} onValueChange={setAllowMesh} disabled={!!heldMandate} />
+            </View>
 
             {origin ? (
                 <View className="p-3 bg-green-500/10 rounded-xl border border-green-500/20 mb-3">
