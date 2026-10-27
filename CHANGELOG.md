@@ -1,3 +1,10 @@
+# [1.24.0](https://github.com/arkitektio/pokket/compare/v1.23.0...v1.24.0) (2026-10-27)
+
+
+### Features
+
+* **ble:** provisioned devices join the mesh unless asked not to ([c92eec0](https://github.com/arkitektio/pokket/commit/c92eec02c44805abf412f6877f7c9682a7d0b805))
+
 # [1.23.0](https://github.com/arkitektio/pokket/compare/v1.22.1...v1.23.0) (2026-10-27)
 
 
