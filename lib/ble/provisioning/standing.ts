@@ -18,16 +18,45 @@ export type StandingCandidate = {
   agentIdentifier?: string | null;
   claimant: string;
   allowMesh: boolean;
-  subject: { identifier?: string | null };
+  subject: {
+    identifier?: string | null;
+    version?: string | null;
+    scopes?: readonly string[] | null;
+    requirements?: readonly { key: string; service: string }[] | null;
+  };
   parent?: { id: string } | null;
 };
 
-/** The live standing mandate this app (`agent`) holds for `subjectIdentifier` with this mesh permission, if any. */
+/** What a device asks for, as its manifest says. */
+export type WantedManifest = {
+  version: string;
+  scopes: readonly string[];
+  requirements: readonly { key: string; service: string }[];
+};
+
+/**
+ * Whether a key under this mandate can log the device in: the same
+ * version, and its scopes and requirements within the mandate's (they are
+ * its ceiling). A firmware that asks for more needs a new standing mandate,
+ * or lok refuses its key at login.
+ */
+export const covers = (subject: StandingCandidate["subject"], wanted: WantedManifest): boolean =>
+  (subject.version == null || subject.version === wanted.version) &&
+  wanted.scopes.every((scope) => (subject.scopes ?? []).includes(scope)) &&
+  wanted.requirements.every((r) =>
+    (subject.requirements ?? []).some((pin) => pin.key === r.key && pin.service === r.service),
+  );
+
+/**
+ * The live standing mandate this app (`agent`) holds for `subjectIdentifier`
+ * with this mesh permission, if any; with `wanted`, only one that covers it.
+ */
 export const findStandingMandate = <T extends StandingCandidate>(
   mandates: readonly T[],
   agent: string,
   subjectIdentifier: string,
   allowMesh: boolean,
+  wanted?: WantedManifest,
 ): T | undefined =>
   mandates.find(
     (m) =>
@@ -35,5 +64,6 @@ export const findStandingMandate = <T extends StandingCandidate>(
       !m.parent &&
       m.agentIdentifier === agent &&
       m.subject.identifier === subjectIdentifier &&
-      m.allowMesh === allowMesh,
+      m.allowMesh === allowMesh &&
+      (!wanted || covers(m.subject, wanted)),
   );

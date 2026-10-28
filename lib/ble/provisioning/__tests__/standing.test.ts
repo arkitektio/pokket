@@ -40,3 +40,38 @@ describe("findStandingMandate", () => {
     expect(findStandingMandate([], AGENT, "live.arkitekt.esp32", true)).toBeUndefined();
   });
 });
+
+describe("a standing mandate covers the device", () => {
+  const wanted = {
+    version: "1",
+    scopes: ["openid"],
+    requirements: [{ key: "rekuest", service: "live.arkitekt.rekuest" }],
+  };
+  const subject = {
+    identifier: "live.arkitekt.esp32",
+    version: "1",
+    scopes: ["openid"],
+    requirements: [{ key: "rekuest", service: "live.arkitekt.rekuest" }],
+  };
+
+  it("passes over one made for less, so the device's key is not refused at login", () => {
+    const found = findStandingMandate(
+      [
+        mandate({ id: "no-scopes", subject: { ...subject, scopes: [] } }),
+        mandate({ id: "no-rekuest", subject: { ...subject, requirements: [] } }),
+        mandate({ id: "old-version", subject: { ...subject, version: "0" } }),
+        mandate({ id: "covers", subject: { ...subject, scopes: ["openid", "read"] } }),
+      ],
+      AGENT,
+      "live.arkitekt.esp32",
+      true,
+      wanted,
+    );
+    expect(found?.id).toBe("covers");
+  });
+
+  it("finds none when none covers it: a new one is made", () => {
+    const found = findStandingMandate([mandate({ subject: { ...subject, scopes: [] } })], AGENT, "live.arkitekt.esp32", true, wanted);
+    expect(found).toBeUndefined();
+  });
+});

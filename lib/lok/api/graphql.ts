@@ -2097,7 +2097,7 @@ export type LayerFragment = { __typename?: 'Layer', id: string, name: string, de
 
 export type ListLayerFragment = { __typename?: 'Layer', id: string, name: string, description?: string | null, logo?: { __typename?: 'MediaStore', presignedUrl: string } | null };
 
-export type ProvisioningMandateFragment = { __typename?: 'Mandate', id: string, agentIdentifier?: string | null, claimant: MandateClaimant, allowMesh: boolean, subject: { __typename?: 'MandatePin', identifier?: string | null, version?: string | null }, parent?: { __typename?: 'Mandate', id: string } | null };
+export type ProvisioningMandateFragment = { __typename?: 'Mandate', id: string, agentIdentifier?: string | null, claimant: MandateClaimant, allowMesh: boolean, subject: { __typename?: 'MandatePin', identifier?: string | null, version?: string | null, scopes?: Array<string> | null, requirements?: Array<{ __typename?: 'RequirementPin', key: string, service: string }> | null }, parent?: { __typename?: 'Mandate', id: string } | null };
 
 export type BrandMembershipFragment = { __typename?: 'Membership', id: string, brandHue?: number | null, brandChroma?: number | null, organization: { __typename?: 'Organization', id: string } };
 
@@ -2169,7 +2169,7 @@ export type CreateMandateMutationVariables = Exact<{
 }>;
 
 
-export type CreateMandateMutation = { __typename?: 'Mutation', createMandate: { __typename?: 'Mandate', id: string, agentIdentifier?: string | null, claimant: MandateClaimant, allowMesh: boolean, subject: { __typename?: 'MandatePin', identifier?: string | null, version?: string | null }, parent?: { __typename?: 'Mandate', id: string } | null } };
+export type CreateMandateMutation = { __typename?: 'Mutation', createMandate: { __typename?: 'Mandate', id: string, agentIdentifier?: string | null, claimant: MandateClaimant, allowMesh: boolean, subject: { __typename?: 'MandatePin', identifier?: string | null, version?: string | null, scopes?: Array<string> | null, requirements?: Array<{ __typename?: 'RequirementPin', key: string, service: string }> | null }, parent?: { __typename?: 'Mandate', id: string } | null } };
 
 export type RevokeMandateMutationVariables = Exact<{
   id: Scalars['ID']['input'];
@@ -2316,7 +2316,7 @@ export type DetailLayerQuery = { __typename?: 'Query', layer: { __typename?: 'La
 export type StandingMandatesQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type StandingMandatesQuery = { __typename?: 'Query', mandates: Array<{ __typename?: 'Mandate', id: string, agentIdentifier?: string | null, claimant: MandateClaimant, allowMesh: boolean, subject: { __typename?: 'MandatePin', identifier?: string | null, version?: string | null }, parent?: { __typename?: 'Mandate', id: string } | null }> };
+export type StandingMandatesQuery = { __typename?: 'Query', mandates: Array<{ __typename?: 'Mandate', id: string, agentIdentifier?: string | null, claimant: MandateClaimant, allowMesh: boolean, subject: { __typename?: 'MandatePin', identifier?: string | null, version?: string | null, scopes?: Array<string> | null, requirements?: Array<{ __typename?: 'RequirementPin', key: string, service: string }> | null }, parent?: { __typename?: 'Mandate', id: string } | null }> };
 
 export type MyActiveMessagesQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -2651,6 +2651,11 @@ export const ProvisioningMandateFragmentDoc = gql`
   subject {
     identifier
     version
+    scopes
+    requirements {
+      key
+      service
+    }
   }
   parent {
     id

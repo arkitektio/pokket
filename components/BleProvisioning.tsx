@@ -245,7 +245,13 @@ export function BleProvisioning() {
                     // permission, made on first use.
                     const { data: live, error } = await loadMandates();
                     if (error) throw error;
-                    let parentId = findStandingMandate(live?.mandates ?? [], appManifest.identifier, manifest.identifier, allowMesh)?.id;
+                    let parentId = findStandingMandate(
+                        live?.mandates ?? [],
+                        appManifest.identifier,
+                        manifest.identifier,
+                        allowMesh,
+                        manifest,
+                    )?.id;
                     if (!parentId) {
                         const { data } = await createMandate({
                             variables: {

@@ -7,6 +7,11 @@ fragment ProvisioningMandate on Mandate {
   subject {
     identifier
     version
+    scopes
+    requirements {
+      key
+      service
+    }
   }
   parent {
     id
