@@ -1,3 +1,10 @@
+## [1.24.1](https://github.com/arkitektio/pokket/compare/v1.24.0...v1.24.1) (2026-10-28)
+
+
+### Bug Fixes
+
+* **ble:** a standing mandate is reused only if it covers the device ([048a434](https://github.com/arkitektio/pokket/commit/048a434e9c0375d660896b09d8db6c7247c175a4))
+
 # [1.24.0](https://github.com/arkitektio/pokket/compare/v1.23.0...v1.24.0) (2026-10-27)
 
 
