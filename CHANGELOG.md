@@ -1,3 +1,10 @@
+# [1.25.0](https://github.com/arkitektio/pokket/compare/v1.24.1...v1.25.0) (2026-10-28)
+
+
+### Features
+
+* ask for every service's all-scope, as Orkestrator does ([b4cf07d](https://github.com/arkitektio/pokket/commit/b4cf07d09962c8c344489295ed7c230f0f8d53c1))
+
 ## [1.24.1](https://github.com/arkitektio/pokket/compare/v1.24.0...v1.24.1) (2026-10-28)
 
 
