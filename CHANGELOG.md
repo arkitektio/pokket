@@ -1,3 +1,10 @@
+# [1.27.0](https://github.com/arkitektio/pokket/compare/v1.26.0...v1.27.0) (2026-10-30)
+
+
+### Features
+
+* **share:** keep Android uploads going in the background ([ba345c7](https://github.com/arkitektio/pokket/commit/ba345c77d9a46931afef9460b6322987d04f3c4f))
+
 # [1.26.0](https://github.com/arkitektio/pokket/compare/v1.25.0...v1.26.0) (2026-10-30)
 
 
