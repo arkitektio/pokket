@@ -1,3 +1,10 @@
+# [1.26.0](https://github.com/arkitektio/pokket/compare/v1.25.0...v1.26.0) (2026-10-30)
+
+
+### Features
+
+* **share:** share files to mikro from the system's share menu ([eb923b5](https://github.com/arkitektio/pokket/commit/eb923b594b52e0dae6a1c12a043cc2227f38fe39))
+
 # [1.25.0](https://github.com/arkitektio/pokket/compare/v1.24.1...v1.25.0) (2026-10-28)
 
 
