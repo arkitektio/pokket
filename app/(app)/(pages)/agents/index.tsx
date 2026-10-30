@@ -56,9 +56,9 @@ function AgentList({ search }: { search: string }) {
       keyboardShouldPersistTaps="handled"
       keyboardDismissMode="on-drag"
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} tintColor={colors.primary} />}
-      ListHeaderComponent={error ? <Text className="px-4 py-2 text-sm text-destructive">Could not load agents: {error.message}</Text> : null}
+      ListHeaderComponent={error ? <Text className="px-4 py-2 text-sm text-destructive">Could not load agents: {error.message}</Text> : undefined}
       ListEmptyComponent={
-        error ? null : (
+        error ? undefined : (
           <TasksEmptyState
             title={search ? 'Nothing matches' : 'No agents'}
             description={search ? `No agent matches “${search}”.` : 'Agents show up here once an app that offers actions has connected.'}

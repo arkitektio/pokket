@@ -52,9 +52,9 @@ function SpaceList() {
           }}
         />
       }
-      ListHeaderComponent={error ? <Text className="px-4 py-2 text-sm text-destructive">Could not load spaces: {error.message}</Text> : null}
+      ListHeaderComponent={error ? <Text className="px-4 py-2 text-sm text-destructive">Could not load spaces: {error.message}</Text> : undefined}
       ListEmptyComponent={
-        error ? null : (
+        error ? undefined : (
           <TasksEmptyState title="No spaces" description="A space places your devices in a room. Create one in orkestrator." />
         )
       }

@@ -11,7 +11,7 @@ import { useMeQuery } from '@/lib/lok/api/graphql';
 import { showDetail } from '@/lib/navigation';
 import { useThemeColors } from '@/lib/theme/BrandProvider';
 import * as React from 'react';
-import { KeyboardAvoidingView, RefreshControl, SectionList, View } from 'react-native';
+import { KeyboardAvoidingView, RefreshControl, SectionList, View, type ViewInstance } from 'react-native';
 import { toast } from 'sonner-native';
 
 const RECENT = 50;
@@ -57,7 +57,7 @@ function HomeContent() {
     }
   };
 
-  const frame = React.useRef<View>(null);
+  const frame = React.useRef<ViewInstance>(null);
   const [top, setTop] = React.useState(0);
   const measure = () => frame.current?.measureInWindow((_x, y) => setTop((current) => (Math.abs(current - y) > 1 ? y : current)));
 
@@ -91,7 +91,7 @@ function HomeContent() {
           ListEmptyComponent={
             !data && loading ? (
               <ChatLoadingState message="Loading chats…" />
-            ) : error ? null : (
+            ) : error ? undefined : (
               <ChatEmptyState title="No chats yet" description="Your conversations show up here." />
             )
           }

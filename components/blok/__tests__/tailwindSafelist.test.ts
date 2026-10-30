@@ -1,6 +1,3 @@
-/**
- * @jest-environment node
- */
 import {beforeAll, describe, expect, it} from '@jest/globals';
 import postcss from 'postcss';
 import tailwind from 'tailwindcss';

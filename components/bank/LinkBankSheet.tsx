@@ -110,7 +110,7 @@ function BankStep({
         ListEmptyComponent={
           valid && !loading ? (
             <Text className="px-3 py-4 text-sm text-muted-foreground">No bank by that name in {country}.</Text>
-          ) : null
+          ) : undefined
         }
       />
     </View>

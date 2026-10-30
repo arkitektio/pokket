@@ -47,7 +47,7 @@ describe("contractAuthFlow", () => {
 
   it("reads and cancels by state", async () => {
     const query = jest.fn(async () => ({ data: { authSession: { ...wire, status: "EXPIRED" } } }));
-    const mutate = jest.fn(async () => ({ data: {} }));
+    const mutate = jest.fn(async (_options: unknown) => ({ data: {} }));
     const session = sessionOf(wire);
     expect((await flow.read!({ query } as never, session))?.status).toBe("EXPIRED");
     await flow.cancel!({ mutate } as never, session);

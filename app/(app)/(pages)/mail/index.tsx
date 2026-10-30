@@ -148,7 +148,7 @@ function ThreadList({ mailbox, chips }: { mailbox: SmartMailbox; chips: React.Re
           <MailEmptyState title={mailbox.empty.title} description={mailbox.empty.description} />
         )
       }
-      ListFooterComponent={loadingMore ? <ActivityIndicator className="py-4" color={colors.primary} /> : null}
+      ListFooterComponent={loadingMore ? <ActivityIndicator className="py-4" color={colors.primary} /> : undefined}
     />
   );
 }

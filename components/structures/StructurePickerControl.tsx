@@ -234,9 +234,9 @@ export function StructurePickerControl({
                   </Pressable>
                 ) : null}
               </View>
-            ) : null
+            ) : undefined
           }
-          ListFooterComponent={hasMore && loading ? <ActivityIndicator className="py-3" color={colors.primary} /> : null}
+          ListFooterComponent={hasMore && loading ? <ActivityIndicator className="py-3" color={colors.primary} /> : undefined}
         />
       </PickerSheet>
     </>

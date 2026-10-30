@@ -32,7 +32,7 @@ import * as Crypto from 'expo-crypto';
 import { Stack } from 'expo-router';
 import { Info } from 'lucide-react-native';
 import * as React from 'react';
-import { FlatList, KeyboardAvoidingView, Pressable, Share, View } from 'react-native';
+import { FlatList, KeyboardAvoidingView, Pressable, Share, View, type ViewInstance } from 'react-native';
 import { toast } from 'sonner-native';
 import { Composer } from './Composer';
 import { type BubbleMessage, MessageBubble } from './MessageBubble';
@@ -162,7 +162,7 @@ export function ChatRoom({ id, replyer }: { id: string; replyer: ReplyerControll
   const [info, setInfo] = React.useState(false);
 
   // Where this page starts on the screen: what the keyboard has to be measured against.
-  const frame = React.useRef<View>(null);
+  const frame = React.useRef<ViewInstance>(null);
   const [top, setTop] = React.useState(0);
   const measure = () => frame.current?.measureInWindow((_x, y) => setTop((current) => (Math.abs(current - y) > 1 ? y : current)));
 

@@ -67,16 +67,16 @@ function ActionList({ search }: { search: string }) {
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} tintColor={colors.primary} />}
       onEndReached={() => void onEndReached()}
       onEndReachedThreshold={0.5}
-      ListHeaderComponent={error ? <Text className="px-4 py-2 text-sm text-destructive">Could not load actions: {error.message}</Text> : null}
+      ListHeaderComponent={error ? <Text className="px-4 py-2 text-sm text-destructive">Could not load actions: {error.message}</Text> : undefined}
       ListEmptyComponent={
-        error ? null : (
+        error ? undefined : (
           <TasksEmptyState
             title={search ? 'Nothing matches' : 'No actions'}
             description={search ? `No action matches “${search}”.` : 'Actions show up here once an app that offers some has connected.'}
           />
         )
       }
-      ListFooterComponent={loadingMore ? <ActivityIndicator className="py-4" color={colors.primary} /> : null}
+      ListFooterComponent={loadingMore ? <ActivityIndicator className="py-4" color={colors.primary} /> : undefined}
     />
   );
 }

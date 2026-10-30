@@ -97,7 +97,7 @@ const running = {isDone: false, events: []};
 
 describe("a task's bloks", () => {
   it('answers a waiting ask through its blok, and the blok reads it as asking', async () => {
-    const onAnswer = jest.fn(() => undefined);
+    const onAnswer = jest.fn((_answer: unknown) => undefined);
     const renderer = await render(
       <TaskBlokList taskId="t1" task={running} bloks={[ask(TaskBlokStatus.Waiting)]} onAnswer={onAnswer} />,
     );

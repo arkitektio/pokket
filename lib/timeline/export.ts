@@ -39,7 +39,7 @@ const share = async (name: string, contents: string, mimeType: string) => {
   const file = new File(Paths.cache, name);
   if (file.exists) file.delete();
   file.create();
-  file.write(contents);
+  await file.write(contents);
   await Sharing.shareAsync(file.uri, { mimeType, dialogTitle: "Export timeline" });
 };
 

@@ -17,6 +17,7 @@ strictPeerDependencies: false
 # (via eslint-config-expo); its postinstall selects the right prebuilt binary,
 # and ESLint's import resolution fails without it.
 allowBuilds:
+  '@parcel/watcher': false
   unrs-resolver: true
 
 minimumReleaseAgeExclude:

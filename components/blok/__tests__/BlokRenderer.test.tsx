@@ -101,7 +101,7 @@ describe('BlokRenderer', () => {
   });
 
   it('answers the open ask of task through task.answer', async () => {
-    const answerTask = jest.fn(() => undefined);
+    const answerTask = jest.fn((_answer: unknown) => undefined);
     const answer = [
       {
         id: 'ok',

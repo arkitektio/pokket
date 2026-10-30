@@ -1,5 +1,6 @@
 import {describe, expect, it, jest} from '@jest/globals';
 import * as React from 'react';
+import {GestureHandlerRootView} from 'react-native-gesture-handler';
 import {act, create, type ReactTestRenderer} from 'react-test-renderer';
 import BlokRenderer from '../BlokRenderer';
 import tree from './scene.fixture.json';
@@ -29,7 +30,11 @@ describe('a scene blok on a phone without WebGPU', () => {
   it('loads the 3D components when first shown and explains why there is no view', async () => {
     let renderer!: ReactTestRenderer;
     await act(async () => {
-      renderer = create(<BlokRenderer uiComponents={tree} />);
+      renderer = create(
+        <GestureHandlerRootView>
+          <BlokRenderer uiComponents={tree} />
+        </GestureHandlerRootView>,
+      );
     });
     // The implementation loads, the GPU is asked for and answers none.
     for (let attempt = 0; attempt < 200 && !textOf(renderer).includes('cannot be shown'); attempt += 1) {

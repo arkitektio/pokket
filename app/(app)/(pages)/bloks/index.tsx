@@ -100,16 +100,16 @@ function BlokList({ search, view }: { search: string; view: BlokView }) {
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} tintColor={colors.primary} />}
       onEndReached={() => void onEndReached()}
       onEndReachedThreshold={0.5}
-      ListHeaderComponent={error ? <Text className="px-4 py-2 text-sm text-destructive">Could not load bloks: {error.message}</Text> : null}
+      ListHeaderComponent={error ? <Text className="px-4 py-2 text-sm text-destructive">Could not load bloks: {error.message}</Text> : undefined}
       ListEmptyComponent={
-        error ? null : (
+        error ? undefined : (
           <TasksEmptyState
             title={search ? 'Nothing matches' : view.key === 'all' ? 'No bloks' : `No ${view.label.toLowerCase()}`}
             description={search ? `No ${view.key === 'all' ? 'blok' : view.label.toLowerCase()} matches “${search}”.` : view.empty}
           />
         )
       }
-      ListFooterComponent={loadingMore ? <ActivityIndicator className="py-4" color={colors.primary} /> : null}
+      ListFooterComponent={loadingMore ? <ActivityIndicator className="py-4" color={colors.primary} /> : undefined}
     />
   );
 }

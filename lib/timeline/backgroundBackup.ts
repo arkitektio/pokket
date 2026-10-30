@@ -95,7 +95,7 @@ let openRoute: MeshRoute | null = null;
  */
 export const runStoredBackup = async ({ whileOpen = false }: { whileOpen?: boolean } = {}): Promise<string> => {
   const settings = await loadTimelineSettings();
-  const plan = planHeadlessBackup(settings, await loadStoredProfileBook(storage), AppState.currentState, { whileOpen });
+  const plan = planHeadlessBackup(settings, await loadStoredProfileBook(storage), AppState.currentState ?? "unknown", { whileOpen });
   if (plan.kind === "skip") return `skipped: ${plan.reason}`;
 
   let alias = plan.alias;

@@ -69,6 +69,7 @@
       "./modules/pokket-mesh/app.plugin.js",
       "./plugins/withGradleMemory.js",
       "./plugins/withMinSdk.js",
+      "./plugins/withoutReleaseMinify.js",
       "./plugins/withAppLabel.js",
       "expo-background-task",
       [

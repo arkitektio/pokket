@@ -156,7 +156,7 @@ export const SpacerRender: BlokRender<Ui['Spacer']> = ({component, schema}) => {
   return (
     <View
       accessible={false}
-      style={{flexBasis: cssLength(size), flexGrow: grow ?? (size ? 0 : 1), flexShrink: 0}}
+      style={{flexBasis: cssLength(size) ?? undefined, flexGrow: grow ?? (size ? 0 : 1), flexShrink: 0}}
     />
   );
 };

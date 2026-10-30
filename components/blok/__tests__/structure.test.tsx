@@ -100,7 +100,7 @@ describe('StructurePicker', () => {
         ? {options: [{value: 'l2', label: 'Second lens'}]}
         : {options: [{value: 'l1', label: 'First lens'}, {value: 'l2', label: 'Second lens', description: 'Max projection'}]},
     );
-    const dispatchAction = jest.fn(() => undefined);
+    const dispatchAction = jest.fn((_action: unknown, _component: unknown) => undefined);
     const {renderer} = await renderBlok(picker([{key: 'query', static_value: QUERY}, {key: 'ward', static_value: 'mikro'}]), {}, {dispatchAction});
     expect(asked).not.toHaveBeenCalled();
 

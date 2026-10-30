@@ -249,7 +249,7 @@ export default function SearchScreen() {
         ListEmptyComponent={
           typed && !searching ? (
             <Text className="px-6 pt-8 text-center text-sm text-muted-foreground">No results for “{filter.trim()}”</Text>
-          ) : null
+          ) : undefined
         }
         ListFooterComponent={
           searching ? <EntitySearch term={term} onPick={openEntity} /> : <View style={{ height: insets.bottom + 24 }} />

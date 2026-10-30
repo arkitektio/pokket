@@ -117,7 +117,7 @@ function TaskList({ view, chips }: { view: View_; chips: React.ReactNode }) {
       ListEmptyComponent={
         loading ? <TasksLoadingState message="Loading tasks…" /> : <TasksEmptyState title="No tasks" description={view.empty} />
       }
-      ListFooterComponent={loadingMore ? <ActivityIndicator className="py-4" color={colors.primary} /> : null}
+      ListFooterComponent={loadingMore ? <ActivityIndicator className="py-4" color={colors.primary} /> : undefined}
     />
   );
 }

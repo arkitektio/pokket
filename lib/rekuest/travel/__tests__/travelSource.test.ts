@@ -644,7 +644,7 @@ describe("travelSource revisions", () => {
 
   it("says how far the session reaches, and debounces a dragged slider", async () => {
     const ends: ((last: number | null) => void)[] = [];
-    const sessionEnd = jest.fn(() => new Promise<number | null>((resolve) => ends.push(resolve)));
+    const sessionEnd = jest.fn((_agent: string, _session: string) => new Promise<number | null>((resolve) => ends.push(resolve)));
     const { source, calls, runTimers } = makeSource({ sessionEnd });
 
     source.seekRevision("a", { revision: 4, sessionId: "s" });

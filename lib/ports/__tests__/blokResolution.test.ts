@@ -70,7 +70,7 @@ describe("resolvePropValue", () => {
   });
 
   it("invokes a pure util call in value position", () => {
-    const invokeFunction = jest.fn(() => ({ok: true as const, value: 6}));
+    const invokeFunction = jest.fn((_name: string, _args: unknown, _options: unknown) => ({ok: true as const, value: 6}));
     const resolved = resolvePropValue(
       {
         key: "text",
@@ -208,7 +208,7 @@ describe("runActionCall", () => {
   it("drops a refused agent call before it binds or dispatches", () => {
     const bindTask = jest.fn<BindTask>(() => ({observe: jest.fn(), release: jest.fn()}));
     const dispatchAction = jest.fn<BlokDispatchActionHandler>();
-    const refuseAction = jest.fn(() => true);
+    const refuseAction = jest.fn((_action: unknown, _component: unknown) => true);
     const component = {id: "btn", component: "Button"};
     const actionCall = getPropActionCall({
       key: "onClick",
@@ -435,7 +435,7 @@ describe("a callback does exactly one thing (v2)", () => {
   });
 
   it("answers the task's ask with task.answer", () => {
-    const answerTask = jest.fn(() => "answered");
+    const answerTask = jest.fn((_values: unknown) => "answered");
     const result = runActionCall(
       {type: "util", call: {operation: "task.answer", arguments: [{key: "values", value_dict: [{key: "image", value_path: "args.image"}]}]}},
       createContext({args: {image: "7"}}, {answerTask}),

@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Text, type TextProps, View, type ViewProps } from 'react-native';
+import { Text, type TextInstance, type TextProps, View, type ViewInstance, type ViewProps } from 'react-native';
 import { cn } from '~/lib/utils';
 import { TextClassContext } from '~/components/ui/text';
 
@@ -7,7 +7,7 @@ function Card({
   className,
   ...props
 }: ViewProps & {
-  ref?: React.RefObject<View>;
+  ref?: React.RefObject<ViewInstance>;
 }) {
   return (
     <View
@@ -24,7 +24,7 @@ function CardHeader({
   className,
   ...props
 }: ViewProps & {
-  ref?: React.RefObject<View>;
+  ref?: React.RefObject<ViewInstance>;
 }) {
   return <View className={cn('flex flex-col space-y-1.5 p-6', className)} {...props} />;
 }
@@ -33,7 +33,7 @@ function CardTitle({
   className,
   ...props
 }: TextProps & {
-  ref?: React.RefObject<Text>;
+  ref?: React.RefObject<TextInstance>;
 }) {
   return (
     <Text
@@ -52,7 +52,7 @@ function CardDescription({
   className,
   ...props
 }: TextProps & {
-  ref?: React.RefObject<Text>;
+  ref?: React.RefObject<TextInstance>;
 }) {
   return <Text className={cn('text-sm text-muted-foreground', className)} {...props} />;
 }
@@ -61,7 +61,7 @@ function CardContent({
   className,
   ...props
 }: ViewProps & {
-  ref?: React.RefObject<View>;
+  ref?: React.RefObject<ViewInstance>;
 }) {
   return (
     <TextClassContext.Provider value='text-card-foreground'>
@@ -74,7 +74,7 @@ function CardFooter({
   className,
   ...props
 }: ViewProps & {
-  ref?: React.RefObject<View>;
+  ref?: React.RefObject<ViewInstance>;
 }) {
   return <View className={cn('flex flex-row items-center p-6 pt-0', className)} {...props} />;
 }

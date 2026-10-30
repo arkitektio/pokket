@@ -168,7 +168,7 @@ function BankContent() {
           <BankEmptyState title={view.empty.title} description={view.empty.description} />
         )
       }
-      ListFooterComponent={loadingMore ? <ActivityIndicator className="py-4" color={colors.primary} /> : null}
+      ListFooterComponent={loadingMore ? <ActivityIndicator className="py-4" color={colors.primary} /> : undefined}
     />
   );
 }

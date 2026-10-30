@@ -114,10 +114,10 @@ export function PagedList<T extends { id: string }>({ document, field, filters, 
       onEndReached={onEndReached}
       onEndReachedThreshold={0.5}
       ListHeaderComponent={
-        error ? <Text className="px-4 py-2 text-sm text-destructive">Could not load {what}: {error.message}</Text> : null
+        error ? <Text className="px-4 py-2 text-sm text-destructive">Could not load {what}: {error.message}</Text> : undefined
       }
-      ListEmptyComponent={error ? null : <MikroEmptyState title={empty.title} description={empty.description} />}
-      ListFooterComponent={loadingMore ? <ActivityIndicator className="py-4" color={colors.primary} /> : null}
+      ListEmptyComponent={error ? undefined : <MikroEmptyState title={empty.title} description={empty.description} />}
+      ListFooterComponent={loadingMore ? <ActivityIndicator className="py-4" color={colors.primary} /> : undefined}
     />
   );
 }

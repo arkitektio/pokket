@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React from 'react';
-import { ActivityIndicator, Animated, Image, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Animated, Image, ScrollView, StyleSheet, TextInput, TouchableOpacity, View, type TextInputInstance } from 'react-native';
 
 export default function LoginScreen() {
   const connect = App.useConnect();
@@ -43,7 +43,7 @@ export default function LoginScreen() {
   }, [advanced, advAnim]);
 
   // Ref to the advanced URL input so we can focus when Advanced is opened
-  const urlInputRef = React.useRef<TextInput | null>(null);
+  const urlInputRef = React.useRef<TextInputInstance | null>(null);
   React.useEffect(() => {
     if (advanced) {
       const t = setTimeout(() => urlInputRef.current?.focus(), 260);

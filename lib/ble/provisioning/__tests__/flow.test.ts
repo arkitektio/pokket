@@ -34,7 +34,7 @@ const harness = (opts: { writeFails?: boolean; statusFails?: boolean } = {}) => 
       return () => (statusCb = undefined);
     },
   };
-  const revokeKey = jest.fn(async () => undefined);
+  const revokeKey = jest.fn(async (_id: string) => undefined);
   const issueKey = jest.fn(async () => ({ key: "K".repeat(43), mandateId: "m1" }));
   const progress: ProvisionProgress[] = [];
   const run = (timeoutMs?: number, extra: { existing?: { mandateId: string }; caPem?: string } = {}) =>

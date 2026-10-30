@@ -2,7 +2,7 @@ import { Text } from '@/components/ui/text';
 import { snap } from '@/lib/ports/calendar';
 import { PortKind } from '@/lib/ports/kinds';
 import * as React from 'react';
-import { View } from 'react-native';
+import { View, type ViewInstance } from 'react-native';
 import { usePortField } from '../context';
 import { NumberField, type FieldProps } from './Scalars';
 
@@ -13,7 +13,7 @@ const THUMB = 26;
  * JS: a native slider would be a new native module, and new binaries.
  */
 function Slider({ value, min, max, step, onChange }: { value: number | null; min: number; max: number; step: number; onChange: (value: number) => void }) {
-  const track = React.useRef<View>(null);
+  const track = React.useRef<ViewInstance>(null);
   // Where the track is on the screen, measured when a drag starts: touches report screen positions.
   const frame = React.useRef({ x: 0, width: 1 });
 

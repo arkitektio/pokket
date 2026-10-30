@@ -1,5 +1,6 @@
 import {describe, expect, it, jest} from '@jest/globals';
 import * as React from 'react';
+import {GestureHandlerRootView} from 'react-native-gesture-handler';
 import {act} from 'react-test-renderer';
 import {resolveAnchors, routePoints} from '@/components/blok/catalog/run/math';
 import {shownTexts} from '@/components/blok/testing';
@@ -74,7 +75,7 @@ describe('a space', () => {
   });
 
   it('says so when nothing stands in it', async () => {
-    const renderer = await renderInSession(<SpaceScene space={{...space, placements: [], blokPlacements: []}} />);
+    const renderer = await renderInSession(<GestureHandlerRootView><SpaceScene space={{...space, placements: [], blokPlacements: []}} /></GestureHandlerRootView>);
     expect(shownTexts(renderer.root).join(' ')).toContain('Nothing stands in this space yet');
     act(() => renderer.unmount());
   });
