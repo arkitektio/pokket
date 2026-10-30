@@ -170,8 +170,8 @@ importers:
         specifier: ^3.13.9
         version: 3.14.1(@types/react@19.3.0)(graphql-ws@6.2.1(graphql@16.14.2)(ws@8.21.3))(graphql@16.14.2)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       '@arkitektio/bsx':
-        specifier: ^2.0.0
-        version: 2.0.0(cd584b84a2f0763b1e616911f253ac45)
+        specifier: ^2.2.0
+        version: 2.2.0(cd584b84a2f0763b1e616911f253ac45)
       '@config-plugins/react-native-webrtc':
         specifier: ^15.0.0
         version: 15.0.2(expo@58.0.21)
@@ -524,8 +524,8 @@ packages:
     peerDependencies:
       graphql: '*'
 
-  '@arkitektio/bsx@2.0.0':
-    resolution: {integrity: sha512-X5Unm1lxxG32i2G7M7lpMTLTPGEnx5C3kU25/nxQpNZ4Fm87ZnL2RUKVJendqLuzpMyW8lofKaneVwYocpXU3Q==}
+  '@arkitektio/bsx@2.2.0':
+    resolution: {integrity: sha512-YlQsMr8bAWwa+rjEi3uub3d5jCEYexH8COfsvCeTvQXdyFccPiPDjcASlHVWhsyo5EQjHHD3Xj92tIP14cqSSg==}
     peerDependencies:
       '@monaco-editor/react': ^4.7.0
       '@react-three/drei': ^10.7.0
@@ -8891,7 +8891,7 @@ snapshots:
       immutable: 5.1.9
       invariant: 2.2.4
 
-  '@arkitektio/bsx@2.0.0(cd584b84a2f0763b1e616911f253ac45)':
+  '@arkitektio/bsx@2.2.0(cd584b84a2f0763b1e616911f253ac45)':
     dependencies:
       graphql: 16.14.2
       react: 19.3.0

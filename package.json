@@ -26,7 +26,7 @@
   },
   "dependencies": {
     "@apollo/client": "^3.13.9",
-    "@arkitektio/bsx": "^2.0.0",
+    "@arkitektio/bsx": "^2.2.0",
     "@config-plugins/react-native-webrtc": "^15.0.0",
     "@expo/vector-icons": "^15.0.3",
     "@hookform/resolvers": "^5.9.1",

@@ -18,7 +18,7 @@ describe('coverage', () => {
   it('implements every pure vocabulary function, and nothing else', () => {
     const declared = [...loadVocabulary().functions.values()].filter(fn => !fn.effect).map(fn => fn.name).sort();
     expect([...v2Functions.keys()].sort()).toEqual(declared);
-    expect(declared).toHaveLength(80);
+    expect(declared).toHaveLength(107);
     expect(undeclaredImplementations()).toEqual([]);
   });
 
@@ -53,6 +53,37 @@ describe('the null table', () => {
     ['math.div', {a: 1, b: 0}, null],
     ['math.div', {a: null, b: 2}, null],
     ['math.mod', {a: 1, b: 0}, null],
+    ['math.pow', {a: null, b: 2}, null],
+    ['math.pow', {a: -8, b: 0.5}, null],
+    ['math.pow', {a: 10, b: 400}, null],
+    ['math.sqrt', {value: -1}, null],
+    ['math.cbrt', {value: null}, null],
+    ['math.exp', {value: 1000}, null],
+    ['math.log', {value: 0}, null],
+    ['math.log', {value: null}, null],
+    ['math.log', {value: 8, base: 1}, null],
+    ['math.log2', {value: -1}, null],
+    ['math.log10', {value: 0}, null],
+    ['math.sin', {value: null}, null],
+    ['math.cos', {value: null}, null],
+    ['math.tan', {value: null}, null],
+    ['math.asin', {value: 2}, null],
+    ['math.acos', {value: 2}, null],
+    ['math.atan', {value: null}, null],
+    ['math.atan2', {y: null, x: 1}, null],
+    ['math.sinh', {value: 1000}, null],
+    ['math.cosh', {value: 1000}, null],
+    ['math.tanh', {value: null}, null],
+    ['math.asinh', {value: null}, null],
+    ['math.acosh', {value: 0}, null],
+    ['math.atanh', {value: 1}, null],
+    ['math.degrees', {value: null}, null],
+    ['math.radians', {value: null}, null],
+    ['math.sign', {value: null}, null],
+    ['math.trunc', {value: null}, null],
+    ['math.hypot', {values: []}, null],
+    ['math.pi', {}, Math.PI],
+    ['math.e', {}, Math.E],
     ['math.neg', {a: null}, null],
     ['math.abs', {value: null}, null],
     ['math.round', {value: null}, null],
