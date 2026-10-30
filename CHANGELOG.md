@@ -1,3 +1,10 @@
+## [1.27.1](https://github.com/arkitektio/pokket/compare/v1.27.0...v1.27.1) (2026-10-30)
+
+
+### Bug Fixes
+
+* show a run's open ask in action bloks, clear all type and lint errors ([e23e926](https://github.com/arkitektio/pokket/commit/e23e92671c98d6da8b367eaf524282660536377c))
+
 # [1.27.0](https://github.com/arkitektio/pokket/compare/v1.26.0...v1.27.0) (2026-10-30)
 
 
