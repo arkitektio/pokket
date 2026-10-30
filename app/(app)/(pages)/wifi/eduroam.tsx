@@ -10,42 +10,34 @@ import { useThemeColors } from '@/lib/theme/BrandProvider';
 
 export default function EduroamWifiScreen() {
   const colors = useThemeColors();
-    const [university, setUniversity] = useState<EduroamInstance | null>(null);
-    const [identity, setIdentity] = useState('');
-    const [anonymousIdentity, setAnonymousIdentity] = useState('');
-    const [password, setPassword] = useState('');
-    const [showPassword, setShowPassword] = useState(false);
-    const [eduroamSearch, setEduroamSearch] = useState('');
-    const [pemCertificate, setPemCertificate] = useState('');
-    const [skipCertValidation, setSkipCertValidation] = useState(false);
-    const [showManualCert, setShowManualCert] = useState(false);
-
     const { saveProfile } = useWifiProfiles();
     const { initialize, search, searchResults, fetchEapConfig, loading } = useEduroam();
     const router = useRouter();
     const params = useLocalSearchParams();
-    const alert = useAlertDialog();
-
-    useEffect(() => {
-        initialize();
-    }, [initialize]);
-
-    useEffect(() => {
-        if (params.universityId) {
-            setUniversity({
+    const [university, setUniversity] = useState<EduroamInstance | null>(
+        params.universityId
+            ? {
                 id: params.universityId as string,
                 name: params.universityName as string,
                 country: params.universityCountry as string,
                 geo: [],
                 profiles: []
-            });
-            if (params.pemCertificate) setPemCertificate(params.pemCertificate as string);
-        }
-        if (params.identity) setIdentity(params.identity as string);
-        if (params.anonymousIdentity) setAnonymousIdentity(params.anonymousIdentity as string);
-        if (params.password) setPassword(params.password as string);
-        if (params.skipCertValidation === 'true') setSkipCertValidation(true);
-    }, [params.universityId, params.universityName, params.universityCountry, params.identity, params.anonymousIdentity, params.password, params.pemCertificate, params.skipCertValidation]);
+            }
+            : null
+    );
+    const [identity, setIdentity] = useState((params.identity as string) ?? '');
+    const [anonymousIdentity, setAnonymousIdentity] = useState((params.anonymousIdentity as string) ?? '');
+    const [password, setPassword] = useState((params.password as string) ?? '');
+    const [showPassword, setShowPassword] = useState(false);
+    const [eduroamSearch, setEduroamSearch] = useState('');
+    const [pemCertificate, setPemCertificate] = useState(params.universityId ? ((params.pemCertificate as string) ?? '') : '');
+    const [skipCertValidation, setSkipCertValidation] = useState(params.skipCertValidation === 'true');
+    const [showManualCert, setShowManualCert] = useState(false);
+    const alert = useAlertDialog();
+
+    useEffect(() => {
+        initialize();
+    }, [initialize]);
 
     useEffect(() => {
         if (university && university.profiles.length > 0 && !pemCertificate) {
@@ -210,7 +202,7 @@ export default function EduroamWifiScreen() {
                                     <View className="flex-1 mr-3">
                                         <Text className="text-sm text-foreground">Skip certificate validation</Text>
                                         <Text className="text-xs text-muted-foreground mt-0.5">
-                                            Use when your institution's CAT profile is unavailable
+                                            Use when your institution&apos;s CAT profile is unavailable
                                         </Text>
                                     </View>
                                     <Switch

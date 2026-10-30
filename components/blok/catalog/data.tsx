@@ -96,8 +96,8 @@ export const CardHeaderRender: BlokRender<Ui['CardHeader']> = ({buildChild, comp
 const cardTextRender = (
   Part: typeof UICardTitle | typeof UICardDescription,
   textClassName: string,
-): BlokRender<Ui['CardTitle']> =>
-  ({buildChild, component, schema}) => {
+): BlokRender<Ui['CardTitle']> => {
+  const CardTextRender: BlokRender<Ui['CardTitle']> = ({buildChild, component, schema}) => {
     const blok = useBlok(component, schema);
     const text = useValue(blok.text);
     const children = useValue(blok.children);
@@ -113,6 +113,8 @@ const cardTextRender = (
 
     return <View className="min-w-0">{renderInlineContent(content, buildChild)}</View>;
   };
+  return CardTextRender;
+};
 
 export const CardTitleRender = cardTextRender(UICardTitle, 'text-base leading-snug');
 export const CardDescriptionRender = cardTextRender(UICardDescription, 'text-sm');
@@ -180,8 +182,8 @@ const TABLE_SECTION_CLASSES: Record<TableSection, string> = {
   footer: 'bg-muted/50 border-t border-border',
 };
 
-const tablePartRender = (section: TableSection): BlokRender<Ui['TableHeader']> =>
-  ({buildChild, component, schema}) => {
+const tablePartRender = (section: TableSection): BlokRender<Ui['TableHeader']> => {
+  const TablePartRender: BlokRender<Ui['TableHeader']> = ({buildChild, component, schema}) => {
     const blok = useBlok(component, schema);
     const children = useValue(blok.children);
     const className = useValue(blok.className);
@@ -194,6 +196,8 @@ const tablePartRender = (section: TableSection): BlokRender<Ui['TableHeader']> =
       </TableSectionContext.Provider>
     );
   };
+  return TablePartRender;
+};
 
 export const TableRender: BlokRender<Ui['Table']> = ({buildChild, component, schema}) => {
   const blok = useBlok(component, schema);
@@ -253,8 +257,8 @@ export const TableRowRender: BlokRender<Ui['TableRow']> = ({buildChild, componen
 };
 
 /** `TableHead` and `TableCell` share one shape over two text styles. */
-const tableCellRender = (head: boolean): BlokRender<Ui['TableHead']> =>
-  ({buildChild, component, schema}) => {
+const tableCellRender = (head: boolean): BlokRender<Ui['TableHead']> => {
+  const TableCellRender: BlokRender<Ui['TableHead']> = ({buildChild, component, schema}) => {
     const blok = useBlok(component, schema);
     const text = useValue(blok.text);
     const children = useValue(blok.children);
@@ -286,6 +290,8 @@ const tableCellRender = (head: boolean): BlokRender<Ui['TableHead']> =>
       </View>
     );
   };
+  return TableCellRender;
+};
 
 export const TableHeadRender = tableCellRender(true);
 export const TableCellRender = tableCellRender(false);
@@ -308,9 +314,8 @@ export const AvatarRender: BlokRender<Shadcn['Avatar']> = ({component, schema}) 
   const fallback = useValue(blok.fallback);
   const size = useValue(blok.size);
   const className = useValue(blok.className);
-  const [failed, setFailed] = React.useState(false);
-
-  React.useEffect(() => setFailed(false), [src]);
+  const [failedSrc, setFailedSrc] = React.useState<string | null>(null);
+  const failed = failedSrc !== null && failedSrc === src;
 
   const dimension = AVATAR_SIZES[size ?? 'default'];
   const showImage = Boolean(src) && !failed && /^(https?:|data:|file:)/.test(src ?? '');
@@ -327,7 +332,7 @@ export const AvatarRender: BlokRender<Shadcn['Avatar']> = ({component, schema}) 
           source={{uri: src}}
           style={{width: dimension, height: dimension}}
           contentFit="cover"
-          onError={() => setFailed(true)}
+          onError={() => setFailedSrc(src ?? null)}
         />
       ) : initials ? (
         <Text

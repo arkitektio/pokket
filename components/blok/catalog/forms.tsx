@@ -37,6 +37,7 @@ import {
   renderChildList,
   renderContent,
   throttle,
+  type Throttled,
   useControlledValue,
   useBlokDataSet,
 } from './shared';
@@ -318,8 +319,8 @@ export const LabelRender: BlokRender<Ui['Label']> = ({buildChild, component, sch
 // ---------------------------------------------------------------------------
 
 /** `Checkbox` and `Switch` are the same contract over two presentations. */
-const booleanControlRender = (kind: 'checkbox' | 'switch'): BlokRender<Ui['Checkbox']> =>
-  ({component, schema}) => {
+const booleanControlRender = (kind: 'checkbox' | 'switch'): BlokRender<Ui['Checkbox']> => {
+  const BooleanControlRender: BlokRender<Ui['Checkbox']> = ({component, schema}) => {
     const blok = useBlok(component, schema);
     const bind = useValue(blok.bind);
     const checked = useValue(blok.checked);
@@ -397,6 +398,8 @@ const booleanControlRender = (kind: 'checkbox' | 'switch'): BlokRender<Ui['Check
       </Pressable>
     );
   };
+  return BooleanControlRender;
+};
 
 export const CheckboxRender = booleanControlRender('checkbox');
 export const SwitchRender = booleanControlRender('switch');
@@ -520,11 +523,12 @@ export const SliderRender: BlokRender<Ui['Slider']> = ({component, schema}) => {
   React.useLayoutEffect(() => {
     onChangeRef.current = onChange;
   });
-  const sendChange = React.useMemo(
-    () => throttle((next: number) => onChangeRef.current?.(next), SLIDER_CHANGE_INTERVAL_MS),
-    [],
-  );
-  React.useEffect(() => () => sendChange.cancel(), [sendChange]);
+  const sendChange = React.useRef<Throttled<number> | null>(null);
+  React.useEffect(() => {
+    const send = throttle((next: number) => onChangeRef.current?.(next), SLIDER_CHANGE_INTERVAL_MS);
+    sendChange.current = send;
+    return () => send.cancel();
+  }, []);
 
   const controlled = useControlledValue<number>({
     bind,
@@ -545,11 +549,11 @@ export const SliderRender: BlokRender<Ui['Slider']> = ({component, schema}) => {
       className={className}
       onValueChange={nextValue => {
         controlled.setValue(nextValue);
-        sendChange(nextValue);
+        sendChange.current?.(nextValue);
       }}
       onValueCommit={nextValue => {
         // Where the drag stopped is sent before the commit, never after it.
-        sendChange.flush();
+        sendChange.current?.flush();
         onCommit?.(nextValue);
       }}
     />

@@ -63,8 +63,8 @@ const CONTENTS = {display: 'contents'} as const;
  * Open/closed state follows the same rules as a form control's value: `open`
  * wins, and without it the surface keeps its own state.
  */
-const overlayRootRender = (kind: OverlayKind): BlokRender<Ui['Dialog']> =>
-  ({buildChild, component, schema}) => {
+const overlayRootRender = (kind: OverlayKind): BlokRender<Ui['Dialog']> => {
+  const OverlayRootRender: BlokRender<Ui['Dialog']> = ({buildChild, component, schema}) => {
     const blok = useBlok(component, schema);
     const children = useValue(blok.children);
     const open = useValue(blok.open);
@@ -112,10 +112,12 @@ const overlayRootRender = (kind: OverlayKind): BlokRender<Ui['Dialog']> =>
       </OverlayContext.Provider>
     );
   };
+  return OverlayRootRender;
+};
 
 /** The control that opens (or, `closes`, closes) its overlay. */
-const triggerRender = (closes = false): BlokRender<Ui['DialogTrigger']> =>
-  ({buildChild, component, schema}) => {
+const triggerRender = (closes = false): BlokRender<Ui['DialogTrigger']> => {
+  const TriggerRender: BlokRender<Ui['DialogTrigger']> = ({buildChild, component, schema}) => {
     const blok = useBlok(component, schema);
     const label = useValue(blok.label);
     const icon = useValue(blok.icon);
@@ -161,10 +163,12 @@ const triggerRender = (closes = false): BlokRender<Ui['DialogTrigger']> =>
       </Button>
     );
   };
+  return TriggerRender;
+};
 
 /** A part that is just "a styled box of children": headers, footers. */
-const panelRender = (baseClassName: string): BlokRender<Ui['DialogHeader']> =>
-  ({buildChild, component, schema}) => {
+const panelRender = (baseClassName: string): BlokRender<Ui['DialogHeader']> => {
+  const PanelRender: BlokRender<Ui['DialogHeader']> = ({buildChild, component, schema}) => {
     const blok = useBlok(component, schema);
     const children = useValue(blok.children);
     const className = useValue(blok.className);
@@ -175,10 +179,12 @@ const panelRender = (baseClassName: string): BlokRender<Ui['DialogHeader']> =>
       </View>
     );
   };
+  return PanelRender;
+};
 
 /** A part that carries a single line of text: titles and descriptions. */
-const textPartRender = (textClassName: string): BlokRender<Ui['DialogTitle']> =>
-  ({buildChild, component, schema}) => {
+const textPartRender = (textClassName: string): BlokRender<Ui['DialogTitle']> => {
+  const TextPartRender: BlokRender<Ui['DialogTitle']> = ({buildChild, component, schema}) => {
     const blok = useBlok(component, schema);
     const text = useValue(blok.text);
     const children = useValue(blok.children);
@@ -192,6 +198,8 @@ const textPartRender = (textClassName: string): BlokRender<Ui['DialogTitle']> =>
       </View>
     );
   };
+  return TextPartRender;
+};
 
 /** The modal a Dialog shows while open, centred. */
 const OverlayPanel = (props: {className?: string; showCloseButton: boolean; children: React.ReactNode}) => {

@@ -2,28 +2,19 @@ import { useAlertDialog } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { useWifiProfiles } from '@/hooks/useWifiProfiles';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { ScrollView, Text, TextInput, View } from 'react-native';
 import { useThemeColors } from '@/lib/theme/BrandProvider';
 
 export default function StandardWifiScreen() {
   const colors = useThemeColors();
-    const [ssid, setSsid] = useState('');
-    const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const { saveProfile } = useWifiProfiles();
     const router = useRouter();
     const params = useLocalSearchParams();
+    const [ssid, setSsid] = useState((params.ssid as string) ?? '');
+    const [password, setPassword] = useState((params.password as string) ?? '');
     const alert = useAlertDialog();
-
-    useEffect(() => {
-        if (params.ssid) {
-            setSsid(params.ssid as string);
-        }
-        if (params.password) {
-            setPassword(params.password as string);
-        }
-    }, [params.ssid, params.password]);
 
     const handleSave = async () => {
         if (!ssid) {

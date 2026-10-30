@@ -7,6 +7,7 @@ import { useThemeColors } from '@/lib/theme/BrandProvider';
 import { cn } from '@/lib/utils';
 import { AudioSession, isTrackReference, LiveKitRoom, useTracks, VideoTrack } from '@livekit/react-native';
 import { Track } from 'livekit-client';
+import type { LivekitClient } from '@/lib/livekit/client';
 import * as React from 'react';
 import { ActivityIndicator, View } from 'react-native';
 
@@ -48,34 +49,40 @@ export function SoloBroadcastPlayer({ broadcastId, className }: { broadcastId: s
   const [roomError, setRoomError] = React.useState<string | null>(null);
   const [joining, setJoining] = React.useState(true);
 
-  const requestToken = React.useCallback(async () => {
-    setJoining(true);
-    setJoinError(null);
-    setRoomError(null);
-    setToken(null);
-
-    try {
-      const result = await joinBroadcast({
-        variables: {
-          input: { broadcast: broadcastId },
-        },
-      });
-
-      if (!result.data?.joinBroadcast) {
-        throw new Error('No broadcast token returned');
-      }
-
-      setToken(result.data.joinBroadcast);
-    } catch (error) {
-      setJoinError(error instanceof Error ? error.message : 'Unable to join broadcast');
-    } finally {
-      setJoining(false);
-    }
-  }, [broadcastId, joinBroadcast]);
+  const [attempt, setAttempt] = React.useState(0);
 
   React.useEffect(() => {
-    void requestToken();
-  }, [requestToken]);
+    let current = true;
+
+    joinBroadcast({
+      variables: {
+        input: { broadcast: broadcastId },
+      },
+    })
+      .then((result) => {
+        if (!result.data?.joinBroadcast) {
+          throw new Error('No broadcast token returned');
+        }
+
+        if (current) {
+          setToken(result.data.joinBroadcast);
+        }
+      })
+      .catch((error) => {
+        if (current) {
+          setJoinError(error instanceof Error ? error.message : 'Unable to join broadcast');
+        }
+      })
+      .finally(() => {
+        if (current) {
+          setJoining(false);
+        }
+      });
+
+    return () => {
+      current = false;
+    };
+  }, [attempt, broadcastId, joinBroadcast]);
 
   React.useEffect(() => {
     if (!token) {
@@ -107,7 +114,11 @@ export function SoloBroadcastPlayer({ broadcastId, className }: { broadcastId: s
             variant="outline"
             className="self-start rounded-xl border-border"
             onPress={() => {
-              void requestToken();
+              setJoining(true);
+              setJoinError(null);
+              setRoomError(null);
+              setToken(null);
+              setAttempt((previous) => previous + 1);
             }}
           >
             <Text className="text-sm font-medium text-foreground">Retry join</Text>
@@ -122,7 +133,7 @@ export function SoloBroadcastPlayer({ broadcastId, className }: { broadcastId: s
       <View className={cn('h-80 overflow-hidden rounded-2xl border border-border bg-black', className)}>
         <LiveKitRoom
           token={token ?? undefined}
-          serverUrl={livekit.client.url}
+          serverUrl={(livekit.client as LivekitClient).url}
           connect={Boolean(token)}
           audio={false}
           video={false}

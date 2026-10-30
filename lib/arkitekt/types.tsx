@@ -100,7 +100,6 @@ export type Service<T = unknown> = {
   client: T;
   clearCache?: () => Promise<void>;
   type?: string;
-  ward?: Ward;
 };
 
 /**

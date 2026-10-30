@@ -362,15 +362,18 @@ const Animated = ({
  * A shape: one SVG element, its geometry props passed through as they are,
  * plus the shared presentation.
  */
-const shapeRender = (Element: unknown, keys: readonly string[]): BlokRender<Logo['Path']> =>
-  ({component, schema}) => {
+const shapeRender = (Element: unknown, keys: readonly string[]): BlokRender<Logo['Path']> => {
+  const ShapeRender: BlokRender<Logo['Path']> = ({component, schema}) => {
     // The contract's geometry differs per shape; read by key, as one generic schema.
     const blok = useBlok(component, schema as BlokObjectSchema);
     const {props, animate, delay} = usePresentation(blok as unknown as PresentationBlok);
     // The geometry keys are fixed per component, so the hooks run in the same order every render.
+    // eslint-disable-next-line react-hooks/rules-of-hooks
     const values = defined(Object.fromEntries(keys.map(key => [key, useValue(blok[key])] as const)));
     return <Animated Element={Element as SvgElement} animate={animate} delay={delay} props={{...props, ...values}} />;
   };
+  return ShapeRender;
+};
 
 /* -------------------------------------------------------------------------- */
 /* The root                                                                   */

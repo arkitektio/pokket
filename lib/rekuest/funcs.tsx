@@ -1,4 +1,5 @@
 import {
+  ApolloClient,
   LazyQueryHookOptions,
   MutationHookOptions,
   QueryHookOptions,
@@ -29,7 +30,7 @@ export const useMutation: MutationFuncType = (doc, options) => {
 
   return useApolloMutation(doc, {
     ...options,
-    client: service.client,
+    client: service.client as ApolloClient<any>,
     onError: (error) => {
       toast.error("Error in useMutation: " + error.message);
     },
@@ -39,17 +40,17 @@ export const useMutation: MutationFuncType = (doc, options) => {
 export const useQuery: QueryFuncType = (doc, options) => {
   const service = useService(ServiceName);
 
-  return useApolloQuery(doc, { ...options, client: service.client });
+  return useApolloQuery(doc, { ...options, client: service.client as ApolloClient<any> });
 };
 
 export const useSubscription: SubscriptionFuncType = (doc, options) => {
   const service = useService(ServiceName);
 
-  return useApolloSubscription(doc, { ...options, client: service.client });
+  return useApolloSubscription(doc, { ...options, client: service.client as ApolloClient<any> });
 };
 
 export const useLazyQuery: LazyQueryFuncType = (doc, options) => {
   const service = useService(ServiceName);
 
-  return useApolloLazyQuery(doc, { ...options, client: service.client });
+  return useApolloLazyQuery(doc, { ...options, client: service.client as ApolloClient<any> });
 };

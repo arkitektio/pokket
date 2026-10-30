@@ -1,4 +1,5 @@
 import {
+  ApolloClient,
   LazyQueryHookOptions,
   MutationHookOptions,
   QueryHookOptions,
@@ -37,7 +38,7 @@ export const useMutation: MutationFuncType = (doc, options) => {
 
   return useApolloMutation(doc, {
     ...options,
-    client: service.client,
+    client: service.client as ApolloClient<any>,
     onError: (error) => {
       /* `toast` was the only report path here, and sonner-native drops every
          toast when no <Toaster /> is mounted — which was the case app-wide. So
@@ -54,7 +55,7 @@ export const useQuery: QueryFuncType = (doc, options) => {
 
   return useApolloQuery(doc, {
     ...options,
-    client: service.client,
+    client: service.client as ApolloClient<any>,
     // Queries had no error handling at all — a failed one rendered as an empty
     // field, which is why a missing username looked like no error.
     onError: (error) => {
@@ -68,12 +69,12 @@ export const useSubscription: SubscriptionFuncType = (doc, options) => {
    const service = useSelfService();
 
 
-  return useApolloSubscription(doc, { ...options, client: service.client });
+  return useApolloSubscription(doc, { ...options, client: service.client as ApolloClient<any> });
 };
 
 export const useLazyQuery: LazyQueryFuncType = (doc, options) => {
    const service = useSelfService();
 
 
-  return useApolloLazyQuery(doc, { ...options, client: service.client });
+  return useApolloLazyQuery(doc, { ...options, client: service.client as ApolloClient<any> });
 };

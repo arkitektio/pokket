@@ -37,7 +37,7 @@ export default function LoginScreen() {
   }, []);
 
   // Animated value for collapsible Advanced area
-  const advAnim = React.useRef(new Animated.Value(advanced ? 1 : 0)).current;
+  const [advAnim] = React.useState(() => new Animated.Value(advanced ? 1 : 0));
   React.useEffect(() => {
     Animated.timing(advAnim, { toValue: advanced ? 1 : 0, duration: 230, useNativeDriver: false }).start();
   }, [advanced, advAnim]);

@@ -16,7 +16,7 @@ export default function NotificationsScreen() {
             No notifications
           </Text>
           <Text className="text-muted-foreground text-center text-sm leading-5">
-            When you receive notifications from your devices or team, they'll appear here.
+            When you receive notifications from your devices or team, they&apos;ll appear here.
           </Text>
         </View>
       </ScrollView>

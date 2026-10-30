@@ -17,6 +17,7 @@ import {
 } from '@livekit/react-native';
 import { Link, Stack } from 'expo-router';
 import { Track } from 'livekit-client';
+import type { LivekitClient } from '@/lib/livekit/client';
 import * as React from 'react';
 import { ActivityIndicator, ScrollView, TextInput, View } from 'react-native';
 import { useThemeColors } from '@/lib/theme/BrandProvider';
@@ -115,7 +116,6 @@ function BroadcasterRoom({
       return;
     }
 
-    setNow(Date.now());
     const interval = setInterval(() => {
       setNow(Date.now());
     }, 1000);
@@ -151,7 +151,7 @@ function BroadcasterRoom({
     <View className="flex-1 bg-black">
       <LiveKitRoom
         token={token}
-        serverUrl={livekit.client.url}
+        serverUrl={(livekit.client as LivekitClient).url}
         connect
         video
         onError={(error) => {

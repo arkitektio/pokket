@@ -93,7 +93,7 @@ function SoloBroadcastContent({ broadcastId }: { broadcastId: string }) {
               </Text>
             </CardContent>
           </Card>
-          <SoloBroadcastPlayer broadcastId={broadcast.id} />
+          <SoloBroadcastPlayer key={broadcast.id} broadcastId={broadcast.id} />
         </>
       ) : null}
     </View>

@@ -23,37 +23,38 @@ type Html = typeof htmlCatalog.components;
 type Shadcn = typeof shadcnCatalog.components;
 type Ui = typeof uiCatalog.components;
 
-const flexRender =
-  (fixedDirection?: 'row' | 'column'): BlokRender<Ui['Flex']> =>
-    ({buildChild, component, schema}) => {
-      const blok = useBlok(component, schema);
-      const layoutProps = useBaseLayoutProps(blok);
-      const children = useValue(blok.children);
-      const direction = useValue(blok.direction);
-      const wrap = useValue(blok.wrap);
-      const justify = useValue(blok.justify);
-      const align = useValue(blok.align);
-      const bordered = useValue(blok.bordered);
+const flexRender = (fixedDirection?: 'row' | 'column'): BlokRender<Ui['Flex']> => {
+  const FlexRender: BlokRender<Ui['Flex']> = ({buildChild, component, schema}) => {
+    const blok = useBlok(component, schema);
+    const layoutProps = useBaseLayoutProps(blok);
+    const children = useValue(blok.children);
+    const direction = useValue(blok.direction);
+    const wrap = useValue(blok.wrap);
+    const justify = useValue(blok.justify);
+    const align = useValue(blok.align);
+    const bordered = useValue(blok.bordered);
 
-      const resolvedDirection = fixedDirection ?? (direction === 'column' ? 'column' : 'row');
+    const resolvedDirection = fixedDirection ?? (direction === 'column' ? 'column' : 'row');
 
-      return (
-        <View
-          className={cn(
-            'min-w-0',
-            resolvedDirection === 'column' ? 'flex-col' : 'flex-row',
-            wrap && 'flex-wrap',
-            mapJustify(justify),
-            // A column stretches its children across, like a block flow on the web.
-            align ? mapAlign(align) : resolvedDirection === 'column' ? 'items-stretch' : 'items-start',
-            bordered && 'rounded-md border border-border',
-          )}
-          style={buildLayoutStyle(layoutProps)}
-        >
-          {renderChildList(children, buildChild)}
-        </View>
-      );
-    };
+    return (
+      <View
+        className={cn(
+          'min-w-0',
+          resolvedDirection === 'column' ? 'flex-col' : 'flex-row',
+          wrap && 'flex-wrap',
+          mapJustify(justify),
+          // A column stretches its children across, like a block flow on the web.
+          align ? mapAlign(align) : resolvedDirection === 'column' ? 'items-stretch' : 'items-start',
+          bordered && 'rounded-md border border-border',
+        )}
+        style={buildLayoutStyle(layoutProps)}
+      >
+        {renderChildList(children, buildChild)}
+      </View>
+    );
+  };
+  return FlexRender;
+};
 
 export const FlexRender = flexRender();
 export const RowRender = flexRender('row');
