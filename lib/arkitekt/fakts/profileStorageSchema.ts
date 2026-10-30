@@ -79,6 +79,11 @@ export const ProfileLabelSchema = z.object({
   /** Plain numbers, so a parked row can be painted offline. */
   brandHue: z.number().nullish(),
   brandChroma: z.number().nullish(),
+  /**
+   * lok's `mycontext.roles`: the user's roles in this organization (a blok's
+   * `viewer.roles`). Absent on logins stored before this was kept.
+   */
+  roles: z.array(z.string()).optional(),
 });
 
 export type ProfileLabel = z.infer<typeof ProfileLabelSchema>;

@@ -122,11 +122,13 @@ import {
   ZoomOut,
   type LucideIcon,
 } from 'lucide-react-native';
-import * as z from 'zod';
-import {createBlokComponent, useBlok, useValue} from '@/lib/ports/blok/runtime';
+import {useBlok, useValue, type BlokRender} from '@arkitektio/bsx/runtime';
 import {iconWithClassName} from '@/lib/icons/iconWithClassName';
 import {useThemeColors} from '@/lib/theme/BrandProvider';
-import {classNameSchema, numberSchema} from './shared';
+
+import type {uiCatalog} from '@arkitektio/bsx/catalogs';
+
+type Ui = typeof uiCatalog.components;
 
 /**
  * The icons a blok payload may name, after orkestrator's `bloks/icons.tsx`.
@@ -261,13 +263,6 @@ export const BLOK_ICONS = {
 
 export type BlokIconName = keyof typeof BLOK_ICONS;
 
-const ICON_NAMES = Object.keys(BLOK_ICONS) as [BlokIconName, ...BlokIconName[]];
-
-export const iconNameSchema = z
-  .enum(ICON_NAMES)
-  .optional()
-  .describe(`Icon name. One of: ${ICON_NAMES.join(', ')}.`);
-
 // Let a `className` colour the glyph (`text-primary`), as it does on the web.
 for (const icon of new Set<LucideIcon>(Object.values(BLOK_ICONS))) {
   iconWithClassName(icon);
@@ -316,29 +311,15 @@ export const renderIcon = (name: unknown, options?: Omit<BlokIconProps, 'name'>)
   return <BlokIcon name={name} {...options} />;
 };
 
-export const Icon = createBlokComponent(
-  {
-    name: 'Icon',
-    schema: z
-      .object({
-        name: iconNameSchema,
-        size: numberSchema.describe('Pixel size. Defaults to the surrounding text size.'),
-        className: classNameSchema,
-      })
-      .describe('A lucide icon.'),
-  },
-  ({component, schema}) => {
-    const blok = useBlok(component, schema);
-    const name = useValue(blok.name);
-    const size = useValue(blok.size);
-    const className = useValue(blok.className);
+export const IconRender: BlokRender<Ui['Icon']> = ({component, schema}) => {
+  const blok = useBlok(component, schema);
+  const name = useValue(blok.name);
+  const size = useValue(blok.size);
+  const className = useValue(blok.className);
 
-    if (!name) {
-      return null;
-    }
+  if (!name) {
+    return null;
+  }
 
-    return <BlokIcon name={name} size={size} className={className} />;
-  },
-);
-
-export const iconBlokComponents = [Icon];
+  return <BlokIcon name={name} size={size} className={className} />;
+};

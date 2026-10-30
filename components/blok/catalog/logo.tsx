@@ -16,36 +16,40 @@ import Svg, {
   Stop,
   Text as SvgTextElement,
 } from 'react-native-svg';
-import * as z from 'zod';
 import {
   BlokNodeErrorSurface,
-  createBlokComponent,
-  useAction,
   useBlok,
+  usePendingAction,
   useValue,
   type Blok,
-  type BlokComponentPlacement,
   type BlokObjectSchema,
   type BlokRenderArgs,
-} from '@/lib/ports/blok/runtime';
+  type BlokRender,
+} from '@arkitektio/bsx/runtime';
+import {loadVocabulary} from '@arkitektio/bsx/spec/vocabulary';
 import {useBrand} from '@/lib/theme/BrandProvider';
 import {buildLogoPalette, type LogoPalette} from '@/lib/theme/brandTokens';
-import {actionProp, describedString} from './shared';
+
+import type {logoCatalog} from '@arkitektio/bsx/catalogs';
+
+type Logo = typeof logoCatalog.components;
 
 /**
- * SVG drawing, after orkestrator's `bloks/logo/index.tsx`: an `SVG` root and
- * the classic SVG elements as components, drawn with react-native-svg.
+ * The `logo@1` catalog, after orkestrator's `bloks/logo/index.tsx`: the
+ * `AgentLogo` and `ActionLogo` roots and the classic SVG elements as
+ * components, drawn with react-native-svg.
  *
  * The same names and prop schemas, so a payload validates on both. What the
  * phone cannot do is still accepted and dropped: an SVG `<title>` (the root's
  * becomes its accessibility label), and the hover that plays animations.
  *
- * `ActionLogo` is the root of an action's logo (blok context ACTION_LOGO):
- * the same shapes, painted with the palette only. A paint is a palette token
- * (`ink`, `brand`, ...) resolved from the brand in JS (`buildLogoPalette`),
- * since react-native-svg cannot read orkestrator's `var(--logo-*)`. Under an
- * `SVG` any colour works beside them, under an `ActionLogo` anything else is
- * drawn in `ink`.
+ * The root names the blok's context: an `AgentLogo` root is an agent's logo,
+ * an `ActionLogo` root an action's (it reads `task`, the viewer's last task of
+ * the action). A logo paints with the viewer's pens only (vocabulary
+ * `theme.logo_pens`: `ink`, `brand`, ..., the status and spectral roles),
+ * resolved from the brand in JS (`buildLogoPalette`), since react-native-svg
+ * cannot read orkestrator's `var(--logo-*)`; or with `url(#id)` into the
+ * drawing. Anything else is drawn in `ink`.
  *
  * A shape may `animate`. Orkestrator plays it on hover and while an action
  * logo's task runs; there is no hover here, so it plays while its host says
@@ -73,19 +77,18 @@ const useReference = (value: string | undefined) => {
   return match ? `url(#${prefix ?? 'svg'}-${safeId(match[1])})` : value;
 };
 
-/** The palette tokens a shape may name. `none` paints nothing. */
-export const LOGO_PAINT_TOKENS = ['ink', 'muted', 'brand', 'brand-strong', 'brand-soft', 'surface', 'none'] as const;
+/** The pens a shape may name (vocabulary `theme.logo_pens`). `none` paints nothing. */
+export const LOGO_PAINT_TOKENS: readonly string[] = loadVocabulary().theme.logoPens;
 
 /** What a shape may play. */
 export const LOGO_ANIMATIONS = ['spin', 'pulse', 'float', 'draw', 'march', 'blink'] as const;
 type LogoAnimation = (typeof LOGO_ANIMATIONS)[number];
 
-/** `free` under an `SVG`, `palette` under an `ActionLogo`. */
-type PaintMode = 'free' | 'palette';
-const PaintModeContext = React.createContext<PaintMode>('free');
+const isPaletteToken = (value: string) => value !== 'none' && LOGO_PAINT_TOKENS.includes(value);
 
-const isPaletteToken = (value: string): value is keyof LogoPalette =>
-  value !== 'none' && (LOGO_PAINT_TOKENS as readonly string[]).includes(value);
+/** A pen as the brand draws it; a pen the palette does not hold yet is drawn in `ink`. */
+const penColor = (palette: LogoPalette, pen: string): string =>
+  Object.prototype.hasOwnProperty.call(palette, pen) ? palette[pen as keyof LogoPalette] : palette.ink;
 
 /** The brand's palette, built once per brand. */
 const useLogoPalette = (): LogoPalette => {
@@ -93,23 +96,17 @@ const useLogoPalette = (): LogoPalette => {
   return React.useMemo(() => buildLogoPalette(hue, chroma), [hue, chroma]);
 };
 
-/** A paint as drawn: a token from the palette, a reference into the drawing, or (under an `SVG` only) a colour. */
+/** A paint as drawn: a pen, a reference into the drawing; anything else in `ink`. */
 const usePaint = (value: string | undefined) => {
-  const mode = React.useContext(PaintModeContext);
   const palette = useLogoPalette();
   const reference = useReference(value);
   if (value === undefined || value === null) return undefined;
   const paint = String(value).trim();
   if (paint === 'none') return 'none';
-  if (isPaletteToken(paint)) return palette[paint];
+  if (isPaletteToken(paint)) return penColor(palette, paint);
   if (URL_REFERENCE.test(paint)) return reference;
-  return mode === 'palette' ? palette.ink : value;
+  return palette.ink;
 };
-
-const length = (description: string) =>
-  z.union([z.number(), z.string()]).optional().describe(description);
-
-const IN_SVG: BlokComponentPlacement = {context: 'logo', downstreamOf: ['SVG', 'ActionLogo']};
 
 /* -------------------------------------------------------------------------- */
 /* Motion                                                                     */
@@ -292,33 +289,8 @@ const LogoMotion = ({
 /* Presentation: what every shape and group may set                           */
 /* -------------------------------------------------------------------------- */
 
-const PAINT_HELP = `${LOGO_PAINT_TOKENS.join(', ')} (the viewer's palette), url(#gradient), or under an SVG any colour`;
-
-const presentationFields = {
-  fill: describedString(`Fill paint: ${PAINT_HELP}.`),
-  fillOpacity: length('Fill opacity, 0 to 1.'),
-  fillRule: z.enum(['nonzero', 'evenodd']).optional().describe('Which parts of a self-intersecting shape are inside.'),
-  stroke: describedString(`Stroke paint: ${PAINT_HELP}.`),
-  strokeWidth: length('Stroke width, in user units.'),
-  strokeOpacity: length('Stroke opacity, 0 to 1.'),
-  strokeLinecap: z.enum(['butt', 'round', 'square']).optional().describe('How open line ends are drawn.'),
-  strokeLinejoin: z.enum(['miter', 'round', 'bevel']).optional().describe('How corners are drawn.'),
-  strokeDasharray: describedString('Dash pattern, e.g. "4 2".'),
-  opacity: length('Opacity of the whole element, 0 to 1.'),
-  transform: describedString('SVG transform, e.g. "rotate(45 12 12)".'),
-  clipPath: describedString('url(#clip) of a ClipPath to clip by.'),
-  title: describedString('Tooltip text (an SVG <title>).'),
-  onClick: actionProp('Runs when the element is clicked.'),
-  animate: z
-    .enum(LOGO_ANIMATIONS)
-    .optional()
-    .describe(
-      'Plays while the logo is hovered, and while an action logo\'s task runs: spin, pulse, float, draw (traces the stroke), march (moves a dashed stroke) or blink.',
-    ),
-  animateDelay: length('Seconds before the animation starts, to stagger shapes.'),
-};
-
-type PresentationBlok = Blok<z.ZodObject<typeof presentationFields>>;
+/** The presentation props every shape and group shares: a `G` holds just those. */
+type PresentationBlok = Blok<Logo['G']['schema']>;
 
 /** react-native-svg drops an `undefined` prop, but not a `null` one. */
 const defined = <T extends Record<string, unknown>>(props: T): Partial<T> =>
@@ -328,7 +300,8 @@ const usePresentation = (blok: PresentationBlok) => {
   const fill = usePaint(useValue(blok.fill));
   const stroke = usePaint(useValue(blok.stroke));
   const clipPath = useReference(useValue(blok.clipPath));
-  const onPress = useAction(blok.onClick);
+  // Busy while the call it started runs: a shape cannot dispatch twice.
+  const {run: onPress} = usePendingAction(blok.onClick);
   const requested = useValue(blok.animate);
   // A bound or computed value may name anything: only a known animation plays.
   const animate = (LOGO_ANIMATIONS as readonly string[]).includes(requested as string)
@@ -389,22 +362,15 @@ const Animated = ({
  * A shape: one SVG element, its geometry props passed through as they are,
  * plus the shared presentation.
  */
-const createShape = (
-  name: string,
-  Element: unknown,
-  description: string,
-  geometry: Record<string, z.ZodTypeAny>,
-) => {
-  const schema: BlokObjectSchema = z.object({...geometry, ...presentationFields}).describe(description);
-  const keys = Object.keys(geometry);
-  return createBlokComponent({name, placement: IN_SVG, schema}, ({component, schema}) => {
-    const blok = useBlok(component, schema);
+const shapeRender = (Element: unknown, keys: readonly string[]): BlokRender<Logo['Path']> =>
+  ({component, schema}) => {
+    // The contract's geometry differs per shape; read by key, as one generic schema.
+    const blok = useBlok(component, schema as BlokObjectSchema);
     const {props, animate, delay} = usePresentation(blok as unknown as PresentationBlok);
     // The geometry keys are fixed per component, so the hooks run in the same order every render.
     const values = defined(Object.fromEntries(keys.map(key => [key, useValue(blok[key])] as const)));
     return <Animated Element={Element as SvgElement} animate={animate} delay={delay} props={{...props, ...values}} />;
-  });
-};
+  };
 
 /* -------------------------------------------------------------------------- */
 /* The root                                                                   */
@@ -412,19 +378,6 @@ const createShape = (
 
 /** Inside an `Svg` nothing can render a `View`: a node that fails is drawn as nothing. */
 const SvgNodeError = () => <G />;
-
-const ROOTS = ['SVG', 'ActionLogo'];
-
-const rootSchema = (description: string) =>
-  z
-    .object({
-      viewBox: describedString('The user coordinate system, "minX minY width height", e.g. "0 0 24 24".'),
-      width: length('Width; fills its box when left out.'),
-      height: length('Height; fills its box when left out.'),
-      preserveAspectRatio: describedString('How the viewBox fits the box, e.g. "xMidYMid meet".'),
-      title: describedString('What the drawing shows, for screen readers and as a tooltip.'),
-    })
-    .describe(description);
 
 /** "minX minY width height", or null when it is not four numbers with a size. */
 export const parseViewBox = (viewBox: string | undefined): Box | null => {
@@ -434,111 +387,61 @@ export const parseViewBox = (viewBox: string | undefined): Box | null => {
   return width > 0 && height > 0 ? {x, y, width, height} : null;
 };
 
-/** A drawing's root: an `Svg` whose shapes paint in `mode`. */
-const createSvgRoot = (name: string, mode: PaintMode, description: string) =>
-  createBlokComponent(
-    {
-      name,
-      acceptsChildren: true,
-      placement: {childrenContext: 'logo', notDownstreamOf: ROOTS},
-      schema: rootSchema(description),
-    },
-    args => {
-      const blok = useBlok(args.component, args.schema);
-      const viewBox = useValue(blok.viewBox);
-      const width = useValue(blok.width);
-      const height = useValue(blok.height);
-      const preserveAspectRatio = useValue(blok.preserveAspectRatio);
-      const title = useValue(blok.title);
-      const prefix = `svg${React.useId().replace(/[^A-Za-z0-9]/g, '')}`;
-      const box = React.useMemo(() => parseViewBox(viewBox) ?? {x: 0, y: 0, width: 24, height: 24}, [viewBox]);
+/** A drawing's root: an `Svg` whose shapes paint with the pens. */
+export const LogoRootRender: BlokRender<Logo['AgentLogo']> = args => {
+  const blok = useBlok(args.component, args.schema);
+  const viewBox = useValue(blok.viewBox);
+  const width = useValue(blok.width);
+  const height = useValue(blok.height);
+  const preserveAspectRatio = useValue(blok.preserveAspectRatio);
+  const title = useValue(blok.title);
+  const prefix = `svg${React.useId().replace(/[^A-Za-z0-9]/g, '')}`;
+  const box = React.useMemo(() => parseViewBox(viewBox) ?? {x: 0, y: 0, width: 24, height: 24}, [viewBox]);
 
-      // A browser's `<svg>` fills its box; a native one with no size has none. Left
-      // unsized, it takes the width it is given and the viewBox's proportions.
-      const size =
-        width === undefined && height === undefined
-          ? {style: {width: '100%' as const, aspectRatio: box.width / box.height}}
-          : defined({width, height});
+  // A browser's `<svg>` fills its box; a native one with no size has none. Left
+  // unsized, it takes the width it is given and the viewBox's proportions.
+  const size =
+    width === undefined && height === undefined
+      ? {style: {width: '100%' as const, aspectRatio: box.width / box.height}}
+      : defined({width, height});
 
-      return (
-        <Svg
-          viewBox={viewBox}
-          {...size}
-          {...defined({preserveAspectRatio})}
-          accessible={Boolean(title)}
-          accessibilityRole={title ? 'image' : undefined}
-          accessibilityLabel={title}
-        >
-          <SvgDrawingContext.Provider value={prefix}>
-            <PaintModeContext.Provider value={mode}>
-              <ViewBoxContext.Provider value={box}>
-                <LogoClock>
-                  <BlokNodeErrorSurface.Provider value={SvgNodeError}>{childrenOf(args)}</BlokNodeErrorSurface.Provider>
-                </LogoClock>
-              </ViewBoxContext.Provider>
-            </PaintModeContext.Provider>
-          </SvgDrawingContext.Provider>
-        </Svg>
-      );
-    },
+  return (
+    <Svg
+      viewBox={viewBox}
+      {...size}
+      {...defined({preserveAspectRatio})}
+      accessible={Boolean(title)}
+      accessibilityRole={title ? 'image' : undefined}
+      accessibilityLabel={title}
+    >
+      <SvgDrawingContext.Provider value={prefix}>
+        <ViewBoxContext.Provider value={box}>
+          <LogoClock>
+            <BlokNodeErrorSurface.Provider value={SvgNodeError}>{childrenOf(args)}</BlokNodeErrorSurface.Provider>
+          </LogoClock>
+        </ViewBoxContext.Provider>
+      </SvgDrawingContext.Provider>
+    </Svg>
   );
-
-export const SvgBlok = createSvgRoot(
-  'SVG',
-  'free',
-  'An SVG drawing. Its children are SVG shapes; the root of a logo blok.',
-);
-
-export const ActionLogoBlok = createSvgRoot(
-  'ActionLogo',
-  'palette',
-  "An action's logo: an SVG drawing whose shapes paint with the viewer's palette only. The root of an action logo blok, which reads @task: the viewer's last task of the action, null until they run it.",
-);
+};
 
 /* -------------------------------------------------------------------------- */
 /* Shapes                                                                     */
 /* -------------------------------------------------------------------------- */
 
-export const PathBlok = createShape('Path', Path, 'An SVG path.', {
-  d: describedString('Path data, e.g. "M2 12h20".'),
-});
+export const PathRender = shapeRender(Path, ['d']);
 
-export const CircleBlok = createShape('Circle', Circle, 'An SVG circle.', {
-  cx: length('Centre x.'),
-  cy: length('Centre y.'),
-  r: length('Radius.'),
-});
+export const CircleRender = shapeRender(Circle, ['cx', 'cy', 'r']);
 
-export const EllipseBlok = createShape('Ellipse', Ellipse, 'An SVG ellipse.', {
-  cx: length('Centre x.'),
-  cy: length('Centre y.'),
-  rx: length('Horizontal radius.'),
-  ry: length('Vertical radius.'),
-});
+export const EllipseRender = shapeRender(Ellipse, ['cx', 'cy', 'rx', 'ry']);
 
-export const RectBlok = createShape('Rect', Rect, 'An SVG rectangle.', {
-  x: length('Left edge.'),
-  y: length('Top edge.'),
-  width: length('Width.'),
-  height: length('Height.'),
-  rx: length('Corner radius, horizontal.'),
-  ry: length('Corner radius, vertical.'),
-});
+export const RectRender = shapeRender(Rect, ['x', 'y', 'width', 'height', 'rx', 'ry']);
 
-export const LineBlok = createShape('Line', Line, 'An SVG line.', {
-  x1: length('Start x.'),
-  y1: length('Start y.'),
-  x2: length('End x.'),
-  y2: length('End y.'),
-});
+export const LineRender = shapeRender(Line, ['x1', 'y1', 'x2', 'y2']);
 
-export const PolylineBlok = createShape('Polyline', Polyline, 'An open SVG polyline.', {
-  points: describedString('Points, e.g. "0,0 10,5 20,0".'),
-});
+export const PolylineRender = shapeRender(Polyline, ['points']);
 
-export const PolygonBlok = createShape('Polygon', Polygon, 'A closed SVG polygon.', {
-  points: describedString('Points, e.g. "0,0 10,5 20,0".'),
-});
+export const PolygonRender = shapeRender(Polygon, ['points']);
 
 /** SVG's `dominant-baseline`, as react-native-svg spells it (`alignmentBaseline`). */
 const BASELINES = {
@@ -549,219 +452,95 @@ const BASELINES = {
   alphabetic: 'alphabetic',
 } as const;
 
-export const SvgTextBlok = createBlokComponent(
-  {
-    name: 'SvgText',
-    placement: IN_SVG,
-    schema: z
-      .object({
-        text: describedString('The text to draw.'),
-        x: length('Anchor x.'),
-        y: length('Baseline y.'),
-        fontSize: length('Font size, in user units.'),
-        fontFamily: describedString('Font family.'),
-        fontWeight: describedString('Font weight, e.g. "bold" or "600".'),
-        textAnchor: z.enum(['start', 'middle', 'end']).optional().describe('Where x is on the text.'),
-        dominantBaseline: z
-          .enum(['auto', 'middle', 'central', 'hanging', 'alphabetic'])
-          .optional()
-          .describe('Where y is on the text.'),
-        ...presentationFields,
-      })
-      .describe('Text in an SVG drawing (the SVG <text> element).'),
-  },
-  ({component, schema}) => {
-    const blok = useBlok(component, schema);
-    const {props, animate, delay} = usePresentation(blok as unknown as PresentationBlok);
-    const baseline = useValue(blok.dominantBaseline);
-    const text = useValue(blok.text);
-    const textProps = defined({
-      x: useValue(blok.x),
-      y: useValue(blok.y),
-      fontSize: useValue(blok.fontSize),
-      fontFamily: useValue(blok.fontFamily),
-      fontWeight: useValue(blok.fontWeight),
-      textAnchor: useValue(blok.textAnchor),
-      alignmentBaseline: baseline ? BASELINES[baseline] : undefined,
-    });
-    return (
-      <Animated Element={SvgTextElement as unknown as SvgElement} animate={animate} delay={delay} props={{...props, ...textProps}}>
-        {text ?? ''}
-      </Animated>
-    );
-  },
-);
+export const SvgTextRender: BlokRender<Logo['SvgText']> = ({component, schema}) => {
+  const blok = useBlok(component, schema);
+  const {props, animate, delay} = usePresentation(blok as unknown as PresentationBlok);
+  const baseline = useValue(blok.dominantBaseline);
+  const text = useValue(blok.text);
+  const textProps = defined({
+    x: useValue(blok.x),
+    y: useValue(blok.y),
+    fontSize: useValue(blok.fontSize),
+    fontFamily: useValue(blok.fontFamily),
+    fontWeight: useValue(blok.fontWeight),
+    textAnchor: useValue(blok.textAnchor),
+    alignmentBaseline: baseline ? BASELINES[baseline] : undefined,
+  });
+  return (
+    <Animated Element={SvgTextElement as unknown as SvgElement} animate={animate} delay={delay} props={{...props, ...textProps}}>
+      {text ?? ''}
+    </Animated>
+  );
+};
 
 /* -------------------------------------------------------------------------- */
 /* Structure: groups, definitions, gradients, clip paths                      */
 /* -------------------------------------------------------------------------- */
 
-export const GroupBlok = createBlokComponent(
-  {
-    name: 'G',
-    acceptsChildren: true,
-    placement: IN_SVG,
-    schema: z.object(presentationFields).describe('A group of SVG elements, which share its presentation and transform.'),
-  },
-  args => {
-    const blok = useBlok(args.component, args.schema);
-    const {props, animate, delay} = usePresentation(blok);
-    return (
-      <Animated Element={G as unknown as SvgElement} animate={animate} delay={delay} props={props}>
-        {childrenOf(args)}
-      </Animated>
-    );
-  },
-);
+export const GroupRender: BlokRender<Logo['G']> = args => {
+  const blok = useBlok(args.component, args.schema);
+  const {props, animate, delay} = usePresentation(blok);
+  return (
+    <Animated Element={G as unknown as SvgElement} animate={animate} delay={delay} props={props}>
+      {childrenOf(args)}
+    </Animated>
+  );
+};
 
-export const DefsBlok = createBlokComponent(
-  {
-    name: 'Defs',
-    acceptsChildren: true,
-    placement: IN_SVG,
-    schema: z.object({}).describe('Definitions (gradients, clip paths) that are referenced, not drawn.'),
-  },
-  args => <Defs>{childrenOf(args)}</Defs>,
-);
+export const DefsRender: BlokRender<Logo['Defs']> = args => <Defs>{childrenOf(args)}</Defs>;
 
-const gradientUnits = z
-  .enum(['objectBoundingBox', 'userSpaceOnUse'])
-  .optional()
-  .describe('Whether the coordinates are fractions of the shape (the default) or user units.');
+export const LinearGradientRender: BlokRender<Logo['LinearGradient']> = args => {
+  const blok = useBlok(args.component, args.schema);
+  return (
+    <LinearGradient
+      id={useElementId(args.component.id)}
+      {...defined({
+        x1: useValue(blok.x1),
+        y1: useValue(blok.y1),
+        x2: useValue(blok.x2),
+        y2: useValue(blok.y2),
+        gradientUnits: useValue(blok.gradientUnits),
+        gradientTransform: useValue(blok.gradientTransform),
+      })}
+    >
+      {childrenOf(args)}
+    </LinearGradient>
+  );
+};
 
-export const LinearGradientBlok = createBlokComponent(
-  {
-    name: 'LinearGradient',
-    acceptsChildren: true,
-    placement: IN_SVG,
-    schema: z
-      .object({
-        x1: length('Start x.'),
-        y1: length('Start y.'),
-        x2: length('End x.'),
-        y2: length('End y.'),
-        gradientUnits,
-        gradientTransform: describedString('Transform of the gradient.'),
-      })
-      .describe('A linear gradient, filled by its Stop children. Referenced as url(#id) by its BSX id.'),
-  },
-  args => {
-    const blok = useBlok(args.component, args.schema);
-    return (
-      <LinearGradient
-        id={useElementId(args.component.id)}
-        {...defined({
-          x1: useValue(blok.x1),
-          y1: useValue(blok.y1),
-          x2: useValue(blok.x2),
-          y2: useValue(blok.y2),
-          gradientUnits: useValue(blok.gradientUnits),
-          gradientTransform: useValue(blok.gradientTransform),
-        })}
-      >
-        {childrenOf(args)}
-      </LinearGradient>
-    );
-  },
-);
+export const RadialGradientRender: BlokRender<Logo['RadialGradient']> = args => {
+  const blok = useBlok(args.component, args.schema);
+  return (
+    <RadialGradient
+      id={useElementId(args.component.id)}
+      {...defined({
+        cx: useValue(blok.cx),
+        cy: useValue(blok.cy),
+        r: useValue(blok.r),
+        fx: useValue(blok.fx),
+        fy: useValue(blok.fy),
+        gradientUnits: useValue(blok.gradientUnits),
+        gradientTransform: useValue(blok.gradientTransform),
+      })}
+    >
+      {childrenOf(args)}
+    </RadialGradient>
+  );
+};
 
-export const RadialGradientBlok = createBlokComponent(
-  {
-    name: 'RadialGradient',
-    acceptsChildren: true,
-    placement: IN_SVG,
-    schema: z
-      .object({
-        cx: length('Centre x.'),
-        cy: length('Centre y.'),
-        r: length('Radius.'),
-        fx: length('Focal point x.'),
-        fy: length('Focal point y.'),
-        gradientUnits,
-        gradientTransform: describedString('Transform of the gradient.'),
-      })
-      .describe('A radial gradient, filled by its Stop children. Referenced as url(#id) by its BSX id.'),
-  },
-  args => {
-    const blok = useBlok(args.component, args.schema);
-    return (
-      <RadialGradient
-        id={useElementId(args.component.id)}
-        {...defined({
-          cx: useValue(blok.cx),
-          cy: useValue(blok.cy),
-          r: useValue(blok.r),
-          fx: useValue(blok.fx),
-          fy: useValue(blok.fy),
-          gradientUnits: useValue(blok.gradientUnits),
-          gradientTransform: useValue(blok.gradientTransform),
-        })}
-      >
-        {childrenOf(args)}
-      </RadialGradient>
-    );
-  },
-);
+export const StopRender: BlokRender<Logo['Stop']> = ({component, schema}) => {
+  const blok = useBlok(component, schema);
+  const stopColor = usePaint(useValue(blok.stopColor));
+  return (
+    <Stop {...defined({offset: useValue(blok.offset), stopColor, stopOpacity: useValue(blok.stopOpacity)})} />
+  );
+};
 
-export const StopBlok = createBlokComponent(
-  {
-    name: 'Stop',
-    placement: {context: 'logo', downstreamOf: ['LinearGradient', 'RadialGradient']},
-    schema: z
-      .object({
-        offset: length('Where along the gradient, 0 to 1 or a percentage.'),
-        stopColor: describedString(`The colour at this stop: ${PAINT_HELP}.`),
-        stopOpacity: length('The opacity at this stop, 0 to 1.'),
-      })
-      .describe('One colour stop of a gradient.'),
-  },
-  ({component, schema}) => {
-    const blok = useBlok(component, schema);
-    const stopColor = usePaint(useValue(blok.stopColor));
-    return (
-      <Stop {...defined({offset: useValue(blok.offset), stopColor, stopOpacity: useValue(blok.stopOpacity)})} />
-    );
-  },
-);
+export const ClipPathRender: BlokRender<Logo['ClipPath']> = args => {
+  const blok = useBlok(args.component, args.schema);
+  // react-native-svg clips in user units only; `clipPathUnits` is accepted and ignored.
+  useValue(blok.clipPathUnits);
+  return <ClipPath id={useElementId(args.component.id)}>{childrenOf(args)}</ClipPath>;
+};
 
-export const ClipPathBlok = createBlokComponent(
-  {
-    name: 'ClipPath',
-    acceptsChildren: true,
-    placement: IN_SVG,
-    schema: z
-      .object({
-        clipPathUnits: z
-          .enum(['userSpaceOnUse', 'objectBoundingBox'])
-          .optional()
-          .describe('Whether its shapes are in user units (the default) or fractions of the clipped shape.'),
-      })
-      .describe('A clip path made of its shape children. Referenced as url(#id) by its BSX id.'),
-  },
-  args => {
-    const blok = useBlok(args.component, args.schema);
-    // react-native-svg clips in user units only; `clipPathUnits` is accepted and ignored.
-    useValue(blok.clipPathUnits);
-    return <ClipPath id={useElementId(args.component.id)}>{childrenOf(args)}</ClipPath>;
-  },
-);
-
-/** The SVG vocabulary: the two roots, seven shapes, text, and what shapes reference. */
-export const logoBlokComponents = [
-  SvgBlok,
-  ActionLogoBlok,
-  PathBlok,
-  CircleBlok,
-  EllipseBlok,
-  RectBlok,
-  LineBlok,
-  PolylineBlok,
-  PolygonBlok,
-  SvgTextBlok,
-  GroupBlok,
-  DefsBlok,
-  LinearGradientBlok,
-  RadialGradientBlok,
-  StopBlok,
-  ClipPathBlok,
-];
+/** The `logo@1` catalog: the two roots, seven shapes, text, and what shapes reference. */

@@ -1,7 +1,7 @@
 import {describe, expect, it, jest} from '@jest/globals';
 import * as React from 'react';
 import {act, create, type ReactTestRenderer} from 'react-test-renderer';
-import {normalizeBlokComponentTree, preflightBlokDocument} from '@/lib/ports/blok/runtime';
+import {normalizeBlokComponentTree, preflightBlokDocument} from '@arkitektio/bsx/runtime';
 import BlokRenderer from '../BlokRenderer';
 import {pokketBlokCatalog} from '../catalog';
 

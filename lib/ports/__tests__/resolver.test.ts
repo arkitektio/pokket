@@ -13,7 +13,7 @@ const p = (over: Record<string, unknown> & { kind: PortKind; key: string }): Por
 
 const gtValidator = (dependency: string, message: string) => ({
   call: {
-    operation: "compare.gt",
+    operation: "cmp.gt",
     arguments: [
       { key: "a", value_path: "value" },
       { key: "b", value_path: dependency },

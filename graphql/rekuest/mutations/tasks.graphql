@@ -42,3 +42,12 @@ mutation Assign($input: AssignInput!) {
     latestEventKind
   }
 }
+
+# Answers a held task: approve or deny it, with what was answered through its blok.
+mutation Decide($input: DecideInput!) {
+  decide(input: $input) {
+    id
+    isDone
+    latestEventKind
+  }
+}

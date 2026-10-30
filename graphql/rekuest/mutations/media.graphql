@@ -1,6 +1,0 @@
-# Read credentials for one stored object (an asset's file), valid for `expiresIn` seconds.
-mutation RequestMediaAccess($input: RequestMediaAccessInput!) {
-  requestMediaAccess(input: $input) {
-    ...MediaAccessGrant
-  }
-}

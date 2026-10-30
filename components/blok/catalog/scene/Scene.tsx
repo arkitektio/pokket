@@ -14,7 +14,7 @@ import {
   useValue,
   type BlokNodeErrorProps,
   type BlokRenderArgs,
-} from '@/lib/ports/blok/runtime';
+} from '@arkitektio/bsx/runtime';
 import {useThemeColors} from '@/lib/theme/BrandProvider';
 import {cn} from '@/lib/utils';
 import {cssLength} from '../shared';
@@ -28,7 +28,10 @@ import {
   type SceneView,
 } from './context';
 import {BlokSceneEmbedProvider, useBlokSceneEmbedded, useBlokSceneFill} from './host';
-import {sceneSchema} from './schemas';
+import {usePersistedComponentState} from '@arkitektio/bsx/renderer/persist';
+import type {sceneCatalog} from '@arkitektio/bsx/catalogs';
+
+type Scene = typeof sceneCatalog.components;
 
 /**
  * orkestrator's `bloks/scene/Scene.tsx` on the phone: the canvas is R3F on
@@ -57,12 +60,26 @@ const FALLBACK_HEIGHT = 384;
 const bounds = new THREE.Box3();
 const sphere = new THREE.Sphere();
 
+/** Where the viewer left the camera: what a `persist` scene keeps by its id. */
+export type ScenePose = {position: [number, number, number]; target: [number, number, number]; grid: boolean};
+
+const isTriple = (value: unknown): value is [number, number, number] =>
+  Array.isArray(value) && value.length === 3 && value.every(item => typeof item === 'number' && Number.isFinite(item));
+
+export const isScenePose = (value: unknown): value is ScenePose =>
+  typeof value === 'object' &&
+  value !== null &&
+  isTriple((value as ScenePose).position) &&
+  isTriple((value as ScenePose).target) &&
+  typeof (value as ScenePose).grid === 'boolean';
+
 /**
  * Points the camera at what is in the scene. A view is a direction; how far
  * back the camera stands follows from the size of the models. The scene is
- * framed when a view is asked for, and once when its first model arrives.
+ * framed when a view is asked for, and once when its first model arrives; a
+ * kept pose stands until the viewer asks for a view.
  */
-const CameraRig = () => {
+const CameraRig = ({pose}: {pose?: ScenePose | null}) => {
   const store = useSceneStoreApi();
   const view = useSceneState(state => state.view);
   const placed = useSceneState(state => state.placed);
@@ -94,13 +111,31 @@ const CameraRig = () => {
     [ready, store, three],
   );
 
-  React.useEffect(() => frame(view.name), [frame, view]);
+  // A kept pose stands until the viewer asks for a view: it is where they left the camera.
+  const restore = React.useCallback(() => {
+    const controls = three().controls as unknown as {target: THREE.Vector3; update: () => void} | null;
+    if (!ready || !controls || !pose) return false;
+    const camera = three().camera;
+    controls.target.set(...pose.target);
+    camera.position.set(...pose.position);
+    const distance = camera.position.distanceTo(controls.target);
+    camera.near = Math.max(distance / 200, 0.001);
+    camera.far = distance * 200;
+    camera.updateProjectionMatrix();
+    controls.update();
+    return true;
+  }, [pose, ready, three]);
+
+  React.useEffect(() => {
+    if (view.serial === 0 && restore()) return;
+    frame(view.name);
+  }, [frame, restore, view]);
 
   const framedFor = React.useRef(0);
   React.useEffect(() => {
-    if (placed.size > framedFor.current) frame(store.getState().view.name);
+    if (placed.size > framedFor.current && !(pose && store.getState().view.serial === 0)) frame(store.getState().view.name);
     framedFor.current = placed.size;
-  }, [frame, placed, store]);
+  }, [frame, placed, pose, store]);
 
   return null;
 };
@@ -363,6 +398,70 @@ const SceneControls = () => {
   );
 };
 
+/** How long the camera stays put before where it stands counts as where the viewer left it. */
+const POSE_SETTLE_MS = 400;
+
+/**
+ * Reports where the viewer leaves the camera (and the grid), for a scene that
+ * keeps its pose. Orkestrator hears the orbit controls' `end`; the phone's
+ * touch controls have none, so a pose is reported once the camera has stood
+ * still for a moment.
+ */
+const PoseKeeper = ({onPoseChange}: {onPoseChange: (pose: ScenePose) => void}) => {
+  const grid = useSceneState(state => state.settings.grid);
+  const get = useThree(state => state.get);
+  const report = React.useRef(onPoseChange);
+  React.useEffect(() => {
+    report.current = onPoseChange;
+  });
+  const last = React.useRef<string | null>(null);
+  const timer = React.useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  const poseNow = React.useCallback((): ScenePose | null => {
+    const controls = get().controls as unknown as {target: THREE.Vector3} | null;
+    if (!controls) return null;
+    const {position} = get().camera;
+    return {
+      position: [position.x, position.y, position.z],
+      target: [controls.target.x, controls.target.y, controls.target.z],
+      grid,
+    };
+  }, [get, grid]);
+
+  const schedule = React.useCallback(
+    (pose: ScenePose) => {
+      if (timer.current !== undefined) clearTimeout(timer.current);
+      timer.current = setTimeout(() => {
+        timer.current = undefined;
+        report.current(pose);
+      }, POSE_SETTLE_MS);
+    },
+    [],
+  );
+
+  useFrame(() => {
+    const pose = poseNow();
+    if (!pose) return;
+    const key = JSON.stringify(pose);
+    if (last.current === null) {
+      // Where it starts is not where the viewer left it.
+      last.current = key;
+      return;
+    }
+    if (key === last.current) return;
+    last.current = key;
+    schedule(pose);
+  });
+
+  React.useEffect(
+    () => () => {
+      if (timer.current !== undefined) clearTimeout(timer.current);
+    },
+    [],
+  );
+  return null;
+};
+
 /** The ground grid, drawn or not as the viewer chose. */
 const SceneGrid = () =>
   useSceneState(state => state.settings.grid) ? (
@@ -402,6 +501,10 @@ type SceneSurfaceProps = {
   overlay?: React.ReactNode;
   /** What stands in the scene: rendered inside the canvas. */
   children?: React.ReactNode;
+  /** Where the viewer left the camera last time (a `persist` scene): it starts there. */
+  pose?: ScenePose | null;
+  /** Hears where the viewer leaves the camera. */
+  onPoseChange?: (pose: ScenePose) => void;
 };
 
 /**
@@ -417,10 +520,12 @@ export const SceneSurface = ({
   onPointerMissed,
   overlay,
   children,
+  pose,
+  onPoseChange,
 }: SceneSurfaceProps) => {
   // What is asked for is where the scene starts; from then on it is the viewer's.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const store = React.useMemo(() => createSceneStore({view, grid}), []);
+  const store = React.useMemo(() => createSceneStore({view, grid: pose?.grid ?? grid}), []);
   const cards = React.useRef(new Map<string, CardHandle>());
   const [camera] = React.useState(() => ({position: VIEW_DIRECTIONS[view], fov: 40, near: 0.005, far: 200}));
 
@@ -444,7 +549,8 @@ export const SceneSurface = ({
               <directionalLight position={[-3, 2, -2]} intensity={0.5} />
               <SceneGrid />
               <SceneControls3D />
-              <CameraRig />
+              <CameraRig pose={pose} />
+              {onPoseChange ? <PoseKeeper onPoseChange={onPoseChange} /> : null}
               {children}
               <OverlayTracker cards={cards} />
             </BlokSceneEmbedProvider>
@@ -458,7 +564,7 @@ export const SceneSurface = ({
   );
 };
 
-type SceneRenderArgs = BlokRenderArgs<typeof sceneSchema>;
+type SceneRenderArgs = BlokRenderArgs<Scene['Scene']['schema']>;
 
 const SceneChildren = ({component, buildChild}: Pick<SceneRenderArgs, 'component' | 'buildChild'>) => (
   <>
@@ -480,11 +586,18 @@ const StandaloneScene = ({component, schema, buildChild}: SceneRenderArgs) => {
   const fill = screen && !collapsed;
   // A scrolling page has no height for "100%" to fill: there the scene takes 24rem.
   const height = fill ? undefined : typeof declared === 'number' ? declared : FALLBACK_HEIGHT;
+  const persist = useValue(blok.persist) === true;
+  const kept = usePersistedComponentState(component.id, persist, isScenePose);
+
+  // A kept pose is read before the scene starts: it starts where the viewer left it.
+  if (!kept.loaded) return <View className={fill ? 'flex-1' : 'w-full'} style={height === undefined ? undefined : {height}} />;
 
   return (
     <SceneSurface
       view={camera}
       grid={grid}
+      pose={kept.initial}
+      onPoseChange={persist ? kept.save : undefined}
       className={fill ? 'flex-1 overflow-hidden' : 'w-full overflow-hidden rounded-xl bg-muted/20'}
       style={height === undefined ? undefined : {height}}
       onLayout={fill ? event => event.nativeEvent.layout.height === 0 && setCollapsed(true) : undefined}

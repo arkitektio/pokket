@@ -19,3 +19,14 @@ fragment StateSnapshotEvent on StateSnapshotEvent {
   sessionId
   timestamp
 }
+
+# One recorded change of an agent's state: what time travel replays.
+fragment Patch on Patch {
+  id
+  op
+  path
+  value
+  interface
+  timestamp
+  globalFutureRevision
+}

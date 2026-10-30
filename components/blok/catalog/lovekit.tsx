@@ -3,7 +3,7 @@ import {ActivityIndicator, View} from 'react-native';
 import * as z from 'zod';
 import {Text} from '@/components/ui/text';
 import {Guard} from '@/lib/app/App';
-import {createBlokComponent, useBlok, useValue} from '@/lib/ports/blok/runtime';
+import {createBlokComponent, useBlok, useValue} from '@arkitektio/bsx/runtime';
 import {useThemeColors} from '@/lib/theme/BrandProvider';
 import {asStructure} from './shared';
 
@@ -77,5 +77,3 @@ export const StreamRenderBlok = createBlokComponent(
     );
   },
 );
-
-export const lovekitBlokComponents = [StreamRenderBlok];

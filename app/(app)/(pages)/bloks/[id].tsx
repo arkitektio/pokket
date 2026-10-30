@@ -1,16 +1,37 @@
 import { BlokSceneFillProvider } from '@/components/blok/catalog/scene/host';
 import MaterializedBlokRenderer from '@/components/blok/MaterializedBlokRenderer';
+import { TravelBar } from '@/components/rekuest/travel/TravelBar';
 import { RekuestUnavailable, TasksLoadingState } from '@/components/tasks/states';
 import { Text } from '@/components/ui/text';
 import { Guard } from '@/lib/app/App';
 import { CanvasVisibleContext } from '@/lib/gpu/FiberCanvas';
 import { ComponentContext, useMaterializedBlokQuery } from '@/lib/rekuest/api/graphql';
+import { BlokTravelProvider } from '@/lib/rekuest/travel/context';
+import { useBlokTravel, type BlokTravel } from '@/lib/rekuest/travel/useBlokTravel';
 import { useTabTitle } from '@/lib/tabs/TabsProvider';
 import { useThemeColors } from '@/lib/theme/BrandProvider';
 import { useIsFocused, useLocalSearchParams } from 'expo-router';
-import { Unplug } from 'lucide-react-native';
+import { History, Unplug } from 'lucide-react-native';
 import * as React from 'react';
-import { KeyboardAvoidingView, Platform, RefreshControl, ScrollView, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, RefreshControl, ScrollView, View } from 'react-native';
+
+/** Opens the history bar, or closes it and goes back to live. */
+function HistoryButton({ travel, className }: { travel: BlokTravel; className?: string }) {
+  const colors = useThemeColors();
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={travel.open ? 'Back to live, and hide the history bar' : 'Show this blok as it was at an earlier time'}
+      onPress={travel.toggle}
+      hitSlop={6}
+      className={`h-9 w-9 items-center justify-center rounded-lg border ${
+        travel.open ? 'border-amber-500/60 bg-amber-500/10' : 'border-border bg-background/90'
+      } ${className ?? ''}`}
+    >
+      <History size={18} color={travel.open ? '#f59e0b' : colors.foreground} />
+    </Pressable>
+  );
+}
 
 function BlokContent({ id }: { id: string }) {
   const colors = useThemeColors();
@@ -19,6 +40,11 @@ function BlokContent({ id }: { id: string }) {
   const { data, loading, error, refetch } = useMaterializedBlokQuery({ variables: { id }, fetchPolicy: 'cache-and-network' });
   const materialized = data?.materializedBlok;
   useTabTitle(materialized ? materialized.name || materialized.blok.name : undefined);
+  const travel = useBlokTravel();
+  const agentNames = React.useMemo(
+    () => new Map((materialized?.agentMappings ?? []).map((mapping) => [mapping.agent.id, mapping.agent.name] as const)),
+    [materialized?.agentMappings],
+  );
 
   if (!materialized) {
     if (loading) return <TasksLoadingState message="Loading blok…" />;
@@ -62,40 +88,50 @@ function BlokContent({ id }: { id: string }) {
         <CanvasVisibleContext.Provider value={focused}>
           <BlokSceneFillProvider value>
             <View className="flex-1">
-              <MaterializedBlokRenderer key={materialized.id} materializedBlok={materialized} fill />
+              <BlokTravelProvider source={travel.source}>
+                <MaterializedBlokRenderer key={materialized.id} materializedBlok={materialized} fill />
+              </BlokTravelProvider>
+              <HistoryButton travel={travel} className="absolute bottom-2 left-2" />
             </View>
           </BlokSceneFillProvider>
         </CanvasVisibleContext.Provider>
+        {travel.open ? <TravelBar travel={travel} names={agentNames} /> : null}
       </View>
     );
   }
 
   return (
     <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={96}>
-      <ScrollView
-        className="flex-1 bg-background"
-        contentContainerStyle={{ padding: 16, paddingBottom: 48 }}
-        keyboardShouldPersistTaps="handled"
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} tintColor={colors.primary} />}
-      >
-        <View className="gap-1 pb-4">
-          <Text selectable className="text-xl font-semibold text-foreground">
-            {materialized.name || materialized.blok.name}
-          </Text>
-          {materialized.description || materialized.blok.description ? (
-            <Text className="text-sm text-muted-foreground">{materialized.description || materialized.blok.description}</Text>
-          ) : null}
-          {materialized.agentMappings.length > 0 ? (
-            <Text className="text-xs text-muted-foreground">
-              On {materialized.agentMappings.map((mapping) => mapping.agent.name).join(', ')}
-            </Text>
-          ) : null}
-        </View>
+      <BlokTravelProvider source={travel.source}>
+        <ScrollView
+          className="flex-1 bg-background"
+          contentContainerStyle={{ padding: 16, paddingBottom: 48 }}
+          keyboardShouldPersistTaps="handled"
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} tintColor={colors.primary} />}
+        >
+          <View className="gap-1 pb-4">
+            <View className="flex-row items-start gap-2">
+              <Text selectable className="flex-1 text-xl font-semibold text-foreground">
+                {materialized.name || materialized.blok.name}
+              </Text>
+              <HistoryButton travel={travel} />
+            </View>
+            {materialized.description || materialized.blok.description ? (
+              <Text className="text-sm text-muted-foreground">{materialized.description || materialized.blok.description}</Text>
+            ) : null}
+            {materialized.agentMappings.length > 0 ? (
+              <Text className="text-xs text-muted-foreground">
+                On {materialized.agentMappings.map((mapping) => mapping.agent.name).join(', ')}
+              </Text>
+            ) : null}
+          </View>
 
-        {warning ? <View className="mb-4">{warning}</View> : null}
+          {warning ? <View className="mb-4">{warning}</View> : null}
 
-        <MaterializedBlokRenderer key={materialized.id} materializedBlok={materialized} />
-      </ScrollView>
+          <MaterializedBlokRenderer key={materialized.id} materializedBlok={materialized} />
+        </ScrollView>
+      </BlokTravelProvider>
+      {travel.open ? <TravelBar travel={travel} names={agentNames} /> : null}
     </KeyboardAvoidingView>
   );
 }

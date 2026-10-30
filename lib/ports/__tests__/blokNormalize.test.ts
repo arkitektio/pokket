@@ -1,6 +1,6 @@
 import {describe, expect, it} from "@jest/globals";
-import {normalizeBlokCall, normalizeBlokComponentTree} from '../blok/runtime/normalize';
-import {BlokSchemas} from '../blok/runtime/schemas';
+import {normalizeBlokCall, normalizeBlokComponentTree} from '@arkitektio/bsx/renderer/runtime/normalize';
+import {BlokSchemas} from '@arkitektio/bsx/renderer/runtime/schemas';
 
 describe('normalizeBlokComponentTree', () => {
   it('translates the GraphQL camelCase tree into the runtime snake_case shape', () => {

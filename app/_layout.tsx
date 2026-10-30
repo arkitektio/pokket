@@ -1,4 +1,5 @@
 import '~/global.css';
+import '@/lib/ports/blok/platform';
 // Defines the background location task; must run before anything else, since
 // the OS may start the app headless just to deliver locations to it.
 import '@/lib/timeline/task';

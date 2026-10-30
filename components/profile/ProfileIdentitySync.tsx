@@ -7,7 +7,8 @@ import * as React from 'react';
  * Tells the profile book who the live login is — orkestrator's
  * `ProfileIdentitySync`. lok's `mycontext` gives the login its real id (which
  * folds a repeat sign-in into the organization's existing row) and the labels
- * the switcher shows for it once it is parked: organization, user, brand.
+ * the switcher shows for it once it is parked: organization, user, brand,
+ * and the user's roles there (a blok's `viewer.roles`).
  *
  * Only the live login is ever asked; a parked one would have to spend its
  * refresh token to be. Keyed on the profile by the caller, so an answer can
@@ -25,6 +26,8 @@ function Sync({ profileId }: { profileId: string }) {
 
   const organization = context?.mycontext?.organization;
   const user = context?.mycontext?.user;
+  // Joined into a key, so a refetch's fresh array with the same roles writes nothing.
+  const rolesKey = context?.mycontext?.roles?.join('\u0000');
 
   React.useEffect(() => {
     if (!organization || !user || !baseUrl) return;
@@ -35,12 +38,13 @@ function Sync({ profileId }: { profileId: string }) {
         organizationName: organization.name,
         organizationSlug: organization.slug,
         username: user.username,
+        ...(rolesKey !== undefined ? { roles: rolesKey ? rolesKey.split('\u0000') : [] } : {}),
         ...(brand ? { brandHue: brand.hue, brandChroma: brand.chroma } : {}),
       },
     });
     // Ids and names, not objects: a refetch with the same answer writes nothing.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profileId, baseUrl, organization?.id, organization?.name, organization?.slug, user?.id, user?.username, hubId, brandData]);
+  }, [profileId, baseUrl, organization?.id, organization?.name, organization?.slug, user?.id, user?.username, hubId, brandData, rolesKey]);
 
   return null;
 }

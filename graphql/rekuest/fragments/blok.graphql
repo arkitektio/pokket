@@ -1,6 +1,6 @@
-# Materialized bloks: a blok (component tree + demo state) bound to agents.
-# The tree comes as the single JSON field `componentTree` (snake_case, no depth
-# limit), the shape the blok runtime reads.
+# Materialized bloks: a blok (blok language v2: its component tree and what it
+# declares beside it) bound to agents. The tree comes as the single JSON field
+# `componentTree` (snake_case, no depth limit), the shape the blok runtime reads.
 
 fragment BlokDiagnostic on Diagnostic {
   level
@@ -18,6 +18,168 @@ fragment BlokAgentMapping on BlokAgentMapping {
   }
 }
 
+# A local as the blok's tree resolves it, its kind always set (inferred when
+# the blok left it out, ANY when nothing tells): what the renderer types it
+# with and keeps a `persist` one by.
+fragment BlokLocalChoice on Choice {
+  value
+  label
+  description
+}
+
+fragment BlokLocalChildLeaf on ArgPort {
+  key
+  label
+  kind
+  description
+  identifier
+  nullable
+  default
+  choices {
+    ...BlokLocalChoice
+  }
+}
+
+fragment BlokLocalChild on ArgPort {
+  ...BlokLocalChildLeaf
+  children {
+    ...BlokLocalChildLeaf
+  }
+}
+
+# A local as the blok wrote it, its kind null when it was left out: kept
+# beside the resolved ones so a client reads the blok as written too.
+fragment BlokLocal on BlokLocal {
+  key
+  label
+  kind
+  description
+  identifier
+  nullable
+  default
+  persist
+  choices {
+    ...BlokLocalChoice
+  }
+  children {
+    ...BlokLocalChild
+  }
+}
+
+fragment ResolvedBlokLocal on ResolvedBlokLocal {
+  key
+  label
+  kind
+  description
+  identifier
+  nullable
+  default
+  persist
+  choices {
+    ...BlokLocalChoice
+  }
+  children {
+    ...BlokLocalChild
+  }
+}
+
+# A declared read's variables are stored calls, like a prop's.
+fragment BlokReadArgument on ActionArgument {
+  ...PortCallLeafArgument
+  utilCall {
+    operation
+    arguments {
+      ...PortCallInnerArgument
+    }
+  }
+  valueList {
+    ...PortCallInnerArgument
+  }
+  valueDict {
+    ...PortCallInnerArgument
+  }
+}
+
+fragment BlokQueryDeclaration on BlokQuery {
+  key
+  service
+  document
+  variables {
+    ...BlokReadArgument
+  }
+  poll
+  more
+}
+
+fragment BlokSubscriptionDeclaration on BlokSubscription {
+  key
+  service
+  document
+  variables {
+    ...BlokReadArgument
+  }
+  keep
+  history
+}
+
+fragment BlokDemo on BlokDemo {
+  deps
+  args
+  task
+  queries
+  subscriptions
+}
+
+# What a blok (or one of its revisions) draws, v2: its tree and what it
+# declares beside it.
+fragment BlokContent on Blok {
+  componentTree
+  vocab
+  catalogs
+  module {
+    id
+    name
+  }
+  locals {
+    ...BlokLocal
+  }
+  resolvedLocals {
+    ...ResolvedBlokLocal
+  }
+  demo {
+    ...BlokDemo
+  }
+  queries {
+    ...BlokQueryDeclaration
+  }
+  subscriptions {
+    ...BlokSubscriptionDeclaration
+  }
+}
+
+fragment BlokRevisionContent on BlokRevision {
+  id
+  number
+  componentTree
+  vocab
+  catalogs
+  locals {
+    ...BlokLocal
+  }
+  resolvedLocals {
+    ...ResolvedBlokLocal
+  }
+  demo {
+    ...BlokDemo
+  }
+  queries {
+    ...BlokQueryDeclaration
+  }
+  subscriptions {
+    ...BlokSubscriptionDeclaration
+  }
+}
+
 fragment MaterializedBlok on MaterializedBlok {
   id
   name
@@ -29,18 +191,34 @@ fragment MaterializedBlok on MaterializedBlok {
     name
     description
     context
-    componentTree
-    demoState
+    hash
+    ...BlokContent
     dependencies {
       id
       key
       description
       optional
     }
+    # What it is opened for (`args.<key>`).
+    args {
+      key
+      kind
+      identifier
+      nullable
+    }
     diagnostics {
       ...BlokDiagnostic
     }
   }
+  # What it shows: the pinned revision, else its blok's head (null for a
+  # provided blok, which draws its own tree).
+  revision {
+    ...BlokRevisionContent
+  }
+  # Required dependencies of the revision shown that no agent is bound to here.
+  unboundDependencies
+  # What it is opened on, when the task that showed it set that.
+  args
   agentMappings {
     ...BlokAgentMapping
   }

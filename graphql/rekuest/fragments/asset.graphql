@@ -1,9 +1,27 @@
 # Assets: the files an agent brings, stored once per organization under the SHA-256
-# of their exact bytes (orkestrator's fragments/asset.graphql). `file` is the media
-# store the bytes are read from; its grant is asked for with RequestMediaAccess.
+# of their exact bytes (orkestrator's fragments/asset.graphql). `file` is the store
+# the bytes are read from: a kulisse store for a model, a media store for an image.
+# Its grant is asked for by the asset's ref (AssetAccess), whichever store it is.
 
 fragment MediaStore on MediaStore {
   id
+  key
+  bucket
+}
+
+fragment KulisseStore on KulisseStore {
+  id
+  key
+  bucket
+}
+
+fragment KulisseAccessGrant on KulisseAccessGrant {
+  accessKey
+  secretKey
+  sessionToken
+  expiresIn
+  region
+  path
   key
   bucket
 }
@@ -34,6 +52,7 @@ fragment StoredAsset on Asset {
   width
   height
   file {
+    ...KulisseStore
     ...MediaStore
   }
 }

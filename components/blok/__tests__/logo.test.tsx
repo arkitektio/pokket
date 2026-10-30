@@ -3,7 +3,7 @@ import * as React from 'react';
 import {View} from 'react-native';
 import {Circle, ClipPath, G, LinearGradient, Path, Rect, Stop, Svg, Text as SvgText} from 'react-native-svg';
 import {act, create, type ReactTestRenderer} from 'react-test-renderer';
-import {normalizeBlokComponentTree, preflightBlokDocument} from '@/lib/ports/blok/runtime';
+import {normalizeBlokComponentTree, preflightBlokDocument} from '@arkitektio/bsx/runtime';
 import {buildLogoPalette} from '@/lib/theme/brandTokens';
 import BlokRenderer from '../BlokRenderer';
 import {pokketBlokCatalog} from '../catalog';
@@ -17,11 +17,13 @@ jest.mock('@rn-primitives/slot', () => {
 });
 
 /**
- * orkestrator's `bloks/logo/logo.fixture.json`: what arkitekt-spec emits for a
- * logo blok written in BSX — a gradient and a clip path referenced by id,
- * every shape, text, and a `foreach` over state drawing one lamp per item.
+ * orkestrator's `bloks/logo/logo.fixture.json`: a v2 logo blok as it is
+ * stored — a gradient and a clip path referenced by id, every shape, text, and
+ * a keyed `foreach` over state drawing one lamp per item, all painted with the
+ * viewer's pens.
  */
-const DEMO_STATE = {self: {Status: {lamps: [{color: 'lime'}, {color: 'red'}]}}};
+/** `self` reads `deps.self`: the agent the logo belongs to. */
+const DEMO_STATE = {deps: {self: {status: {lamps: [{name: 'a', pen: 'success'}, {name: 'b', pen: 'warning'}]}}}};
 
 const roots = () => normalizeBlokComponentTree(tree).roots;
 
@@ -43,7 +45,7 @@ const circle = (id: string, props: Record<string, string>) => ({
   props: [{key: 'r', static_value: '2'}, ...Object.entries(props).map(([key, value]) => ({key, static_value: value}))],
 });
 
-describe('a logo blok from the Python client', () => {
+describe('a v2 logo blok', () => {
   it('is a tree this catalog knows', () => {
     const preflight = preflightBlokDocument(roots(), pokketBlokCatalog);
     expect(preflight.errors).toEqual([]);
@@ -69,8 +71,8 @@ describe('a logo blok from the Python client', () => {
     // Polygon and Polyline draw through a Path of their own.
     const [path] = root.findAllByType(Path).filter(shape => shape.props.d === 'M6 18 L12 4 L18 18 Z');
     expect(path.props.d).toBe('M6 18 L12 4 L18 18 Z');
-    // A length reads as the number it spells.
-    expect(path.props.strokeWidth).toBe(1.5);
+    // A v2 literal is the string it spells (`strokeWidth="1.5"`); react-native-svg reads it as a length.
+    expect(path.props.strokeWidth).toBe('1.5');
     const text = root.findByType(SvgText);
     expect(text.props.children).toBe('A');
     expect(text.props.textAnchor).toBe('middle');
@@ -79,8 +81,9 @@ describe('a logo blok from the Python client', () => {
   it('draws its state from the state it is given', async () => {
     const {root} = await draw(roots(), DEMO_STATE);
 
-    const lamps = root.findAllByType(Circle).filter(lamp => lamp.props.cx === 20);
-    expect(lamps.map(lamp => lamp.props.fill)).toEqual(['lime', 'red']);
+    const palette = buildLogoPalette();
+    const lamps = root.findAllByType(Circle).filter(lamp => lamp.props.cx === '20');
+    expect(lamps.map(lamp => lamp.props.fill)).toEqual([palette.success, palette.warning]);
   });
 
   it('gives two drawings of one blok ids of their own', async () => {
@@ -95,7 +98,7 @@ describe('a logo blok from the Python client', () => {
     const {root} = await draw([
       {
         id: 'logo',
-        component: 'SVG',
+        component: 'AgentLogo',
         children: [
           {id: 'ok', component: 'Circle', props: [{key: 'r', static_value: '2'}]},
           {id: 'broken', component: 'Circle', props: [{key: 'r', util_call: {operation: 'no_such_function'}}]},
@@ -110,21 +113,38 @@ describe('a logo blok from the Python client', () => {
 });
 
 describe('paint', () => {
-  it('draws palette tokens from the brand under either root, and colours only under an SVG', async () => {
+  it('draws the pens from the brand and the status roles, and anything else in ink', async () => {
     const palette = buildLogoPalette();
     const shapes = [
       circle('token', {fill: 'brand-soft', stroke: 'ink'}),
+      circle('status', {fill: 'success', stroke: 'info'}),
       circle('colour', {fill: '#fbbf24'}),
       circle('empty', {fill: 'none'}),
     ];
-    const free = await draw([{id: 'logo', component: 'SVG', children: shapes}]);
-    const action = await draw([{id: 'action', component: 'ActionLogo', children: shapes}]);
+    for (const root of ['AgentLogo', 'ActionLogo']) {
+      const drawn = await draw([{id: 'logo', component: root, children: shapes}]);
+      const circles = drawn.root.findAllByType(Circle);
+      expect(circles.map(shape => shape.props.fill)).toEqual([palette['brand-soft'], palette.success, palette.ink, 'none']);
+      expect(circles[1].props.stroke).toBe(palette.info);
+    }
+  });
 
-    const fills = (renderer: ReactTestRenderer) => renderer.root.findAllByType(Circle).map(shape => shape.props.fill);
-    expect(fills(free)).toEqual([palette['brand-soft'], '#fbbf24', 'none']);
-    // An action logo paints with the palette only: anything else is drawn in ink.
-    expect(fills(action)).toEqual([palette['brand-soft'], palette.ink, 'none']);
-    expect(action.root.findAllByType(Circle)[0].props.stroke).toBe(palette.ink);
+  it('draws the spectral pens, not their soft roles', async () => {
+    const palette = buildLogoPalette();
+    const drawn = await draw([
+      {
+        id: 'logo',
+        component: 'AgentLogo',
+        children: [
+          circle('green', {fill: 'spectrum-green', stroke: 'spectrum-violet'}),
+          circle('soft', {fill: 'spectrum-green-soft'}),
+        ],
+      },
+    ]);
+    const [green, soft] = drawn.root.findAllByType(Circle);
+    expect(green.props.fill).toBe(palette['spectrum-green']);
+    expect(green.props.stroke).toBe(palette['spectrum-violet']);
+    expect(soft.props.fill).toBe(palette.ink);
   });
 
   it('keeps an action logo a tree this catalog knows, its shapes placed under it', () => {

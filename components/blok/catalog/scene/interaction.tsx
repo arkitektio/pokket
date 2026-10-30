@@ -10,11 +10,14 @@ import {
   useBlokTree,
   useEventAction,
   useValue,
-  type BlokRenderArgs,
-} from '@/lib/ports/blok/runtime';
+  type BlokRender,
+} from '@arkitektio/bsx/runtime';
 import {useModel, useSceneNotice, useSceneOverlay, useSceneStoreApi} from './context';
+import {useBlokTray} from '../run/host';
 import {useBlokSceneHost} from './host';
-import {onClickSchema, popoutSchema} from './schemas';
+import type {sceneCatalog} from '@arkitektio/bsx/catalogs';
+
+type Scene = typeof sceneCatalog.components;
 
 /**
  * orkestrator's `bloks/scene/interaction.tsx`, for a touch screen: a click is
@@ -25,8 +28,8 @@ import {onClickSchema, popoutSchema} from './schemas';
 /** The clicked spot, kept in the node's own coordinates so the card points at it while the node moves. */
 const localPoint = (node: THREE.Object3D, world: THREE.Vector3): THREE.Vector3 => node.worldToLocal(world.clone());
 
-export const OnClickRender = ({component}: BlokRenderArgs<typeof onClickSchema>) => {
-  const blok = useBlok(component, onClickSchema);
+export const OnClickRender: BlokRender<Scene['OnClick']> = ({component, schema}) => {
+  const blok = useBlok(component, schema);
   const model = useModel();
   const host = useBlokSceneHost();
   const name = useValue(blok.node);
@@ -35,7 +38,7 @@ export const OnClickRender = ({component}: BlokRenderArgs<typeof onClickSchema>)
   const description = useValue(blok.description);
   const mode = useValue(blok.mode) ?? 'popout';
   const onClick = useEventAction(blok, 'onClick');
-  const node = name ? model.instance.nodes.get(name) : undefined;
+  const node = name ? model.instance.nodes.get(name) : model.instance.root;
   useSceneNotice(name && !node ? 'Unknown node' : null, `The model has no node '${name}'.`);
 
   const store = useSceneStoreApi();
@@ -79,23 +82,26 @@ export const OnClickRender = ({component}: BlokRenderArgs<typeof onClickSchema>)
   return null;
 };
 
-export const PopoutRender = ({component, buildChild}: BlokRenderArgs<typeof popoutSchema>) => {
-  const blok = useBlok(component, popoutSchema);
+export const PopoutRender: BlokRender<Scene['Popout']> = ({component, buildChild, schema}) => {
+  const blok = useBlok(component, schema);
   const model = useModel();
   const name = useValue(blok.node);
   const trigger = useValue(blok.trigger) ?? 'click';
   const controlled = useValue(blok.open);
   const title = useValue(blok.title);
   const description = useValue(blok.description);
-  const node = name ? model.instance.nodes.get(name) : undefined;
+  const node = name ? model.instance.nodes.get(name) : model.instance.root;
   useSceneNotice(name && !node ? 'Unknown node' : null, `The model has no node '${name}'.`);
+  // Under an `Anchor` whose device the space does not place: nothing to point at,
+  // so the card shows in the side tray, as long as it would show at all.
+  const tray = useBlokTray();
 
   const store = useSceneStoreApi();
   const [toggled, setToggled] = React.useState(false);
   // The spot a click opened the card on; the node's origin otherwise.
   const [point, setPoint] = React.useState<THREE.Vector3 | null>(null);
   const [hovered, setHovered] = React.useState(false);
-  const interactive = controlled === undefined && trigger !== 'always';
+  const interactive = controlled === undefined && trigger !== 'always' && tray === null;
   // Nothing hovers on a touch screen: a hover card opens on a tap, as a click card does.
   const tapped = trigger !== 'always';
   const openRef = React.useRef(toggled);
@@ -121,7 +127,8 @@ export const PopoutRender = ({component, buildChild}: BlokRenderArgs<typeof popo
   }, [interactive, model, node, store, tapped]);
 
   const visible =
-    controlled ?? (trigger === 'always' ? true : trigger === 'hover' ? hovered || toggled : toggled);
+    controlled ??
+    (tray !== null || trigger === 'always' ? true : trigger === 'hover' ? hovered || toggled : toggled);
   const anchor = React.useCallback(() => node ?? null, [node]);
   const close = React.useCallback(() => setToggled(false), []);
 
@@ -150,11 +157,11 @@ export const PopoutRender = ({component, buildChild}: BlokRenderArgs<typeof popo
     visible: Boolean(node) && visible,
     anchor,
     point: tapped ? point : null,
-    title: title ?? name,
+    title: title ?? name ?? tray ?? undefined,
     description,
     content,
-    mode: 'popout',
-    dismissable: controlled === undefined && tapped,
+    mode: tray === null ? 'popout' : 'panel',
+    dismissable: tray === null && controlled === undefined && tapped,
     onDismiss: close,
   });
   return null;

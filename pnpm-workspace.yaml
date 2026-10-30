@@ -29,3 +29,4 @@ minimumReleaseAgeExclude:
   - expo-updates@57.0.24
   - '@expo/dom-webview@57.0.1'
   - '@expo/metro-runtime@57.0.16'
+  - '@arkitektio/bsx'

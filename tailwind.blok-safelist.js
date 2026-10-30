@@ -44,6 +44,12 @@ const THEME_COLORS = [
   "chart-3",
   "chart-4",
   "chart-5",
+  // Blok language v2 status and spectral roles (vocabulary `theme`).
+  ...["success", "warning", "info"].flatMap((role) => [role, `${role}-foreground`, `${role}-soft`]),
+  ...["violet", "blue", "cyan", "green", "yellow", "orange", "red"].flatMap((band) => [
+    `spectrum-${band}`,
+    `spectrum-${band}-soft`,
+  ]),
   "white",
   "black",
 ];
@@ -113,6 +119,15 @@ module.exports = [
   ...["bg", "border"].flatMap((utility) =>
     PALETTE.split("|").flatMap((hue) =>
       TINT_OPACITIES.map((opacity) => `${utility}-${hue}-500/${opacity}`),
+    ),
+  ),
+
+  // The language's two data attributes (`data-busy`, `data-stale`, set by
+  // every component through its `dataSet`): `data-[busy]:opacity-60`. Only
+  // opacity: React Native draws no `grayscale` filter.
+  ...["busy", "stale"].flatMap((attribute) =>
+    ["0", "20", "25", "30", "40", "50", "60", "70", "75", "80", "90"].map(
+      (opacity) => `data-[${attribute}]:opacity-${opacity}`,
     ),
   ),
 ];

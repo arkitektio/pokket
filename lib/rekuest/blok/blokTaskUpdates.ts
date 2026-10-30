@@ -1,4 +1,4 @@
-import type {BlokTaskUpdate} from '@/lib/ports/blok/runtime';
+import type {BlokTaskUpdate} from '@arkitektio/bsx/runtime';
 import {TaskEventKind, type TaskEventFragment} from '../api/graphql';
 
 const failureFallback = (kind: TaskEventKind | string) =>

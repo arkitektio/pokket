@@ -114,6 +114,14 @@ export const MODULE_CATALOG: ModuleDecl[] = [
         description: "Interfaces your agents provide",
         keywords: ["rekuest", "blok", "ui", "dashboard", "panel", "interface"],
       },
+      {
+        label: "Spaces",
+        route: "/spaces",
+        group: "Run",
+        icon: "box",
+        description: "Rooms your devices stand in, in 3D, with the runs drawn over them",
+        keywords: ["rekuest", "space", "room", "3d", "placement", "lab"],
+      },
     ],
   },
   {

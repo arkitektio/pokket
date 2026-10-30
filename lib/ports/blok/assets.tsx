@@ -1,11 +1,11 @@
 import * as React from 'react';
-import {splitPathSegments, type BlokComponentNode} from './runtime';
+import {splitPathSegments, type BlokComponentNode} from '@arkitektio/bsx/runtime';
 
 /**
  * Assets: the files an app brings with it, named in a blok like everything
- * else of a dependency, as `@<dependency>.assets.<name>` (a model in a scene).
- * orkestrator's `core/blok/renderer/assets.tsx`, without the image half: an
- * html `img` naming an asset still draws nothing here.
+ * else of an agent, as `deps.<key>.assets.<name>` or `self.assets.<name>` (a
+ * model in a scene). orkestrator's `core/blok/renderer/assets.tsx`, without
+ * the image half: an `Image` naming an asset still draws nothing here.
  *
  * The blok core knows how to show one; it does not know which agent a
  * dependency is bound to or where its files are stored. A host (rekuest, in
@@ -53,15 +53,19 @@ export const ASSETS_SEGMENT = 'assets';
 
 export const ASSET_KIND_LABELS: Record<BlokAssetKind, string> = {MODEL_3D: '3D model', IMAGE: 'image'};
 
-/** The `(dependency, name)` a prop names when it is bound to `<dependency>.assets.<name>`; `null` otherwise. */
+/**
+ * The `(dependency, name)` a prop names when it is bound to an agent's asset,
+ * `deps.<key>.assets.<name>` or `self.assets.<name>` (the agent the blok
+ * belongs to, `deps.self`); `null` otherwise.
+ */
 export const assetNamedBy = (
   component: BlokComponentNode,
   key: string,
 ): {dependency: string; name: string} | null => {
   const path = component.props?.find(candidate => candidate.key === key)?.dynamic_value?.path;
   if (typeof path !== 'string') return null;
-  // `self.assets.scope`, `@self.assets.scope` or `self/assets/scope`: split as every other path is.
-  const [dependency, segment, name, ...rest] = splitPathSegments(path.replace(/^@/, ''));
+  const parts = splitPathSegments(path);
+  const [dependency, segment, name, ...rest] = parts[0] === 'deps' ? parts.slice(1) : parts[0] === 'self' ? parts : [];
   if (segment !== ASSETS_SEGMENT || !dependency || !name || rest.length) return null;
   return {dependency, name};
 };

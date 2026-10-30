@@ -1,0 +1,70 @@
+# An agent's state at a moment in the past, and the patches around it: the
+# travel source's buffer (`lib/rekuest/travel/travelSource.ts`).
+query CheckoutAgent(
+  $agent: ID!
+  $globalRevision: Int
+  $timestamp: DateTime
+  $sessionId: ID
+  $forwardPatchCount: Int!
+  $backwardPatchCount: Int!
+) {
+  checkoutAgent(
+    agent: $agent
+    globalRevision: $globalRevision
+    timestamp: $timestamp
+    sessionId: $sessionId
+    forwardPatchCount: $forwardPatchCount
+    backwardPatchCount: $backwardPatchCount
+  ) {
+    agentId
+    values
+    globalRevision
+    forwardPatches {
+      ...Patch
+    }
+    backwardPatches {
+      ...Patch
+    }
+  }
+}
+
+# The checkout behind stepping an agent by revision: a revision only means
+# something inside one session, so every patch names its own.
+query CheckoutAgentRevision(
+  $agent: ID!
+  $globalRevision: Int
+  $timestamp: DateTime
+  $sessionId: ID
+  $forwardPatchCount: Int!
+  $backwardPatchCount: Int!
+) {
+  checkoutAgent(
+    agent: $agent
+    globalRevision: $globalRevision
+    timestamp: $timestamp
+    sessionId: $sessionId
+    forwardPatchCount: $forwardPatchCount
+    backwardPatchCount: $backwardPatchCount
+  ) {
+    agentId
+    values
+    globalRevision
+    forwardPatches {
+      ...Patch
+      sessionId
+    }
+    backwardPatches {
+      ...Patch
+      sessionId
+    }
+  }
+}
+
+# How far the revisions of one session reach.
+query SessionBoundaries($sessionId: ID!) {
+  sessionBoundaries(sessionId: $sessionId) {
+    sessionId
+    startGlobalRevision
+    endGlobalRevision
+  }
+}

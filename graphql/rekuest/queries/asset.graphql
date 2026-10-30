@@ -20,3 +20,24 @@ query BloksForModel($ref: String!) {
     ...ModelBlok
   }
 }
+
+# Read credentials for the file of the asset `ref`, valid for `expiresIn` seconds.
+query AssetAccess($ref: String!) {
+  asset(ref: $ref) {
+    id
+    file {
+      ... on KulisseStore {
+        id
+        accessGrant {
+          ...KulisseAccessGrant
+        }
+      }
+      ... on MediaStore {
+        id
+        accessGrant {
+          ...MediaAccessGrant
+        }
+      }
+    }
+  }
+}

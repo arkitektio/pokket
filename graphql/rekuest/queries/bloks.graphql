@@ -14,12 +14,11 @@ query ListMaterializedBloks(
   }
 }
 
-# A logo blok's drawing: its tree and the demo state it shows.
+# A logo blok's drawing: its tree and the demo it shows.
 query LogoBlok($id: ID!) {
   blok(id: $id) {
     id
     hash
-    componentTree
-    demoState
+    ...BlokContent
   }
 }

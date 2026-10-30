@@ -131,6 +131,8 @@ fragment TaskEventChange on TaskEventChange {
   message
   progress
   returns
+  # HELD / DECIDED: the ask a run's blok shows (`lib/rekuest/run/holds.ts`).
+  value
   createdAt
 }
 

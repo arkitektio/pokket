@@ -1,34 +1,34 @@
 import * as React from 'react';
 import {ActivityIndicator, Animated, View} from 'react-native';
 import * as z from 'zod';
-import {BlokPropSchemas, createBlokComponent, useBlok, useValue} from '@/lib/ports/blok/runtime';
+import {useBlok, useValue, type BlokRender} from '@arkitektio/bsx/runtime';
 import {Text, TextClassContext} from '@/components/ui/text';
 import {useThemeColors} from '@/lib/theme/BrandProvider';
 import {cn} from '@/lib/utils';
-import {iconNameSchema, renderIcon} from './icons';
+import {renderIcon} from './icons';
 import {
-  badgeVariantSchema,
-  childListSchema,
-  classNameSchema,
-  contentSchema,
   cssLength,
-  numberSchema,
   renderChildList,
   renderContent,
-  sizeSchema,
+  useBlokDataSet,
+  type BlokDataSet,
 } from './shared';
+import {badgeVariantSchema, type uiCatalog} from '@arkitektio/bsx/catalogs';
+
+type Ui = typeof uiCatalog.components;
 
 /**
  * Status, progress and empty-state bloks, after orkestrator's
  * `bloks/feedback.tsx`: the same names and schemas, drawn with React Native.
  */
 
-/** A determinate bar, shared with the raw `progress` element in `html.tsx`. */
-export const ProgressTrack = ({percent, className}: {percent: number; className?: string}) => {
+/** A determinate bar. */
+export const ProgressTrack = ({percent, className, dataSet}: {percent: number; className?: string} & BlokDataSet) => {
   const clamped = Number.isFinite(percent) ? Math.max(0, Math.min(100, percent)) : 0;
 
   return (
     <View
+      {...({dataSet} satisfies BlokDataSet)}
       accessibilityRole="progressbar"
       accessibilityValue={{min: 0, max: 100, now: Math.round(clamped)}}
       className={cn('h-2 w-full overflow-hidden rounded-full bg-primary/20', className)}
@@ -38,76 +38,60 @@ export const ProgressTrack = ({percent, className}: {percent: number; className?
   );
 };
 
-export const Alert = createBlokComponent(
-  {
-    name: 'Alert',
-    schema: z
-      .object({
-        title: BlokPropSchemas.DynamicString.optional().describe('Alert heading.'),
-        description: BlokPropSchemas.DynamicString.optional().describe('Supporting text.'),
-        icon: iconNameSchema.describe('Icon shown beside the heading.'),
-        children: childListSchema.describe('Extra content below the description.'),
-        variant: z
-          .enum(['default', 'destructive'])
-          .optional()
-          .describe('Alert appearance.'),
-        className: classNameSchema,
-      })
-      .describe('A callout that draws attention to a message.'),
-  },
-  ({buildChild, component, schema}) => {
-    const blok = useBlok(component, schema);
-    const title = useValue(blok.title);
-    const description = useValue(blok.description);
-    const icon = useValue(blok.icon);
-    const children = useValue(blok.children);
-    const variant = useValue(blok.variant);
-    const className = useValue(blok.className);
-    const colors = useThemeColors();
+export const AlertRender: BlokRender<Ui['Alert']> = ({buildChild, component, schema}) => {
+  const blok = useBlok(component, schema);
+  const title = useValue(blok.title);
+  const description = useValue(blok.description);
+  const icon = useValue(blok.icon);
+  const children = useValue(blok.children);
+  const variant = useValue(blok.variant);
+  const className = useValue(blok.className);
+  const colors = useThemeColors();
 
-    const destructive = variant === 'destructive';
+  const destructive = variant === 'destructive';
+  const dataSet = useBlokDataSet();
 
-    return (
-      <View
-        accessibilityRole="alert"
-        className={cn(
-          'w-full flex-row gap-3 rounded-lg border bg-card px-4 py-3',
-          destructive ? 'border-destructive/50' : 'border-border',
-          className,
-        )}
-      >
-        {icon ? (
-          <View className="pt-0.5">
-            {renderIcon(icon, {color: destructive ? colors.destructive : colors.foreground})}
-          </View>
-        ) : null}
-        <View className="min-w-0 flex-1 gap-1">
-          {title ? (
-            <Text
-              className={cn(
-                'text-sm font-medium tracking-tight',
-                destructive && 'text-destructive',
-              )}
-            >
-              {title}
-            </Text>
-          ) : null}
-          {description ? (
-            <Text
-              className={cn(
-                'text-sm leading-relaxed',
-                destructive ? 'text-destructive/90' : 'text-muted-foreground',
-              )}
-            >
-              {description}
-            </Text>
-          ) : null}
-          {renderChildList(children, buildChild)}
+  return (
+    <View
+      {...dataSet}
+      accessibilityRole="alert"
+      className={cn(
+        'w-full flex-row gap-3 rounded-lg border bg-card px-4 py-3',
+        destructive ? 'border-destructive/50' : 'border-border',
+        className,
+      )}
+    >
+      {icon ? (
+        <View className="pt-0.5">
+          {renderIcon(icon, {color: destructive ? colors.destructive : colors.foreground})}
         </View>
+      ) : null}
+      <View className="min-w-0 flex-1 gap-1">
+        {title ? (
+          <Text
+            className={cn(
+              'text-sm font-medium tracking-tight',
+              destructive && 'text-destructive',
+            )}
+          >
+            {title}
+          </Text>
+        ) : null}
+        {description ? (
+          <Text
+            className={cn(
+              'text-sm leading-relaxed',
+              destructive ? 'text-destructive/90' : 'text-muted-foreground',
+            )}
+          >
+            {description}
+          </Text>
+        ) : null}
+        {renderChildList(children, buildChild)}
       </View>
-    );
-  },
-);
+    </View>
+  );
+};
 
 type BadgeVariant = NonNullable<z.infer<typeof badgeVariantSchema>>;
 
@@ -129,78 +113,54 @@ const BADGE_TEXT: Record<BadgeVariant, string> = {
   link: 'text-primary underline',
 };
 
-export const Badge = createBlokComponent(
-  {
-    name: 'Badge',
-    schema: z
-      .object({
-        text: BlokPropSchemas.DynamicString.optional().describe('Badge text.'),
-        icon: iconNameSchema.describe('Icon rendered before the text.'),
-        children: contentSchema,
-        className: classNameSchema,
-        variant: badgeVariantSchema,
-      })
-      .describe('A small status or count label.'),
-  },
-  ({buildChild, component, schema}) => {
-    const blok = useBlok(component, schema);
-    const text = useValue(blok.text);
-    const icon = useValue(blok.icon);
-    const children = useValue(blok.children);
-    const className = useValue(blok.className);
-    const variant = (useValue(blok.variant) ?? 'default') as BadgeVariant;
-    const colors = useThemeColors();
+export const BadgeRender: BlokRender<Ui['Badge']> = ({buildChild, component, schema}) => {
+  const blok = useBlok(component, schema);
+  const text = useValue(blok.text);
+  const icon = useValue(blok.icon);
+  const children = useValue(blok.children);
+  const className = useValue(blok.className);
+  const variant = (useValue(blok.variant) ?? 'default') as BadgeVariant;
+  const colors = useThemeColors();
 
-    const iconColor =
-      variant === 'default'
-        ? colors.primaryForeground
-        : variant === 'destructive'
-          ? colors.destructiveForeground
-          : variant === 'link'
-            ? colors.primary
-            : colors.foreground;
-    const textClassName = cn('text-xs font-medium', BADGE_TEXT[variant]);
+  const iconColor =
+    variant === 'default'
+      ? colors.primaryForeground
+      : variant === 'destructive'
+        ? colors.destructiveForeground
+        : variant === 'link'
+          ? colors.primary
+          : colors.foreground;
+  const textClassName = cn('text-xs font-medium', BADGE_TEXT[variant]);
+  const dataSet = useBlokDataSet();
 
-    return (
-      <TextClassContext.Provider value={textClassName}>
-        <View
-          className={cn(
-            'shrink-0 flex-row items-center gap-1 self-start overflow-hidden rounded-md border px-2 py-0.5',
-            BADGE_BOX[variant],
-            className,
-          )}
-        >
-          {renderIcon(icon, {size: 12, color: iconColor})}
-          {renderContent(children ?? text, buildChild, textClassName)}
-        </View>
-      </TextClassContext.Provider>
-    );
-  },
-);
+  return (
+    <TextClassContext.Provider value={textClassName}>
+      <View
+        {...dataSet}
+        className={cn(
+          'shrink-0 flex-row items-center gap-1 self-start overflow-hidden rounded-md border px-2 py-0.5',
+          BADGE_BOX[variant],
+          className,
+        )}
+      >
+        {renderIcon(icon, {size: 12, color: iconColor})}
+        {renderContent(children ?? text, buildChild, textClassName)}
+      </View>
+    </TextClassContext.Provider>
+  );
+};
 
-export const Progress = createBlokComponent(
-  {
-    name: 'Progress',
-    schema: z
-      .object({
-        value: numberSchema.describe('Completion between 0 and max.'),
-        max: numberSchema.describe('Maximum value. Defaults to 100.'),
-        className: classNameSchema,
-      })
-      .describe('A determinate progress bar.'),
-  },
-  ({component, schema}) => {
-    const blok = useBlok(component, schema);
-    const value = useValue(blok.value);
-    const max = useValue(blok.max);
-    const className = useValue(blok.className);
+export const ProgressRender: BlokRender<Ui['Progress']> = ({component, schema}) => {
+  const blok = useBlok(component, schema);
+  const value = useValue(blok.value);
+  const max = useValue(blok.max);
+  const className = useValue(blok.className);
 
-    const resolvedMax = max ?? 100;
-    const percent = resolvedMax > 0 ? ((value ?? 0) / resolvedMax) * 100 : 0;
+  const resolvedMax = max ?? 100;
+  const percent = resolvedMax > 0 ? ((value ?? 0) / resolvedMax) * 100 : 0;
 
-    return <ProgressTrack percent={percent} className={className} />;
-  },
-);
+  return <ProgressTrack {...useBlokDataSet()} percent={percent} className={className} />;
+};
 
 /** A muted block that pulses, like the web skeleton's `animate-pulse`. */
 const PulsingBlock = ({className, width, height}: {
@@ -236,100 +196,62 @@ const PulsingBlock = ({className, width, height}: {
   );
 };
 
-export const Skeleton = createBlokComponent(
-  {
-    name: 'Skeleton',
-    schema: z
-      .object({
-        width: sizeSchema,
-        height: sizeSchema,
-        className: classNameSchema,
-      })
-      .describe('A placeholder block shown while content loads.'),
-  },
-  ({component, schema}) => {
-    const blok = useBlok(component, schema);
-    const width = useValue(blok.width);
-    const height = useValue(blok.height);
-    const className = useValue(blok.className);
+export const SkeletonRender: BlokRender<Ui['Skeleton']> = ({component, schema}) => {
+  const blok = useBlok(component, schema);
+  const width = useValue(blok.width);
+  const height = useValue(blok.height);
+  const className = useValue(blok.className);
 
-    return <PulsingBlock className={className} width={width} height={height} />;
-  },
-);
+  return <PulsingBlock className={className} width={width} height={height} />;
+};
 
-export const Spinner = createBlokComponent(
-  {
-    name: 'Spinner',
-    schema: z
-      .object({
-        className: classNameSchema,
-      })
-      .describe('An indeterminate loading indicator.'),
-  },
-  ({component, schema}) => {
-    const blok = useBlok(component, schema);
-    const className = useValue(blok.className);
-    const colors = useThemeColors();
+export const SpinnerRender: BlokRender<Ui['Spinner']> = ({component, schema}) => {
+  const blok = useBlok(component, schema);
+  const className = useValue(blok.className);
+  const colors = useThemeColors();
 
-    return (
-      <View className={cn('self-start', className)}>
-        <ActivityIndicator size="small" color={colors.mutedForeground} />
-      </View>
-    );
-  },
-);
+  return (
+    <View className={cn('self-start', className)}>
+      <ActivityIndicator size="small" color={colors.mutedForeground} />
+    </View>
+  );
+};
 
-export const Empty = createBlokComponent(
-  {
-    name: 'Empty',
-    schema: z
-      .object({
-        title: BlokPropSchemas.DynamicString.optional().describe('Empty-state heading.'),
-        description: BlokPropSchemas.DynamicString.optional().describe('Supporting text.'),
-        icon: iconNameSchema.describe('Icon shown above the heading.'),
-        children: childListSchema.describe('Actions offered in the empty state.'),
-        className: classNameSchema,
-      })
-      .describe('The placeholder shown when there is nothing to list.'),
-  },
-  ({buildChild, component, schema}) => {
-    const blok = useBlok(component, schema);
-    const title = useValue(blok.title);
-    const description = useValue(blok.description);
-    const icon = useValue(blok.icon);
-    const children = useValue(blok.children);
-    const className = useValue(blok.className);
+export const EmptyRender: BlokRender<Ui['Empty']> = ({buildChild, component, schema}) => {
+  const blok = useBlok(component, schema);
+  const title = useValue(blok.title);
+  const description = useValue(blok.description);
+  const icon = useValue(blok.icon);
+  const children = useValue(blok.children);
+  const className = useValue(blok.className);
 
-    return (
-      <View
-        className={cn(
-          'min-w-0 items-center justify-center gap-6 rounded-lg border border-dashed border-border p-6',
-          className,
-        )}
-      >
-        <View className="max-w-sm items-center gap-2">
-          {icon ? (
-            <View className="mb-2 h-10 w-10 items-center justify-center rounded-lg bg-muted">
-              {renderIcon(icon, {size: 24})}
-            </View>
-          ) : null}
-          {title ? (
-            <Text className="text-center text-lg font-medium tracking-tight">{title}</Text>
-          ) : null}
-          {description ? (
-            <Text className="text-center text-sm leading-relaxed text-muted-foreground">
-              {description}
-            </Text>
-          ) : null}
-        </View>
-        {children ? (
-          <View className="w-full max-w-sm items-center gap-4">
-            {renderChildList(children, buildChild)}
+  return (
+    <View
+      className={cn(
+        'min-w-0 items-center justify-center gap-6 rounded-lg border border-dashed border-border p-6',
+        className,
+      )}
+    >
+      <View className="max-w-sm items-center gap-2">
+        {icon ? (
+          <View className="mb-2 h-10 w-10 items-center justify-center rounded-lg bg-muted">
+            {renderIcon(icon, {size: 24})}
           </View>
         ) : null}
+        {title ? (
+          <Text className="text-center text-lg font-medium tracking-tight">{title}</Text>
+        ) : null}
+        {description ? (
+          <Text className="text-center text-sm leading-relaxed text-muted-foreground">
+            {description}
+          </Text>
+        ) : null}
       </View>
-    );
-  },
-);
-
-export const feedbackBlokComponents = [Alert, Badge, Progress, Skeleton, Spinner, Empty];
+      {children ? (
+        <View className="w-full max-w-sm items-center gap-4">
+          {renderChildList(children, buildChild)}
+        </View>
+      ) : null}
+    </View>
+  );
+};

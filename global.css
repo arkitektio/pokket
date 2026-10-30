@@ -40,6 +40,32 @@
     --chart-3: 159.348 80.307% 40.545%;
     --chart-4: 161.715 100% 29.733%;
     --chart-5: 161.37 71.741% 27.361%;
+
+    /* Blok language v2 status and spectral roles (lib/theme/brandTokens.ts
+       buildRoleTokens), orkestrator's `.dark` values at the default brand. */
+    --success: 134.812 63.325% 66.844%;
+    --success-foreground: 127.369 100% 4.767%;
+    --success-soft: 135.391 40.505% 19.142%;
+    --warning: 37.309 91.116% 59.102%;
+    --warning-foreground: 19.202 100% 7.988%;
+    --warning-soft: 38.047 100% 13.858%;
+    --info: 201.817 94.174% 57.8%;
+    --info-foreground: 211.621 100% 8.042%;
+    --info-soft: 201.328 97.818% 15.089%;
+    --spectrum-violet: 262.967 79.653% 73.315%;
+    --spectrum-violet-soft: 263.224 35.313% 21.979%;
+    --spectrum-blue: 216.323 100% 70.266%;
+    --spectrum-blue-soft: 217.458 55.263% 20.472%;
+    --spectrum-cyan: 189.229 100% 49.547%;
+    --spectrum-cyan-soft: 192.35 100% 13.302%;
+    --spectrum-green: 123.345 51.763% 62.936%;
+    --spectrum-green-soft: 124.836 49.553% 14.366%;
+    --spectrum-yellow: 51.72 84.728% 61.613%;
+    --spectrum-yellow-soft: 50.634 100% 10.661%;
+    --spectrum-orange: 30.184 100% 63.452%;
+    --spectrum-orange-soft: 29.977 100% 13.904%;
+    --spectrum-red: 4.991 90.615% 69.938%;
+    --spectrum-red-soft: 4.641 49.61% 19.796%;
   }
 
   .dark:root {
@@ -70,5 +96,31 @@
     --chart-3: 159.348 80.307% 40.545%;
     --chart-4: 161.715 100% 29.733%;
     --chart-5: 161.37 71.741% 27.361%;
+
+    /* Blok language v2 status and spectral roles (lib/theme/brandTokens.ts
+       buildRoleTokens), orkestrator's `.dark` values at the default brand. */
+    --success: 134.812 63.325% 66.844%;
+    --success-foreground: 127.369 100% 4.767%;
+    --success-soft: 135.391 40.505% 19.142%;
+    --warning: 37.309 91.116% 59.102%;
+    --warning-foreground: 19.202 100% 7.988%;
+    --warning-soft: 38.047 100% 13.858%;
+    --info: 201.817 94.174% 57.8%;
+    --info-foreground: 211.621 100% 8.042%;
+    --info-soft: 201.328 97.818% 15.089%;
+    --spectrum-violet: 262.967 79.653% 73.315%;
+    --spectrum-violet-soft: 263.224 35.313% 21.979%;
+    --spectrum-blue: 216.323 100% 70.266%;
+    --spectrum-blue-soft: 217.458 55.263% 20.472%;
+    --spectrum-cyan: 189.229 100% 49.547%;
+    --spectrum-cyan-soft: 192.35 100% 13.302%;
+    --spectrum-green: 123.345 51.763% 62.936%;
+    --spectrum-green-soft: 124.836 49.553% 14.366%;
+    --spectrum-yellow: 51.72 84.728% 61.613%;
+    --spectrum-yellow-soft: 50.634 100% 10.661%;
+    --spectrum-orange: 30.184 100% 63.452%;
+    --spectrum-orange-soft: 29.977 100% 13.904%;
+    --spectrum-red: 4.991 90.615% 69.938%;
+    --spectrum-red-soft: 4.641 49.61% 19.796%;
   }
 }

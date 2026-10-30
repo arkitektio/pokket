@@ -1,77 +1,42 @@
 import * as React from 'react';
 import {View} from 'react-native';
-import * as z from 'zod';
-import {BlokPropSchemas, createBlokComponent, useBlok, useValue} from '@/lib/ports/blok/runtime';
+import {dateText, relativeTime} from '@arkitektio/bsx/renderer/functions/v2/index';
+import {useBlok, useBlokRuntime, useValue, type BlokRender} from '@arkitektio/bsx/runtime';
 import {Text} from '@/components/ui/text';
 import {cn} from '@/lib/utils';
 import {
-  classNameSchema,
-  contentSchema,
-  headingLevelSchema,
   mapTextAlign,
   renderInlineContent,
-  textAlignSchema,
-  textFields,
   textLines,
   textPresentationClasses,
+  useBlokDataSet,
   useTextPresentationProps,
 } from './shared';
+import type {shadcnCatalog, uiCatalog} from '@arkitektio/bsx/catalogs';
 
-/**
- * Text-bearing bloks, after orkestrator's `bloks/typography.tsx`: the same
- * names and schemas. Each renders one `<Text>`; child ids nest inside it, so
- * inline children (`span`, `strong`, `a`) flow with the text as on the web.
- */
+type Shadcn = typeof shadcnCatalog.components;
+type Ui = typeof uiCatalog.components;
 
-/**
- * `Text` and `p`/`span` differ only in the element they render, so they share
- * one factory over one schema. In React Native both are a `<Text>`.
- */
-const textComponentSchema = z
-  .object({
-    text: BlokPropSchemas.DynamicString.optional().describe('The text to render.'),
-    children: contentSchema,
-    className: classNameSchema,
-    ...textFields,
-  })
-  .describe('A run of text.');
+export const TextRender: BlokRender<Ui['Text']> = ({buildChild, component, schema}) => {
+  const blok = useBlok(component, schema);
+  const text = useValue(blok.text);
+  const children = useValue(blok.children);
+  const className = useValue(blok.className);
+  const presentation = useTextPresentationProps(blok);
+  const dataSet = useBlokDataSet();
 
-const createTextComponent = (name: string, description: string) =>
-  createBlokComponent(
-    {
-      name,
-      schema: textComponentSchema.describe(description),
-    },
-    ({buildChild, component, schema}) => {
-      const blok = useBlok(component, schema);
-      const text = useValue(blok.text);
-      const children = useValue(blok.children);
-      const className = useValue(blok.className);
-      const presentation = useTextPresentationProps(blok);
-
-      return (
-        <Text
-          className={cn(...textPresentationClasses(presentation), className)}
-          numberOfLines={textLines(presentation)}
-        >
-          {renderInlineContent(children ?? text, buildChild)}
-        </Text>
-      );
-    },
+  return (
+    <Text
+      {...dataSet}
+      className={cn(...textPresentationClasses(presentation), className)}
+      numberOfLines={textLines(presentation)}
+    >
+      {renderInlineContent(children ?? text, buildChild)}
+    </Text>
   );
-
-export const TextBlok = createTextComponent('Text', 'A paragraph of text.');
-export const Paragraph = createTextComponent('p', 'An HTML paragraph.');
-export const Span = createTextComponent('span', 'An inline run of text.');
+};
 
 type HeadingLevel = 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6';
-
-const headingFields = {
-  text: BlokPropSchemas.DynamicString.optional().describe('The heading text.'),
-  children: contentSchema,
-  align: textAlignSchema,
-  className: classNameSchema,
-};
 
 const headingClassName = (level: HeadingLevel, align?: 'start' | 'center' | 'end') =>
   cn(
@@ -96,6 +61,7 @@ const HeadingText = ({
   children: React.ReactNode;
 }) => (
   <Text
+    {...useBlokDataSet()}
     accessibilityRole="header"
     className={cn(headingClassName(level, align), className)}
   >
@@ -103,91 +69,39 @@ const HeadingText = ({
   </Text>
 );
 
-/**
- * `Heading` takes the level as a prop; `h1`…`h6` are the same renderer with
- * the level fixed, so a payload can use whichever reads better. The fixed ones
- * deliberately do not publish a `level` prop — it would have no effect.
- */
-export const Heading = createBlokComponent(
-  {
-    name: 'Heading',
-    schema: z
-      .object({...headingFields, level: headingLevelSchema})
-      .describe('A section heading at an author-chosen level.'),
-  },
-  ({buildChild, component, schema}) => {
-    const blok = useBlok(component, schema);
-    const text = useValue(blok.text);
-    const children = useValue(blok.children);
-    const level = useValue(blok.level);
-    const align = useValue(blok.align);
-    const className = useValue(blok.className);
+/** A heading at an author-chosen level (ui@1 has no `h1`…`h6`). */
+export const HeadingRender: BlokRender<Ui['Heading']> = ({buildChild, component, schema}) => {
+  const blok = useBlok(component, schema);
+  const text = useValue(blok.text);
+  const children = useValue(blok.children);
+  const level = useValue(blok.level);
+  const align = useValue(blok.align);
+  const className = useValue(blok.className);
 
-    return (
-      <HeadingText level={(level ?? 'h3') as HeadingLevel} align={align} className={className}>
-        {renderInlineContent(children ?? text, buildChild)}
-      </HeadingText>
-    );
-  },
-);
-
-const createFixedHeading = (level: HeadingLevel) =>
-  createBlokComponent(
-    {
-      name: level,
-      schema: z.object(headingFields).describe(`An HTML ${level} heading.`),
-    },
-    ({buildChild, component, schema}) => {
-      const blok = useBlok(component, schema);
-      const text = useValue(blok.text);
-      const children = useValue(blok.children);
-      const align = useValue(blok.align);
-      const className = useValue(blok.className);
-
-      return (
-        <HeadingText level={level} align={align} className={className}>
-          {renderInlineContent(children ?? text, buildChild)}
-        </HeadingText>
-      );
-    },
+  return (
+    <HeadingText level={(level ?? 'h3') as HeadingLevel} align={align} className={className}>
+      {renderInlineContent(children ?? text, buildChild)}
+    </HeadingText>
   );
+};
 
-export const H1 = createFixedHeading('h1');
-export const H2 = createFixedHeading('h2');
-export const H3 = createFixedHeading('h3');
-export const H4 = createFixedHeading('h4');
-export const H5 = createFixedHeading('h5');
-export const H6 = createFixedHeading('h6');
+export const KbdRender: BlokRender<Shadcn['Kbd']> = ({buildChild, component, schema}) => {
+  const blok = useBlok(component, schema);
+  const text = useValue(blok.text);
+  const children = useValue(blok.children);
+  const className = useValue(blok.className);
 
-export const Kbd = createBlokComponent(
-  {
-    name: 'Kbd',
-    schema: z
-      .object({
-        text: BlokPropSchemas.DynamicString.optional().describe('The key or chord to show.'),
-        children: contentSchema,
-        className: classNameSchema,
-      })
-      .describe('A keyboard key or shortcut.'),
-  },
-  ({buildChild, component, schema}) => {
-    const blok = useBlok(component, schema);
-    const text = useValue(blok.text);
-    const children = useValue(blok.children);
-    const className = useValue(blok.className);
-
-    return (
-      <Text
-        className={cn(
-          'overflow-hidden rounded border border-border bg-muted px-1 font-mono text-xs font-medium text-muted-foreground',
-          className,
-        )}
-      >
-        {renderInlineContent(children ?? text, buildChild)}
-      </Text>
-    );
-  },
-);
+  return (
+    <Text
+      className={cn(
+        'overflow-hidden rounded border border-border bg-muted px-1 font-mono text-xs font-medium text-muted-foreground',
+        className,
+      )}
+    >
+      {renderInlineContent(children ?? text, buildChild)}
+    </Text>
+  );
+};
 
 /**
  * Markdown without a markdown engine: block structure (headings, lists,
@@ -352,36 +266,66 @@ const MarkdownView = ({content, className}: {content: string; className?: string
   );
 };
 
-export const Markdown = createBlokComponent(
-  {
-    name: 'Markdown',
-    schema: z
-      .object({
-        content: BlokPropSchemas.DynamicString.optional().describe('Markdown source to render.'),
-        className: classNameSchema,
-      })
-      .describe('Renders a Markdown document.'),
-  },
-  ({component, schema}) => {
-    const blok = useBlok(component, schema);
-    const content = useValue(blok.content);
-    const className = useValue(blok.className);
+export const MarkdownRender: BlokRender<Ui['Markdown']> = ({component, schema}) => {
+  const blok = useBlok(component, schema);
+  const content = useValue(blok.content);
+  const className = useValue(blok.className);
 
-    return <MarkdownView content={content ?? ''} className={className} />;
-  },
-);
+  return <MarkdownView content={content ?? ''} className={className} />;
+};
 
-export const typographyBlokComponents = [
-  TextBlok,
-  Paragraph,
-  Span,
-  Heading,
-  H1,
-  H2,
-  H3,
-  H4,
-  H5,
-  H6,
-  Kbd,
-  Markdown,
-];
+/** How long until a relative text can change: every second under a minute, then every half minute. */
+const tickFor = (distanceMs: number): number => (Math.abs(distanceMs) < 60_000 ? 1_000 : 30_000);
+
+/**
+ * The wall clock, ticking while `active`: the one place a blok's view reads
+ * it (the language never does). Measured from `then` while travelling, it
+ * does not tick at all.
+ */
+const useClock = (active: boolean, target: number | null): number => {
+  const [now, setNow] = React.useState(() => Date.now());
+  React.useEffect(() => {
+    if (!active) return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const schedule = (delay: number) => {
+      timer = setTimeout(() => {
+        const current = Date.now();
+        setNow(current);
+        schedule(tickFor(target === null ? 0 : target - current));
+      }, delay);
+    };
+    // Caught up at once (it may have been off while travelling), then on its own beat.
+    schedule(0);
+    return () => {
+      if (timer !== undefined) clearTimeout(timer);
+    };
+  }, [active, target]);
+  return now;
+};
+
+/**
+ * `<Time value relative? format?>` (ui@1): a moment, absolute or relative.
+ * Relative time is measured from the viewed moment: the wall clock live
+ * (ticking here), `then` while travelling, so the past renders as it did.
+ */
+export const TimeRender: BlokRender<Ui['Time']> = ({component, schema}) => {
+  const blok = useBlok(component, schema);
+  const value = useValue(blok.value);
+  const relative = useValue(blok.relative) === true;
+  const format = useValue(blok.format);
+  const className = useValue(blok.className);
+  const travelAt = useBlokRuntime(state => state.travelAt);
+  const dataSet = useBlokDataSet();
+  const moment = typeof value === 'string' ? Date.parse(value) : Number.NaN;
+  const known = !Number.isNaN(moment);
+  const then = travelAt === null ? Number.NaN : Date.parse(travelAt);
+  const live = Number.isNaN(then);
+  const now = useClock(relative && known && live, known ? moment : null);
+  if (!known || typeof value !== 'string') return null;
+  const text = relative ? relativeTime((moment - (live ? now : then)) / 1000, undefined) : dateText(value, format ?? null, undefined, true);
+  return (
+    <Text {...dataSet} accessibilityLabel={relative ? dateText(value, null, undefined, true) : undefined} className={cn(className)}>
+      {text}
+    </Text>
+  );
+};

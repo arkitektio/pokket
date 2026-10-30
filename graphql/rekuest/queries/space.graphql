@@ -1,0 +1,11 @@
+query Spaces($pagination: OffsetPaginationInput, $filters: SpaceFilter, $ordering: [SpaceOrder!]) {
+  spaces(ordering: $ordering, pagination: $pagination, filters: $filters) {
+    ...ListSpace
+  }
+}
+
+query Space($id: ID!) {
+  space(id: $id) {
+    ...Space
+  }
+}

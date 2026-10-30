@@ -79,6 +79,80 @@ export const renderInlineContent = (
   return null;
 };
 
+/**
+ * Components a browser lays out inline (`span`, a `Link`'s `<a>`, a `Time`'s
+ * `<time>`). In a `div` the web flows a run of them as one line of text, so
+ * `renderFlowChildList` wraps each run in one `<Text>` (nested `<Text>` is
+ * inline in React Native); everything else stacks. Loose text in a `div`
+ * arrives as implicit `span` nodes, so it flows too.
+ */
+export const INLINE_COMPONENTS: ReadonlySet<string> = new Set(['span', 'Link', 'Time']);
+
+const childIdOf = (item: unknown): string | undefined => {
+  if (typeof item === 'string') return item;
+  if (item && typeof item === 'object' && 'id' in item) {
+    return (item as Extract<ChildDescriptor, {id: string}>).id;
+  }
+  return undefined;
+};
+
+/**
+ * `renderChildList` as a web block lays its children out: consecutive inline
+ * children share one `<Text>` line instead of stacking one per row.
+ */
+export const renderFlowChildList = (
+  childList: unknown,
+  buildChild: ChildBuilder,
+  componentOf: (id: string) => string | undefined,
+): React.ReactNode => {
+  if (!Array.isArray(childList)) {
+    return null;
+  }
+
+  const groups: unknown[][] = [];
+  let run: unknown[] | null = null;
+  for (const item of childList) {
+    const id = childIdOf(item);
+    const component = id === undefined ? undefined : componentOf(id);
+    if (component !== undefined && INLINE_COMPONENTS.has(component)) {
+      if (run === null) {
+        run = [];
+        groups.push(run);
+      }
+      run.push(item);
+    } else {
+      run = null;
+      groups.push([item]);
+    }
+  }
+
+  return groups.map((group, index) => {
+    const first = childIdOf(group[0]) ?? String(index);
+    const component = componentOf(first);
+    if (component !== undefined && INLINE_COMPONENTS.has(component)) {
+      return <Text key={`${first}-run-${index}`}>{renderChildList(group, buildChild)}</Text>;
+    }
+    return <React.Fragment key={`${first}-${index}`}>{renderChildList(group, buildChild)}</React.Fragment>;
+  });
+};
+
+const TEXT_UTILITY =
+  /^-?(text-|font-|leading-|tracking-|decoration-|whitespace-|break-|italic$|not-italic$|underline$|overline$|line-through$|no-underline$|uppercase$|lowercase$|capitalize$|normal-case$|truncate$)/;
+
+/**
+ * The text utilities in a class list (`text-*`, `font-*`, `italic`, …, any
+ * variant prefix kept). On the web a block's text classes reach the text
+ * inside it through CSS inheritance; React Native has none, so a container
+ * hands these to its descendants' `<Text>` through `TextClassContext`.
+ */
+export const textClassesOf = (className: string | undefined): string | undefined => {
+  if (!className) return undefined;
+  const picked = className
+    .split(/\s+/)
+    .filter(token => token !== '' && TEXT_UTILITY.test(token.slice(token.lastIndexOf(':') + 1)));
+  return picked.length > 0 ? picked.join(' ') : undefined;
+};
+
 /** Whether a content prop is plain text, i.e. needs no child nodes. */
 export const isTextContent = (content: unknown): content is string | number =>
   typeof content === 'string' || typeof content === 'number';

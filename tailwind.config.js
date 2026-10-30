@@ -51,6 +51,32 @@ module.exports = {
           DEFAULT: "hsl(var(--card) / <alpha-value>)",
           foreground: "hsl(var(--card-foreground) / <alpha-value>)",
         },
+        /* Blok language v2 status and spectral roles (vocabulary `theme`),
+           derived from the brand in lib/theme/brandTokens.ts. */
+        success: {
+          DEFAULT: "hsl(var(--success) / <alpha-value>)",
+          foreground: "hsl(var(--success-foreground) / <alpha-value>)",
+          soft: "hsl(var(--success-soft) / <alpha-value>)",
+        },
+        warning: {
+          DEFAULT: "hsl(var(--warning) / <alpha-value>)",
+          foreground: "hsl(var(--warning-foreground) / <alpha-value>)",
+          soft: "hsl(var(--warning-soft) / <alpha-value>)",
+        },
+        info: {
+          DEFAULT: "hsl(var(--info) / <alpha-value>)",
+          foreground: "hsl(var(--info-foreground) / <alpha-value>)",
+          soft: "hsl(var(--info-soft) / <alpha-value>)",
+        },
+        spectrum: Object.fromEntries(
+          ["violet", "blue", "cyan", "green", "yellow", "orange", "red"].map((band) => [
+            band,
+            {
+              DEFAULT: `hsl(var(--spectrum-${band}) / <alpha-value>)`,
+              soft: `hsl(var(--spectrum-${band}-soft) / <alpha-value>)`,
+            },
+          ]),
+        ),
         chart: {
           1: "hsl(var(--chart-1) / <alpha-value>)",
           2: "hsl(var(--chart-2) / <alpha-value>)",

@@ -33,7 +33,7 @@ describe("module links", () => {
     });
     expect(links.map((g) => [g.title, g.links.map((l) => l.label)])).toEqual([["Pages", ["Other"]]]);
     expect(homePageLinks(moduleByKey("mail")!)).toEqual([]);
-    expect(homePageLinks(moduleByKey("tasks")!).flatMap((g) => g.links.map((l) => l.label))).toEqual(["Actions", "Agents", "Bloks"]);
+    expect(homePageLinks(moduleByKey("tasks")!).flatMap((g) => g.links.map((l) => l.label))).toEqual(["Actions", "Agents", "Bloks", "Spaces"]);
   });
 
   it("finds a page's module by the longest route prefix", () => {

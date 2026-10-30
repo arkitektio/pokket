@@ -41,6 +41,7 @@ const PAGES: Record<string, string> = {
   'actions/index': 'Actions',
   'agents/index': 'Agents',
   'bloks/index': 'Bloks',
+  'spaces/index': 'Spaces',
   broadcasts: 'Broadcasts',
   'calls/index': 'Calls',
   'alpaka/index': 'Chat',
@@ -138,6 +139,7 @@ export default function PagesLayout() {
         <Stack.Screen name="agents/[id]" options={{ title: 'Agent' }} />
         <Stack.Screen name="implementations/[id]" options={{ title: 'Action' }} />
         <Stack.Screen name="bloks/[id]" options={{ title: 'Blok' }} />
+        <Stack.Screen name="spaces/[id]" options={{ title: 'Space' }} />
         <Stack.Screen name="calls/[id]" options={{ title: 'Call' }} />
         <Stack.Screen name="alpaka/rooms/[id]" options={{ title: 'Chat' }} />
         <Stack.Screen name="mikro/arraydatasets/[id]" options={{ title: 'Dataset' }} />

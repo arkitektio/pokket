@@ -1,43 +1,267 @@
-import {createBlokCatalog} from '@/lib/ports/blok/runtime';
-import {standardBlokFunctions} from '@/lib/ports/blok/functions';
-import {controlBlokComponents} from './control';
-import {dataBlokComponents} from './data';
-import {feedbackBlokComponents} from './feedback';
-import {formBlokComponents} from './forms';
-import {htmlBlokComponents} from './html';
-import {iconBlokComponents} from './icons';
-import {layoutBlokComponents} from './layout';
-import {logoBlokComponents} from './logo';
-import {lovekitBlokComponents} from './lovekit';
-import {navigationBlokComponents} from './navigation';
-import {sceneBlokComponents} from './scene';
-import {typographyBlokComponents} from './typography';
+import {
+  htmlCatalog,
+  logoCatalog,
+  sceneCatalog,
+  shadcnCatalog,
+  structureCatalog,
+  uiCatalog,
+} from '@arkitektio/bsx/catalogs';
+import {declareBlokUi, implementBlokCatalog, ownBlokCatalog, type BlokCatalog} from '@arkitektio/bsx/runtime';
+import {
+  AvatarRender,
+  CardContentRender,
+  CardDescriptionRender,
+  CardFooterRender,
+  CardHeaderRender,
+  CardRender,
+  CardTitleRender,
+  ItemGroupRender,
+  ItemRender,
+  TableBodyRender,
+  TableCellRender,
+  TableFooterRender,
+  TableHeaderRender,
+  TableHeadRender,
+  TableRender,
+  TableRowRender,
+} from './data';
+import {AlertRender, BadgeRender, EmptyRender, ProgressRender, SkeletonRender, SpinnerRender} from './feedback';
+import {
+  ButtonGroupRender,
+  ButtonRender,
+  CheckboxRender,
+  FieldRender,
+  FieldSetRender,
+  InputRender,
+  LabelRender,
+  RadioGroupItemRender,
+  RadioGroupRender,
+  SelectContentRender,
+  SelectGroupRender,
+  SelectItemRender,
+  SelectLabelRender,
+  SelectRender,
+  SelectTriggerRender,
+  SliderRender,
+  SwitchRender,
+  TextareaRender,
+  ToggleGroupItemRender,
+  ToggleGroupRender,
+  ToggleRender,
+} from './forms';
+import {CodeRender, ImageRender, LinkRender} from './html';
+import {IconRender} from './icons';
+import {
+  AspectRatioRender,
+  ColumnRender,
+  DivRender,
+  FlexRender,
+  GridRender,
+  RowRender,
+  ScrollAreaRender,
+  SeparatorRender,
+  SpacerRender,
+} from './layout';
+import {
+  CircleRender,
+  ClipPathRender,
+  DefsRender,
+  EllipseRender,
+  GroupRender,
+  LinearGradientRender,
+  LineRender,
+  LogoRootRender,
+  PathRender,
+  PolygonRender,
+  PolylineRender,
+  RadialGradientRender,
+  RectRender,
+  StopRender,
+  SvgTextRender,
+} from './logo';
+import {StreamRenderBlok} from './lovekit';
+import {
+  AccordionContentRender,
+  AccordionItemRender,
+  AccordionRender,
+  AccordionTriggerRender,
+  CollapsibleContentRender,
+  CollapsibleRender,
+  CollapsibleTriggerRender,
+  TabsContentRender,
+  TabsListRender,
+  TabsRender,
+  TabsTriggerRender,
+} from './navigation';
+import {
+  DialogCloseRender,
+  DialogContentRender,
+  DialogDescriptionRender,
+  DialogFooterRender,
+  DialogHeaderRender,
+  DialogRender,
+  DialogTitleRender,
+  DialogTriggerRender,
+  PopoverContentRender,
+  PopoverRender,
+  PopoverTriggerRender,
+  TooltipContentRender,
+  TooltipRender,
+  TooltipTriggerRender,
+} from './overlays';
+import {runRenders} from './run';
+import {sceneRenders} from './scene';
+import {StructureDisplayRender, StructurePickerRender, StructureViewerRender} from './structure';
+import {OutcomeSlotRender, ToastRender} from './toast';
+import {HeadingRender, KbdRender, MarkdownRender, TextRender, TimeRender} from './typography';
 
 /**
- * What pokket can draw of orkestrator's catalog (`core/blok/renderer/catalog.tsx`):
- * the same component names and prop schemas, rendered with React Native.
- * A blok naming a component left out here (charts, overlays, resizable
- * panels…) still renders, with an "Unknown component" card in that node's
- * place.
+ * What pokket draws (orkestrator `renderer/catalog.tsx`): the spec's global
+ * catalogs, rendered with React Native. `ui@1`, `html@1`, `logo@1`, `scene@1`
+ * and `structure@1` are drawn whole, so pokket claims them; of `shadcn@1` only
+ * the few families a phone has an answer for, so a blok naming the rest
+ * (sheets, menus, charts, resizable panels…) still renders, with an "Unknown
+ * component" card in that node's place. Pokket's own catalog holds what no
+ * global one does: lovekit streams.
  *
  * The SVG components (`logo.tsx`) draw logo bloks: an agent's, an action's.
  * The 3D components (`scene/`) draw scene bloks with three.js on WebGPU.
  */
-export const pokketBlokCatalog = createBlokCatalog(
-  'https://arkitekt.live/catalogs/v1.json',
-  [
-    ...layoutBlokComponents,
-    ...typographyBlokComponents,
-    ...htmlBlokComponents,
-    ...formBlokComponents,
-    ...navigationBlokComponents,
-    ...feedbackBlokComponents,
-    ...dataBlokComponents,
-    ...iconBlokComponents,
-    ...controlBlokComponents,
-    ...logoBlokComponents,
-    ...lovekitBlokComponents,
-    ...sceneBlokComponents,
+export const pokketBlokUi = declareBlokUi({
+  name: 'pokket',
+  description: 'The Arkitekt phone app: bloks drawn with React Native, scenes with three.js on WebGPU.',
+  implements: [
+    implementBlokCatalog(uiCatalog, {
+      Accordion: AccordionRender,
+      AccordionContent: AccordionContentRender,
+      AccordionItem: AccordionItemRender,
+      AccordionTrigger: AccordionTriggerRender,
+      Alert: AlertRender,
+      Badge: BadgeRender,
+      Button: ButtonRender,
+      Card: CardRender,
+      CardContent: CardContentRender,
+      CardDescription: CardDescriptionRender,
+      CardFooter: CardFooterRender,
+      CardHeader: CardHeaderRender,
+      CardTitle: CardTitleRender,
+      Checkbox: CheckboxRender,
+      Code: CodeRender,
+      Column: ColumnRender,
+      Dialog: DialogRender,
+      DialogClose: DialogCloseRender,
+      DialogContent: DialogContentRender,
+      DialogDescription: DialogDescriptionRender,
+      DialogFooter: DialogFooterRender,
+      DialogHeader: DialogHeaderRender,
+      DialogTitle: DialogTitleRender,
+      DialogTrigger: DialogTriggerRender,
+      Empty: EmptyRender,
+      Field: FieldRender,
+      FieldSet: FieldSetRender,
+      Flex: FlexRender,
+      Grid: GridRender,
+      Heading: HeadingRender,
+      Icon: IconRender,
+      Image: ImageRender,
+      Input: InputRender,
+      Label: LabelRender,
+      Link: LinkRender,
+      Markdown: MarkdownRender,
+      Popover: PopoverRender,
+      PopoverContent: PopoverContentRender,
+      PopoverTrigger: PopoverTriggerRender,
+      Progress: ProgressRender,
+      RadioGroup: RadioGroupRender,
+      RadioGroupItem: RadioGroupItemRender,
+      Row: RowRender,
+      ScrollArea: ScrollAreaRender,
+      Select: SelectRender,
+      SelectContent: SelectContentRender,
+      SelectGroup: SelectGroupRender,
+      SelectItem: SelectItemRender,
+      SelectLabel: SelectLabelRender,
+      SelectTrigger: SelectTriggerRender,
+      Separator: SeparatorRender,
+      Skeleton: SkeletonRender,
+      Slider: SliderRender,
+      Spacer: SpacerRender,
+      Spinner: SpinnerRender,
+      Switch: SwitchRender,
+      Table: TableRender,
+      TableBody: TableBodyRender,
+      TableCell: TableCellRender,
+      TableFooter: TableFooterRender,
+      TableHead: TableHeadRender,
+      TableHeader: TableHeaderRender,
+      TableRow: TableRowRender,
+      Tabs: TabsRender,
+      TabsContent: TabsContentRender,
+      TabsList: TabsListRender,
+      TabsTrigger: TabsTriggerRender,
+      Text: TextRender,
+      Textarea: TextareaRender,
+      Time: TimeRender,
+      Toast: ToastRender,
+      Toggle: ToggleRender,
+      ToggleGroup: ToggleGroupRender,
+      ToggleGroupItem: ToggleGroupItemRender,
+      Tooltip: TooltipRender,
+      TooltipContent: TooltipContentRender,
+      TooltipTrigger: TooltipTriggerRender,
+      cancelled: OutcomeSlotRender,
+      done: OutcomeSlotRender,
+      failed: OutcomeSlotRender,
+    }),
+    implementBlokCatalog(htmlCatalog, {
+      div: DivRender,
+      p: TextRender,
+      span: TextRender,
+    }),
+    implementBlokCatalog(logoCatalog, {
+      ActionLogo: LogoRootRender,
+      AgentLogo: LogoRootRender,
+      Circle: CircleRender,
+      ClipPath: ClipPathRender,
+      Defs: DefsRender,
+      Ellipse: EllipseRender,
+      G: GroupRender,
+      Line: LineRender,
+      LinearGradient: LinearGradientRender,
+      Path: PathRender,
+      Polygon: PolygonRender,
+      Polyline: PolylineRender,
+      RadialGradient: RadialGradientRender,
+      Rect: RectRender,
+      Stop: StopRender,
+      SvgText: SvgTextRender,
+    }),
+    implementBlokCatalog(sceneCatalog, {
+      ...sceneRenders,
+      ...runRenders,
+    }),
+    implementBlokCatalog(structureCatalog, {
+      StructureDisplay: StructureDisplayRender,
+      StructurePicker: StructurePickerRender,
+      StructureViewer: StructureViewerRender,
+    }),
+    implementBlokCatalog(
+      shadcnCatalog,
+      {
+        AspectRatio: AspectRatioRender,
+        Avatar: AvatarRender,
+        ButtonGroup: ButtonGroupRender,
+        Collapsible: CollapsibleRender,
+        CollapsibleContent: CollapsibleContentRender,
+        CollapsibleTrigger: CollapsibleTriggerRender,
+        Item: ItemRender,
+        ItemGroup: ItemGroupRender,
+        Kbd: KbdRender,
+      },
+      {partial: true},
+    ),
+    ownBlokCatalog({name: 'pokket', description: "Pokket's own components: lovekit streams."}, [StreamRenderBlok]),
   ],
-  standardBlokFunctions,
-);
+});
+
+export const pokketBlokCatalog: BlokCatalog = pokketBlokUi.catalog;

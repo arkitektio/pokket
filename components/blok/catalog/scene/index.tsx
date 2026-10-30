@@ -1,38 +1,21 @@
 import * as React from 'react';
-import {
-  createBlokComponent,
-  type BlokComponentDefinition,
-  type BlokObjectSchema,
-  type BlokRenderArgs,
-} from '@/lib/ports/blok/runtime';
-import {
-  animateSchema,
-  attachSchema,
-  beamSchema,
-  glowSchema,
-  IN_MODEL,
-  MODEL_PROP_KINDS,
-  modelSchema,
-  moveSchema,
-  onClickSchema,
-  popoutSchema,
-  robotSchema,
-  rotateSchema,
-  sceneSchema,
-  showSchema,
-  tintSchema,
-} from './schemas';
+import type {sceneCatalog} from '@arkitektio/bsx/catalogs';
+import type {BlokRender, BlokRenderArgs} from '@arkitektio/bsx/runtime';
+
+type Scene = typeof sceneCatalog.components;
 
 export * from './host';
+export {SceneOwnerProvider, useSceneNotice, useSceneOverlay} from './context';
 
 /**
- * The 3D vocabulary (orkestrator's `bloks/scene`): three containers place
- * models, eight children bind their named nodes to state, and two handle
- * interaction and the cards laid over the scene.
+ * The 3D vocabulary (scene@1, orkestrator's `bloks/scene`): three containers
+ * place models, a transform places what it holds, eight children bind their
+ * named nodes to state, and two handle interaction and the cards laid over the
+ * scene. The run components (`Overlay`, `Anchor`, `Route`) are `../run`.
  *
- * The definitions here (names, schemas, placement) are what the catalog checks
- * every blok against. What draws them is three.js on the GPU, which most bloks
- * never need: it is loaded the first time a scene is shown, not with the app.
+ * The contract (names, schemas, placement) is the package's `sceneCatalog`.
+ * What draws it is three.js on the GPU, which most bloks never need: it is
+ * loaded the first time a scene is shown, not with the app.
  */
 
 type Implementation = typeof import('./implementation');
@@ -47,7 +30,7 @@ const loadImplementation = (): Promise<Implementation> => {
 };
 
 type RenderName = {
-  [K in keyof Implementation]: Implementation[K] extends React.ComponentType<never> ? K : never;
+  [K in keyof Implementation]: Implementation[K] extends React.ComponentType<BlokRenderArgs<any>> ? K : never;
 }[keyof Implementation] &
   `${string}Render`;
 
@@ -71,55 +54,23 @@ const suspended = (name: RenderName) => {
   };
 };
 
-const sceneComponent = <TSchema extends BlokObjectSchema>(
-  api: Parameters<typeof createBlokComponent<TSchema>>[0],
-  name: RenderName,
-): BlokComponentDefinition => createBlokComponent(api, suspended(name));
+/** A scene@1 component's render, loaded with three.js. */
+export const sceneRender = <K extends keyof Scene>(name: RenderName): BlokRender<Scene[K]> => suspended(name);
 
-export const sceneBlokComponents: BlokComponentDefinition[] = [
-  sceneComponent(
-    {name: 'Scene', acceptsChildren: true, placement: {childrenContext: 'scene', notDownstreamOf: ['Scene']}, schema: sceneSchema},
-    'SceneRender',
-  ),
-  sceneComponent(
-    {
-      name: 'Model',
-      acceptsChildren: true,
-      placement: {context: 'scene', downstreamOf: ['Scene']},
-      propKinds: MODEL_PROP_KINDS,
-      schema: modelSchema,
-    },
-    'ModelRender',
-  ),
-  sceneComponent(
-    {
-      name: 'Robot',
-      acceptsChildren: true,
-      placement: {context: 'scene', downstreamOf: ['Scene']},
-      propKinds: MODEL_PROP_KINDS,
-      schema: robotSchema,
-    },
-    'RobotRender',
-  ),
-  sceneComponent({name: 'Move', placement: IN_MODEL, schema: moveSchema}, 'MoveRender'),
-  sceneComponent({name: 'Rotate', placement: IN_MODEL, schema: rotateSchema}, 'RotateRender'),
-  sceneComponent({name: 'Animate', placement: IN_MODEL, schema: animateSchema}, 'AnimateRender'),
-  sceneComponent({name: 'Show', placement: IN_MODEL, schema: showSchema}, 'ShowRender'),
-  sceneComponent({name: 'Glow', placement: IN_MODEL, schema: glowSchema}, 'GlowRender'),
-  sceneComponent({name: 'Tint', placement: IN_MODEL, schema: tintSchema}, 'TintRender'),
-  sceneComponent({name: 'Attach', placement: IN_MODEL, schema: attachSchema}, 'AttachRender'),
-  sceneComponent({name: 'Beam', placement: IN_MODEL, schema: beamSchema}, 'BeamRender'),
-  sceneComponent(
-    {name: 'OnClick', placement: {context: 'scene', downstreamOf: ['Model', 'Robot']}, schema: onClickSchema},
-    'OnClickRender',
-  ),
-  sceneComponent(
-    {
-      name: 'Popout',
-      acceptsChildren: true,
-      placement: {context: 'scene', childrenContext: 'html', downstreamOf: ['Model', 'Robot']},
-      schema: popoutSchema,
-    },
-    'PopoutRender',
-  ),
-];
+/** What draws scene@1 but the run components (`../run`): each loaded with three.js. */
+export const sceneRenders = {
+  Scene: sceneRender<'Scene'>('SceneRender'),
+  Model: sceneRender<'Model'>('ModelRender'),
+  Robot: sceneRender<'Robot'>('RobotRender'),
+  Transform: sceneRender<'Transform'>('TransformRender'),
+  Move: sceneRender<'Move'>('MoveRender'),
+  Rotate: sceneRender<'Rotate'>('RotateRender'),
+  Animate: sceneRender<'Animate'>('AnimateRender'),
+  Visible: sceneRender<'Visible'>('VisibleRender'),
+  Glow: sceneRender<'Glow'>('GlowRender'),
+  Tint: sceneRender<'Tint'>('TintRender'),
+  Attach: sceneRender<'Attach'>('AttachRender'),
+  Beam: sceneRender<'Beam'>('BeamRender'),
+  OnClick: sceneRender<'OnClick'>('OnClickRender'),
+  Popout: sceneRender<'Popout'>('PopoutRender'),
+};

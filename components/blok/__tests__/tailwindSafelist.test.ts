@@ -46,6 +46,11 @@ describe('blok tailwind safelist', () => {
     'bg-primary', 'bg-primary/10', 'text-muted-foreground', 'border-destructive/30', 'bg-chart-3/20',
     'text-amber-700', 'bg-slate-950', 'border-rose-200', 'bg-sky-500/10', 'border-emerald-500/30',
     'bg-transparent',
+    // blok language v2 status and spectral roles
+    'bg-success', 'text-success-foreground', 'bg-success-soft', 'text-warning', 'border-info/30', 'bg-warning-soft/50',
+    'bg-spectrum-red', 'bg-spectrum-red-soft', 'text-spectrum-violet', 'border-spectrum-green/40', 'bg-spectrum-cyan-soft',
+    // the language's data attributes, read from a component's `dataSet`
+    'data-[busy]:opacity-60', 'data-[stale]:opacity-50',
   ])('compiles %s', className => {
     expect(rules[className]).toBeDefined();
   });

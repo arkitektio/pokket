@@ -33,6 +33,21 @@ export const declaredVariables = (query: string): Record<string, string> => {
   }
 };
 
+/**
+ * The variables a query cannot be run without: declared non-null, with no
+ * default. A picker waits for these instead of asking with a null.
+ */
+export const requiredVariables = (query: string): string[] => {
+  try {
+    const operation = parse(query).definitions.find((d): d is OperationDefinitionNode => d.kind === "OperationDefinition");
+    return (operation?.variableDefinitions ?? [])
+      .filter((definition) => definition.type.kind === "NonNullType" && definition.defaultValue === undefined)
+      .map((definition) => definition.variable.name.value);
+  } catch {
+    return [];
+  }
+};
+
 const SCALARS = ["ID", "String", "Int"];
 
 /**

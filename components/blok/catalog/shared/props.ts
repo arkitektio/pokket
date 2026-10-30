@@ -1,7 +1,7 @@
 import {cva} from 'class-variance-authority';
 import type {DimensionValue, TextStyle, ViewStyle} from 'react-native';
 import * as z from 'zod';
-import {BlokPropSchemas, useValue, type BlokPropHandle} from '@/lib/ports/blok/runtime';
+import {BlokPropSchemas, useValue, type BlokPropHandle} from '@arkitektio/bsx/runtime';
 import {
   alignSchema,
   boolSchema,
@@ -14,7 +14,7 @@ import {
   textSizeSchema,
   textToneSchema,
   textWeightSchema,
-} from './schemas';
+} from '@arkitektio/bsx/catalogs';
 
 /**
  * Orkestrator's `shared/props.ts`, for React Native. The schemas are the

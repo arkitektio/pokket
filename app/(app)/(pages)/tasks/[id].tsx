@@ -1,3 +1,4 @@
+import { TaskRun } from '@/components/rekuest/run/TaskRun';
 import { PortValues } from '@/components/tasks/PortValues';
 import { RekuestUnavailable, TasksLoadingState } from '@/components/tasks/states';
 import { ProgressBar, TaskStatusBadge, useNow } from '@/components/tasks/status';
@@ -229,6 +230,10 @@ function TaskContent({ id }: { id: string }) {
     >
       <TaskHero task={task} />
       <TaskActions task={task} />
+      {/* Its open ask, its action's own blok and the bloks it showed. */}
+      <View className="px-4 pb-4">
+        <TaskRun taskId={task.id} follow={!!task.parent} />
+      </View>
       <Section title="Inputs">
         <Card className="border-border bg-card">
           <CardContent className="px-3 py-1">

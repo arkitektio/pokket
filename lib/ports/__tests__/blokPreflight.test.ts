@@ -1,15 +1,10 @@
 import {describe, expect, it} from '@jest/globals';
 import {z} from "zod";
 
-import {createBlokComponent} from "../blok/runtime/components";
-import {
-  createBlokCatalog,
-  createBlokFunction,
-  createVariadicBlokFunction,
-  normalizeFunctionArgs,
-} from "../blok/runtime/functions";
-import {preflightBlokDocument} from "../blok/runtime/preflight";
-import {BlokPropSchemas} from "../blok/runtime/schemas";
+import {createBlokComponent} from '@arkitektio/bsx/renderer/runtime/components';
+import {createBlokCatalog} from '@arkitektio/bsx/renderer/runtime/functions';
+import {preflightBlokDocument} from '@arkitektio/bsx/renderer/runtime/preflight';
+import {BlokPropSchemas} from '@arkitektio/bsx/renderer/runtime/schemas';
 
 const Box = createBlokComponent(
   {
@@ -24,17 +19,7 @@ const Box = createBlokComponent(
   () => null,
 );
 
-const pureFn = createBlokFunction(
-  {name: "double", description: "Doubles a number.", purity: "pure", schema: z.object({a: z.number()})},
-  args => args.a * 2,
-);
-
-const effectFn = createBlokFunction(
-  {name: "logger.info", description: "Logs a message.", schema: z.record(z.string(), z.unknown())},
-  args => args,
-);
-
-const catalog = createBlokCatalog("test-catalog", [Box], [pureFn, effectFn]);
+const catalog = createBlokCatalog("test-catalog", [Box]);
 
 const preflight = (roots: unknown[]) => preflightBlokDocument(roots, catalog);
 
@@ -91,149 +76,6 @@ describe("preflightBlokDocument", () => {
     expect(result.nodes.get("dupe")?.id).toBe("dupe");
   });
 
-  it("reports an unknown function referenced by a prop", () => {
-    const result = preflight([
-      {id: "a", component: "Box", props: [{key: "title", util_call: {operation: "missing"}}]},
-    ]);
-
-    expect(result.errors[0].message).toContain('Unknown function "missing"');
-  });
-
-  it("refuses an effectful function in value position", () => {
-    const result = preflight([
-      {
-        id: "a",
-        component: "Box",
-        props: [{key: "title", util_call: {operation: "logger.info"}}],
-      },
-    ]);
-
-    expect(result.errors[0].message).toContain("has side effects");
-  });
-
-  it("allows an effectful function on an action prop", () => {
-    const result = preflight([
-      {
-        id: "a",
-        component: "Box",
-        props: [
-          {key: "title", static_value: "x"},
-          {key: "onClick", util_call: {operation: "logger.info"}},
-        ],
-      },
-    ]);
-
-    expect(result.errors).toEqual([]);
-  });
-
-  it("reports an unknown argument key", () => {
-    const result = preflight([
-      {
-        id: "a",
-        component: "Box",
-        props: [
-          {key: "title", util_call: {operation: "double", arguments: [{key: "bogus"}]}},
-        ],
-      },
-    ]);
-
-    expect(result.errors.map(error => error.message).join(" ")).toContain(
-      'Unknown argument "bogus"',
-    );
-  });
-
-  it("reports a missing required argument", () => {
-    const result = preflight([
-      {id: "a", component: "Box", props: [{key: "title", util_call: {operation: "double"}}]},
-    ]);
-
-    expect(result.errors.map(error => error.message).join(" ")).toContain(
-      'Missing required argument "a"',
-    );
-  });
-
-  it("counts positional arguments as filling the schema keys in order", () => {
-    const result = preflight([
-      {
-        id: "a",
-        component: "Box",
-        props: [
-          {key: "title", util_call: {operation: "double", arguments: [{value_literal: 2}]}},
-        ],
-      },
-    ]);
-
-    expect(result.errors).toEqual([]);
-  });
-
-  it("reports too many positional arguments", () => {
-    const result = preflight([
-      {
-        id: "a",
-        component: "Box",
-        props: [
-          {
-            key: "title",
-            util_call: {
-              operation: "double",
-              arguments: [{value_literal: 1}, {value_literal: 2}],
-            },
-          },
-        ],
-      },
-    ]);
-
-    expect(result.errors.map(error => error.message).join(" ")).toContain(
-      "takes 1 argument(s) but 2 were given",
-    );
-  });
-
-  it("does not constrain the arity of a variadic function", () => {
-    const variadicCatalog = createBlokCatalog(
-      "variadic",
-      [Box],
-      [
-        createVariadicBlokFunction(
-          {name: "sum", description: "sums", purity: "pure", item: z.number()},
-          values => values.reduce((total, value) => total + value, 0),
-        ),
-      ],
-    );
-
-    const result = preflightBlokDocument(
-      [
-        {
-          id: "a",
-          component: "Box",
-          props: [
-            {
-              key: "title",
-              util_call: {
-                operation: "sum",
-                arguments: [{value_literal: 1}, {value_literal: 2}, {value_literal: 3}],
-              },
-            },
-          ],
-        },
-      ],
-      variadicCatalog,
-    );
-
-    expect(result.errors).toEqual([]);
-  });
-
-  it("allows a pure function in value position", () => {
-    const result = preflight([
-      {
-        id: "a",
-        component: "Box",
-        props: [{key: "title", util_call: {operation: "double", arguments: [{key: "a", value_literal: 2}]}}],
-      },
-    ]);
-
-    expect(result.errors).toEqual([]);
-  });
-
   it("keeps valid siblings renderable when one node is invalid", () => {
     const result = preflight([
       validNode("root", {children: [validNode("good"), {id: "bad", component: "Nope"}]}),
@@ -258,49 +100,27 @@ describe("preflightBlokDocument", () => {
   });
 });
 
-describe("catalog invokeFunction", () => {
-  it("returns a failure for an unknown function instead of throwing", () => {
-    expect(catalog.invokeFunction("nope", {})).toEqual({
-      ok: false,
-      error: "Function not found in catalog test-catalog: nope",
-    });
+describe("preflightBlokDocument for a v2 blok", () => {
+  const box = (props: unknown[]) => ({id: "box", component: "Box", props: [{key: "title", static_value: "t"}, ...props]});
+
+  it("knows the vocabulary's functions, not the catalog's", () => {
+    expect(preflight([box([{key: "subtitle", util_call: {operation: "str.upper", arguments: [{key: "value", value_literal: "x"}]}}])]).nodes.has("box")).toBe(true);
+    const unknown = preflight([box([{key: "subtitle", util_call: {operation: "double", arguments: []}}])]);
+    expect(unknown.invalidNodes.get("box")?.[0]).toContain("not a function of the blok language");
   });
 
-  it("returns a failure for invalid arguments", () => {
-    const result = catalog.invokeFunction("double", {a: "not a number"});
-
-    expect(result.ok).toBe(false);
-    expect(result.ok === false && result.error).toContain("Invalid arguments");
+  it("allows an effect only as a callback's one thing", () => {
+    const copy = {operation: "ui.copy", arguments: [{key: "text", value_literal: "x"}]};
+    expect(preflight([box([{key: "onClick", util_call: copy}])]).nodes.has("box")).toBe(true);
+    expect(preflight([box([{key: "subtitle", util_call: copy}])]).invalidNodes.has("box")).toBe(true);
   });
 
-  it("refuses an effectful function when purity is required", () => {
-    const result = catalog.invokeFunction("logger.info", {}, {requirePure: true});
-
-    expect(result.ok).toBe(false);
-    expect(result.ok === false && result.error).toContain("side effects");
+  it("lets when guard any component", () => {
+    expect(preflight([box([{key: "when", dynamic_value: {path: "flag"}}])]).nodes.has("box")).toBe(true);
   });
 
-  it("catches a throw inside a function body", () => {
-    const throwing = createBlokCatalog(
-      "throwing",
-      [],
-      [
-        createBlokFunction({name: "boom", description: "Always throws.", purity: "pure", schema: z.object({})}, () => {
-          throw new Error("kaboom");
-        }),
-      ],
-    );
-
-    expect(throwing.invokeFunction("boom", {})).toEqual({ok: false, error: "kaboom"});
-  });
-
-  it("maps positional args onto the schema keys", () => {
-    const schema = z.object({a: z.number(), b: z.number()});
-    expect(normalizeFunctionArgs(schema, {0: 1, 1: 2})).toEqual({a: 1, b: 2});
-  });
-
-  it("leaves already-named args alone", () => {
-    const schema = z.object({a: z.number(), b: z.number()});
-    expect(normalizeFunctionArgs(schema, {a: 1, b: 2})).toEqual({a: 1, b: 2});
+  it("refuses a call kind it does not know, a reserved service_call above all", () => {
+    const result = preflight([box([{key: "onClick", service_call: {mutation: "drop"}}])]);
+    expect(result.invalidNodes.get("box")?.[0]).toContain("service_call");
   });
 });

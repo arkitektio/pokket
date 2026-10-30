@@ -1,0 +1,31 @@
+query RunTask($id: ID!) {
+  task(id: $id) {
+    ...RunTask
+  }
+}
+
+# The bloks a task showed, oldest first.
+query TaskBloks($id: ID!) {
+  task(id: $id) {
+    id
+    isDone
+    latestEventKind
+    bloks {
+      ...TaskBlok
+    }
+  }
+}
+
+# The runs of an implementation around a moment, for time travel.
+query PastTasks($filter: TaskFilter, $ordering: [TaskOrder!], $pagination: OffsetPaginationInput) {
+  tasks(filters: $filter, ordering: $ordering, pagination: $pagination) {
+    ...PastTask
+  }
+}
+
+# Where to show a run over these agents: the spaces placing the most of them first.
+query SpacesForAgents($agents: [ID!]!) {
+  spacesForAgents(agents: $agents) {
+    ...SpaceForAgents
+  }
+}

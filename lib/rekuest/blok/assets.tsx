@@ -11,12 +11,11 @@ import {
 } from '@/lib/ports/blok/assets';
 import {modelBytes} from '@/lib/scene/assetCache';
 import {
-  RequestMediaAccessDocument,
+  AssetAccessDocument,
   useAgentAssetsQuery,
+  type AssetAccessQuery,
+  type AssetAccessQueryVariables,
   type MediaAccessGrantFragment,
-  type MediaStoreFragment,
-  type RequestMediaAccessMutation,
-  type RequestMediaAccessMutationVariables,
 } from '../api/graphql';
 import {useRekuestClient} from '../useTaskStream';
 
@@ -31,50 +30,54 @@ import {useRekuestClient} from '../useTaskStream';
  * source for is added by an admin, from the desktop app.
  *
  * A stored model is read from the phone's cache when it was opened before
- * (`lib/scene/assetCache`), and otherwise fetched with a presigned URL.
+ * (`lib/scene/assetCache`), and otherwise fetched with a presigned URL. The
+ * grant comes off the asset's store (`AssetAccess`), whichever store holds it:
+ * a kulisse store for a model, a media store for an image.
  */
 
 type Client = ApolloClient<unknown>;
-type Credentials = MediaAccessGrantFragment & {expiresAt: number};
+type Credentials = Omit<MediaAccessGrantFragment, '__typename'> & {expiresAt: number};
 
 /** Ask again this long before a grant runs out. */
 const REFRESH_SKEW_MS = 60_000;
 
-/** Grants are per stored object; one per store id, per client (a profile switch builds another client). */
+/** Grants are per stored asset; one per asset ref, per client (a profile switch builds another client). */
 const grants = new WeakMap<Client, Map<string, Promise<Credentials>>>();
 
-const credentialsFor = (store: MediaStoreFragment, client: Client): Promise<Credentials> => {
-  const byStore = grants.get(client) ?? new Map<string, Promise<Credentials>>();
-  grants.set(client, byStore);
-  const cached = byStore.get(store.id);
+const credentialsFor = (ref: string, client: Client): Promise<Credentials> => {
+  const byRef = grants.get(client) ?? new Map<string, Promise<Credentials>>();
+  grants.set(client, byRef);
+  const cached = byRef.get(ref);
   if (cached) return cached;
   const request = client
-    .mutate<RequestMediaAccessMutation, RequestMediaAccessMutationVariables>({
-      mutation: RequestMediaAccessDocument,
-      variables: {input: {storeId: store.id}},
+    .query<AssetAccessQuery, AssetAccessQueryVariables>({
+      query: AssetAccessDocument,
+      variables: {ref},
+      fetchPolicy: 'network-only',
     })
     .then(({data}) => {
-      const grant = data?.requestMediaAccess;
-      if (!grant) throw new Error('No access to the asset store was granted.');
-      const credentials = {...grant, expiresAt: grantExpiresAt(grant.expiresIn, Date.now())};
+      const grant = data?.asset?.file.accessGrant;
+      if (!grant) throw new Error(`No access to the asset ${ref} was granted.`);
+      const {__typename: _kind, ...fields} = grant;
+      const credentials = {...fields, expiresAt: grantExpiresAt(grant.expiresIn, Date.now())};
       setTimeout(
         () => {
-          if (byStore.get(store.id) === request) byStore.delete(store.id);
+          if (byRef.get(ref) === request) byRef.delete(ref);
         },
         Math.max(0, credentials.expiresAt - REFRESH_SKEW_MS - Date.now()),
       );
       return credentials;
     })
     .catch((error: unknown) => {
-      if (byStore.get(store.id) === request) byStore.delete(store.id);
+      if (byRef.get(ref) === request) byRef.delete(ref);
       throw error;
     });
-  byStore.set(store.id, request);
+  byRef.set(ref, request);
   return request;
 };
 
-const assetUrl = async (store: MediaStoreFragment, client: Client, datalayer: DatalayerEndpoint): Promise<string> => {
-  const credentials = await credentialsFor(store, client);
+const assetUrl = async (ref: string, client: Client, datalayer: DatalayerEndpoint): Promise<string> => {
+  const credentials = await credentialsFor(ref, client);
   const {at, expiresSeconds} = signingWindow(Date.now(), credentials.expiresAt);
   return presignUrl(
     {url: `${datalayer.own}/${credentials.bucket}/${credentials.key}`, credentials, at, expiresSeconds},
@@ -97,7 +100,6 @@ const useAsset = (dependency: string, name: string): BlokAsset => {
   });
 
   const declared = data?.agent.assets.find(candidate => candidate.name === name);
-  const file = declared?.asset?.file;
   const stored = declared?.asset?.ref;
   const awaited = Boolean(declared) && !declared?.asset;
   React.useEffect(() => {
@@ -107,12 +109,12 @@ const useAsset = (dependency: string, name: string): BlokAsset => {
   }, [awaited, startPolling, stopPolling]);
 
   const load = React.useCallback(async (): Promise<BlokAssetBytes> => {
-    if (!file || !stored) throw new Error('This asset is not stored.');
+    if (!stored) throw new Error('This asset is not stored.');
     return modelBytes(stored, async () => {
       if (!datalayer) throw new Error('This deployment has no asset store to fetch the model from.');
-      return assetUrl(file, client, datalayer);
+      return assetUrl(stored, client, datalayer);
     });
-  }, [client, datalayer, file, stored]);
+  }, [client, datalayer, stored]);
 
   return React.useMemo<BlokAsset>(() => {
     if (!name) return {status: 'unknown', reason: 'No asset is named.'};

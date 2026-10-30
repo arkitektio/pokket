@@ -15,3 +15,13 @@ query DetailImplementation($id: ID!) {
     ...DetailImplementation
   }
 }
+
+# The @rekuest/agent picker (a blok's StructurePicker). `$requires` is a port's
+# descriptor constraints, handed on unchanged (the only descriptor of an agent
+# is @rekuest/supervisor).
+query AgentOptions($search: String, $values: [ID!], $requires: [RequiresInput!]) {
+  options: agents(filters: { search: $search, ids: $values, requires: $requires }, pagination: { limit: 25 }) {
+    value: id
+    label: name
+  }
+}

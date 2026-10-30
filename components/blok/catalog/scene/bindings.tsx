@@ -7,20 +7,14 @@ import {useFrame, useThree} from '@react-three/fiber';
 import {clipMotion, initialMotion, isMotionSettled, stepMotion, stillMotion, type MotionState} from '@/lib/scene/motion';
 import {parseAxis, toBaseUnit, wavelengthToColor, type Dimension} from '@/lib/scene/units';
 import {parseNodeAddress} from '@/lib/scene/writers';
-import {useBlok, useValue, type BlokRenderArgs} from '@/lib/ports/blok/runtime';
+import {useBlok, useValue, type BlokRender} from '@arkitektio/bsx/runtime';
 import {useModel, useSceneModelKey, useSceneNotice, useSceneState, type ModelContextValue} from './context';
+import {useThemeColour} from './colour';
 import {useBlokSceneStill} from './host';
 import {ownMaterials} from '@/lib/scene/loadModel';
-import {
-  animateSchema,
-  attachSchema,
-  beamSchema,
-  glowSchema,
-  moveSchema,
-  rotateSchema,
-  showSchema,
-  tintSchema,
-} from './schemas';
+import type {sceneCatalog} from '@arkitektio/bsx/catalogs';
+
+type Scene = typeof sceneCatalog.components;
 
 /**
  * orkestrator's `bloks/scene/bindings.tsx`. The scene draws on demand, so a
@@ -32,6 +26,14 @@ import {
 const useNode = (name: string | undefined): THREE.Object3D | undefined => {
   const model = useModel();
   const node = name ? model.instance.nodes.get(name) : undefined;
+  useSceneNotice(name && !node ? 'Unknown node' : null, `The model has no node '${name}'.`);
+  return node;
+};
+
+/** The node a binding names, or the whole model when it names none. */
+const useNodeOrRoot = (name: string | undefined): THREE.Object3D | undefined => {
+  const model = useModel();
+  const node = name ? model.instance.nodes.get(name) : model.instance.root;
   useSceneNotice(name && !node ? 'Unknown node' : null, `The model has no node '${name}'.`);
   return node;
 };
@@ -134,8 +136,8 @@ const useMotionBinding = (
   );
 };
 
-const motionRender = (schema: typeof moveSchema, dimension: Dimension) =>
-  function MotionBinding({component}: BlokRenderArgs<typeof moveSchema>) {
+const motionRender = (dimension: Dimension): BlokRender<Scene['Move']> =>
+  function MotionBinding({component, schema}) {
     const blok = useBlok(component, schema);
     useMotionBinding(
       useModel(),
@@ -156,36 +158,36 @@ const motionRender = (schema: typeof moveSchema, dimension: Dimension) =>
     return null;
   };
 
-export const MoveRender = motionRender(moveSchema, 'length');
-export const RotateRender = motionRender(rotateSchema, 'angle');
+export const MoveRender = motionRender('length');
+export const RotateRender = motionRender('angle');
 
-export const ShowRender = ({component}: BlokRenderArgs<typeof showSchema>) => {
-  const blok = useBlok(component, showSchema);
+export const VisibleRender: BlokRender<Scene['Visible']> = ({component, schema}) => {
+  const blok = useBlok(component, schema);
   const node = useNode(useValue(blok.node));
-  const when = useValue(blok.when);
+  const on = useValue(blok.on);
   const invalidate = useThree(three => three.invalidate);
   React.useEffect(() => {
     if (!node) return;
     const authored = node.visible;
-    node.visible = when ?? authored;
+    node.visible = on ?? authored;
     invalidate();
     return () => {
       node.visible = authored;
       invalidate();
     };
-  }, [invalidate, node, when]);
+  }, [invalidate, node, on]);
   return null;
 };
 
 type Emissive = THREE.Material & {emissive?: THREE.Color; emissiveIntensity?: number};
 type Colored = THREE.Material & {color?: THREE.Color};
 
-export const GlowRender = ({component}: BlokRenderArgs<typeof glowSchema>) => {
-  const blok = useBlok(component, glowSchema);
-  const node = useNode(useValue(blok.node));
+export const GlowRender: BlokRender<Scene['Glow']> = ({component, schema}) => {
+  const blok = useBlok(component, schema);
+  const node = useNodeOrRoot(useValue(blok.node));
   const on = useValue(blok.on) ?? false;
   const intensity = useValue(blok.intensity);
-  const color = useValue(blok.color);
+  const color = useThemeColour(useValue(blok.color));
   const invalidate = useThree(three => three.invalidate);
   React.useEffect(() => {
     if (!node) return;
@@ -225,10 +227,10 @@ export const GlowRender = ({component}: BlokRenderArgs<typeof glowSchema>) => {
   return null;
 };
 
-export const TintRender = ({component}: BlokRenderArgs<typeof tintSchema>) => {
-  const blok = useBlok(component, tintSchema);
+export const TintRender: BlokRender<Scene['Tint']> = ({component, schema}) => {
+  const blok = useBlok(component, schema);
   const node = useNode(useValue(blok.node));
-  const color = useValue(blok.color);
+  const color = useThemeColour(useValue(blok.color));
   const invalidate = useThree(three => three.invalidate);
   React.useEffect(() => {
     if (!node || !color) return;
@@ -247,23 +249,23 @@ export const TintRender = ({component}: BlokRenderArgs<typeof tintSchema>) => {
   return null;
 };
 
-export const AttachRender = ({component}: BlokRenderArgs<typeof attachSchema>) => {
-  const blok = useBlok(component, attachSchema);
+export const AttachRender: BlokRender<Scene['Attach']> = ({component, schema}) => {
+  const blok = useBlok(component, schema);
   const model = useModel();
   const node = useNode(useValue(blok.node));
   const target = useAddressedNode(useValue(blok.to));
-  const when = useValue(blok.when) ?? false;
+  const on = useValue(blok.on) ?? false;
   const invalidate = useThree(three => three.invalidate);
   React.useEffect(() => {
     const home = node ? model.instance.rest.get(node)?.parent : undefined;
-    if (!node || !target || !home || !when) return;
+    if (!node || !target || !home || !on) return;
     target.attach(node);
     invalidate();
     return () => {
       home.attach(node);
       invalidate();
     };
-  }, [invalidate, model, node, target, when]);
+  }, [invalidate, model, node, target, on]);
   return null;
 };
 
@@ -272,14 +274,14 @@ const to = new THREE.Vector3();
 const up = new THREE.Vector3(0, 1, 0);
 const orientation = new THREE.Quaternion();
 
-export const BeamRender = ({component}: BlokRenderArgs<typeof beamSchema>) => {
-  const blok = useBlok(component, beamSchema);
+export const BeamRender: BlokRender<Scene['Beam']> = ({component, schema}) => {
+  const blok = useBlok(component, schema);
   const start = useNode(useValue(blok.start));
   const end = useAddressedNode(useValue(blok.end));
   const length = useValue(blok.length);
   const on = useValue(blok.on) ?? true;
   const wavelength = useValue(blok.wavelength);
-  const color = useValue(blok.color) ?? (wavelength ? wavelengthToColor(wavelength) : '#ff3b30');
+  const color = useThemeColour(useValue(blok.color)) ?? (wavelength ? wavelengthToColor(wavelength) : '#ff3b30');
   const width = useValue(blok.width) ?? 0.002;
   const mesh = React.useRef<THREE.Mesh>(null);
   // It follows its anchors in the frames they move in; a change of its own asks for one.
@@ -315,8 +317,8 @@ export const BeamRender = ({component}: BlokRenderArgs<typeof beamSchema>) => {
   );
 };
 
-export const AnimateRender = ({component}: BlokRenderArgs<typeof animateSchema>) => {
-  const blok = useBlok(component, animateSchema);
+export const AnimateRender: BlokRender<Scene['Animate']> = ({component, schema}) => {
+  const blok = useBlok(component, schema);
   const model = useModel();
   const clipName = useValue(blok.clip);
   const progress = useValue(blok.progress);

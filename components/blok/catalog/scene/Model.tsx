@@ -9,8 +9,9 @@ import {
   useEventAction,
   useValue,
   type BlokComponentNode,
+  type BlokRender,
   type BlokRenderArgs,
-} from '@/lib/ports/blok/runtime';
+} from '@arkitektio/bsx/runtime';
 import {resolveJoints} from '@/lib/scene/joints';
 import {instantiate, loadModel, type ModelInstance} from '@/lib/scene/loadModel';
 import {initialMotion, isMotionSettled, stepMotion, stillMotion, type MotionState} from '@/lib/scene/motion';
@@ -20,6 +21,7 @@ import {RangeSlider} from '../forms';
 import {
   ModelProvider,
   useSceneModelKey,
+  useSceneOwner,
   useSceneNotice,
   useSceneOverlay,
   useSceneStoreApi,
@@ -27,7 +29,10 @@ import {
   type ModelContextValue,
 } from './context';
 import {useBlokSceneHost, useBlokSceneInert, useBlokSceneStill, type BlokModelDecoration} from './host';
-import {modelSchema, robotSchema} from './schemas';
+import {sceneCatalog} from '@arkitektio/bsx/catalogs';
+import {isExplicitId} from '@arkitektio/bsx/spec/vocabulary';
+
+type Scene = typeof sceneCatalog.components;
 
 /**
  * orkestrator's `bloks/scene/Model.tsx`, for a touch screen: a part is used
@@ -205,7 +210,7 @@ const turn = new THREE.Quaternion();
 
 /** Applies the joint state map to the pivot nodes, frame by frame while a joint is on its way. */
 const JointDriver = ({component, model}: {component: BlokComponentNode; model: ModelContextValue}) => {
-  const blok = useBlok(component, robotSchema);
+  const blok = useBlok(component, sceneCatalog.components.Robot.schema);
   const joints = useValue(blok.joints);
   const animateTo = useValue(blok.animateTo);
   const speed = useValue(blok.speed);
@@ -356,6 +361,15 @@ const LoadedModel = ({
     return () => store.getState().setModel(key, null);
   }, [id, instance, modelKey, store]);
 
+  // Who the model stands for (an agent, in a space): an overlay anchored there binds to it.
+  const owner = useSceneOwner();
+  const ownedKey = React.useId();
+  React.useEffect(() => {
+    if (!owner) return;
+    store.getState().setOwnedModel(owner, ownedKey, model);
+    return () => store.getState().setOwnedModel(owner, ownedKey, null);
+  }, [model, owner, ownedKey, store]);
+
   const placedKey = React.useId();
   React.useEffect(() => {
     store.getState().setPlaced(placedKey, instance.root);
@@ -415,8 +429,9 @@ const LoadedModel = ({
 };
 
 const ModelBody = ({component, buildChild, robot}: Pick<BlokRenderArgs, 'component' | 'buildChild'> & {robot: boolean}) => {
-  const blok = useBlok(component, modelSchema);
-  const id = useValue(blok.id);
+  const blok = useBlok(component, sceneCatalog.components.Model.schema);
+  // Other models address this one by its explicit node id, as in to="arm:tool0".
+  const id = isExplicitId(component.id) ? component.id : undefined;
   const origin = parseVector(useValue(blok.origin)) ?? [0, 0, 0];
   const rotation = parseVector(useValue(blok.rotation)) ?? [0, 0, 0];
   const scale = useValue(blok.scale) ?? 1;
@@ -445,7 +460,7 @@ const ModelBody = ({component, buildChild, robot}: Pick<BlokRenderArgs, 'compone
   const current = load && loaded.reference === reference ? loaded : undefined;
   const reason =
     asset === null
-      ? 'A model names an asset its app registered: src="@self.assets.<name>".'
+      ? 'A model names an asset its app registered: src={self.assets.<name>}.'
       : asset.status === 'unknown'
         ? asset.reason
         : asset.status === 'awaited'
@@ -474,10 +489,10 @@ const ModelBody = ({component, buildChild, robot}: Pick<BlokRenderArgs, 'compone
   );
 };
 
-export const ModelRender = ({component, buildChild}: BlokRenderArgs<typeof modelSchema>) => (
+export const ModelRender: BlokRender<Scene['Model']> = ({component, buildChild}) => (
   <ModelBody component={component} buildChild={buildChild} robot={false} />
 );
 
-export const RobotRender = ({component, buildChild}: BlokRenderArgs<typeof robotSchema>) => (
+export const RobotRender: BlokRender<Scene['Robot']> = ({component, buildChild}) => (
   <ModelBody component={component} buildChild={buildChild} robot />
 );

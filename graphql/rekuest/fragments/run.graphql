@@ -1,0 +1,116 @@
+# An action's own blok for one context (`Task.actionBloks`): how a client shows
+# a run of the action. It names devices only by the action's dependency keys;
+# a run binds them through `Task.dependencyAgents`.
+fragment ActionBlok on ActionBlok {
+  id
+  context
+  blok {
+    id
+    context
+    heldByAction
+    ...BlokContent
+  }
+}
+
+# The agent a run got for one dependency key; a key bound to several agents
+# comes once per agent.
+fragment TaskDependencyAgent on TaskDependencyAgent {
+  key
+  agent {
+    id
+    name
+    connected
+  }
+}
+
+# An event as a run's blok reads it: what it reports, and (HELD / DECIDED) the
+# ask it opens or closes, in `value`.
+fragment RunTaskEvent on TaskEvent {
+  id
+  kind
+  message
+  progress
+  returns
+  value
+  createdAt
+  task {
+    id
+  }
+}
+
+# A run as its action's bloks draw it: what it reports (`task`), its open asks,
+# the agent that runs it (`self`), the agents its keys are bound to, and the
+# space it was started in.
+fragment RunTask on Task {
+  id
+  args
+  latestEventKind
+  latestProgress
+  latestMessage
+  latestReturns
+  isDone
+  events(ordering: [{ createdAt: DESC }]) {
+    ...RunTaskEvent
+  }
+  action {
+    id
+    name
+  }
+  implementation {
+    id
+    agent {
+      id
+      name
+      connected
+    }
+  }
+  actionBloks {
+    ...ActionBlok
+  }
+  dependencyAgents {
+    ...TaskDependencyAgent
+  }
+  space {
+    id
+    name
+  }
+}
+
+# A blok a task showed a person: an ask (waiting, answered, dismissed, gone) or an inform.
+fragment TaskBlok on TaskBlok {
+  role
+  status
+  message
+  values
+  decidedBy
+  createdAt
+  materializedBlok {
+    ...MaterializedBlok
+  }
+}
+
+# A run of an implementation as a blok's `deps.<key>.tasks.<action>` reads it
+# at a moment in the past: when it started, and what it reported when.
+fragment PastTask on Task {
+  id
+  createdAt
+  implementation {
+    id
+  }
+  events(ordering: [{ createdAt: DESC }]) {
+    id
+    kind
+    message
+    progress
+    returns
+    createdAt
+  }
+}
+
+# A space that places some of the agents asked about, and how many.
+fragment SpaceForAgents on SpaceForAgents {
+  placed
+  space {
+    ...ListSpace
+  }
+}
