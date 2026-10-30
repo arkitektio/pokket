@@ -8,6 +8,7 @@ import '@/lib/timeline/backgroundBackup';
 
 import { CallBar } from '@/components/calls/CallBar';
 import { DeepLinkGate } from '@/components/deeplink/DeepLinkGate';
+import { ShareGate } from '@/components/share/ShareGate';
 import { AlertDialogProvider } from '@/components/ui/alert-dialog';
 import { ProfileIdentitySync } from '@/components/profile/ProfileIdentitySync';
 import { TabsProvider } from '@/lib/tabs/TabsProvider';
@@ -66,6 +67,8 @@ export const AppLayout = () => {
         <Stack.Screen name="(app)" options={{ headerShown: false, title: "Orkestrator" }} />
         {/* Search: the palette, over everything. */}
         <Stack.Screen name="search" options={{ headerShown: false, presentation: 'fullScreenModal', animation: 'fade' }} />
+        {/* Files shared to the app from another one, over everything. */}
+        <Stack.Screen name="share" options={{ headerShown: false, presentation: 'fullScreenModal' }} />
       </Stack.Protected>
       <Stack.Protected guard={!isLoggedIn} >
         <Stack.Screen name="login" options={{ headerShown: false }} />
@@ -114,6 +117,7 @@ export default function RootLayout() {
               <AppLayout />
               {/* Opens the link the app was launched with, in the organization it belongs to. */}
               <DeepLinkGate />
+              <ShareGate />
             </TabsProvider>
             <ProfileIdentitySync />
             {/* Silent, and only while push is switched on in Settings. */}

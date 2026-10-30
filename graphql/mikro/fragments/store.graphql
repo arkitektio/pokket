@@ -35,3 +35,16 @@ fragment BigFileAccessGrant on BigFileAccessGrant {
   key
   bucket
 }
+
+# The right to write one new object, asked for when uploading a file.
+fragment BigFileUploadGrant on BigFileUploadGrant {
+  accessKey
+  secretKey
+  sessionToken
+  expiresIn
+  region
+  maxBytes
+  bucket
+  key
+  store
+}

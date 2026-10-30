@@ -3,7 +3,7 @@ import { sha256 } from "@noble/hashes/sha256";
 import { bytesToHex, utf8ToBytes } from "@noble/hashes/utils";
 
 /**
- * SigV4 presigned GET urls for datalayer objects, as orkestrator's
+ * SigV4 presigned urls for datalayer objects, as orkestrator's
  * `core/data/zarr/runner/s3-request.ts` makes them. A presigned url carries
  * its signature in the query, so an `<Image>` or a download can fetch it with
  * no headers of its own.
@@ -25,6 +25,8 @@ export type PresignInput = {
   /** When the signature starts being valid. */
   at: Date;
   expiresSeconds: number;
+  /** What the url allows: reading the object, or writing it. */
+  method?: "GET" | "PUT";
 };
 
 /** What MinIO and the datalayer answer to when a grant names no region. */
@@ -62,7 +64,7 @@ const signingKey = (secretKey: string, day: string, region: string): Uint8Array 
   );
 
 /** The object's path and signed query: append it to whichever origin reaches the store. */
-export const presignPathAndQuery = ({ url, credentials, at, expiresSeconds }: PresignInput): string => {
+export const presignPathAndQuery = ({ url, credentials, at, expiresSeconds, method = "GET" }: PresignInput): string => {
   const { host, path } = splitUrl(url);
   const region = credentials.region || DEFAULT_REGION;
   const timestamp = amzTimestamp(at);
@@ -86,7 +88,7 @@ export const presignPathAndQuery = ({ url, credentials, at, expiresSeconds }: Pr
     .map(([key, value]) => `${key}=${value}`)
     .join("&");
 
-  const request = ["GET", wirePath, query, `host:${host}\n`, "host", "UNSIGNED-PAYLOAD"].join("\n");
+  const request = [method, wirePath, query, `host:${host}\n`, "host", "UNSIGNED-PAYLOAD"].join("\n");
   const toSign = ["AWS4-HMAC-SHA256", timestamp, scope, bytesToHex(sha256(utf8ToBytes(request)))].join("\n");
   const signature = bytesToHex(hmac(sha256, signingKey(credentials.secretKey, day, region), utf8ToBytes(toSign)));
 

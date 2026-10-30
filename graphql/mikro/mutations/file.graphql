@@ -1,0 +1,19 @@
+mutation RequestBigfileUpload($input: RequestBigFileUploadInput!) {
+  requestBigfileUpload(input: $input) {
+    ...BigFileUploadGrant
+  }
+}
+
+mutation FinishBigfileUpload($input: FinishBigFileUploadInput!) {
+  finishBigfileUpload(input: $input) {
+    id
+  }
+}
+
+# `file` is the store id of a finished upload. Without a folder, the file goes
+# to the organization's default one.
+mutation FromFileLike($file: FileLike!, $name: String!, $folder: ID) {
+  fromFileLike(input: { file: $file, fileName: $name, folder: $folder }) {
+    ...ListFile
+  }
+}

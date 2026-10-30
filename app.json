@@ -90,7 +90,7 @@
         }
       ],
       "expo-secure-store",
-      "expo-sharing",
+      "./plugins/withShareInto.js",
       "@maplibre/maplibre-react-native",
       "react-native-webgpu"
     ],

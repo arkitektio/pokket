@@ -88,6 +88,8 @@ const screenOptions = ({ route, navigation }: Screen) => {
   const back = navigation.canGoBack();
   const menu = <MenuButton onPress={() => drawerOf(navigation)?.openDrawer()} />;
   return {
+    // On iOS 26 and later a header is otherwise see-through, with the page under it.
+    headerTransparent: false,
     headerLeft:
       route.name in PAGES
         ? () => (
