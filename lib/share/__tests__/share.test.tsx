@@ -7,6 +7,11 @@ import { discardSharedFiles, openSharedFile, sharedFiles, type SharedFile } from
 import { clearPendingShare, isShareLink, rememberPendingShare, usePendingShare } from "../pending";
 import { useShareUploads } from "../useShareUploads";
 
+jest.mock("expo-notifications", () => ({
+  getPermissionsAsync: jest.fn(async () => ({ status: "granted", canAskAgain: true })),
+  requestPermissionsAsync: jest.fn(async () => ({ status: "granted" })),
+}));
+
 const mockDisk = new Map<string, number>();
 const mockDeleted: string[] = [];
 

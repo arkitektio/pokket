@@ -1,0 +1,10 @@
+{
+  "name": "pokket-upload",
+  "version": "0.1.0",
+  "private": true,
+  "description": "pokket's upload service: the Android foreground service that keeps files uploading while the app is in the background.",
+  "main": "index.ts",
+  "license": "MIT",
+  "author": "arkitektio",
+  "homepage": "https://github.com/arkitektio/pokket"
+}
