@@ -30,7 +30,7 @@ export const RunAsk = ({task}: {task: RunTaskFragment}) => {
 };
 
 /**
- * The run host the run components (`Anchor`, `Route`, `ask`) read, for `run`.
+ * The run host the run components (`Placed`, `Route`, `ask`) read, for `run`.
  * `showAsk: false` leaves `ask` empty where the screen shows the run's asks already.
  */
 export const useRunHost = (run: ActionBlokRun, showAsk = true): BlokRunHost => {
@@ -78,7 +78,7 @@ type ActionBlokRendererProps = {
   run: ActionBlokRun;
   /** Whether `ask` shows the run's open ask; off where the screen shows it already. */
   showAsk?: boolean;
-  /** `none`: drawn into a scene that is already open (an overlay in a space). */
+  /** `none`: drawn into a scene that is already open (a run's `Space` in the space screen). */
   chrome?: 'default' | 'none';
 };
 

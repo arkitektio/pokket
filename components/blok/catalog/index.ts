@@ -58,6 +58,7 @@ import {
   FlexRender,
   GridRender,
   RowRender,
+  ListRender,
   ScrollAreaRender,
   SeparatorRender,
   SpacerRender,
@@ -116,13 +117,13 @@ import {OutcomeSlotRender, ToastRender} from './toast';
 import {HeadingRender, KbdRender, MarkdownRender, TextRender, TimeRender} from './typography';
 
 /**
- * What pokket draws (orkestrator `renderer/catalog.tsx`): the spec's global
- * catalogs, rendered with React Native. `ui@1`, `html@1`, `logo@1`, `scene@1`
- * and `structure@1` are drawn whole, so pokket claims them; of `shadcn@1` only
- * the few families a phone has an answer for, so a blok naming the rest
- * (sheets, menus, charts, resizable panels…) still renders, with an "Unknown
- * component" card in that node's place. Pokket's own catalog holds what no
- * global one does: lovekit streams.
+ * What pokket draws (orkestrator `core/blok/catalog.tsx`): the base catalog,
+ * rendered with React Native. Its `ui`, `html`, `logo`, `scene` and
+ * `structure` families are drawn whole; of the `shadcn` family only what a
+ * phone has an answer for yet, so a blok naming the rest (sheets, menus,
+ * charts, resizable panels…) still renders, with an "Unknown component" card
+ * in that node's place. Pokket's own catalog holds what the base does not:
+ * lovekit streams.
  *
  * The SVG components (`logo.tsx`) draw logo bloks: an agent's, an action's.
  * The 3D components (`scene/`) draw scene bloks with three.js on WebGPU.
@@ -175,6 +176,7 @@ export const pokketBlokUi = declareBlokUi({
       RadioGroup: RadioGroupRender,
       RadioGroupItem: RadioGroupItemRender,
       Row: RowRender,
+      List: ListRender,
       ScrollArea: ScrollAreaRender,
       Select: SelectRender,
       SelectContent: SelectContentRender,

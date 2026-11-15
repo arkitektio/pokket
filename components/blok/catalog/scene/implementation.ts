@@ -16,4 +16,4 @@ export {OnClickRender, PopoutRender} from './interaction';
 export {ModelRender, RobotRender} from './Model';
 export {SceneRender, SceneSurface} from './Scene';
 export {TransformRender} from './Transform';
-export {AnchorRender, RouteRender} from '../run/render';
+export {PlacedRender, RouteRender, SpaceRender} from '../run/render';

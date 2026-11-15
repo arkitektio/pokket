@@ -191,6 +191,31 @@ export const AspectRatioRender: BlokRender<Shadcn['AspectRatio']> = ({buildChild
   );
 };
 
+/**
+ * A long list. Its rows are what a `foreach` draws straight into it. Here they
+ * scroll, and the rows off the screen are detached from the view hierarchy
+ * (`removeClippedSubviews`); they are still mounted, so a list of many
+ * thousands wants a window of its own, which the language does not give a
+ * renderer yet.
+ */
+export const ListRender: BlokRender<Ui['List']> = ({buildChild, component, schema}) => {
+  const blok = useBlok(component, schema);
+  const children = useValue(blok.children);
+  const className = useValue(blok.className);
+  const height = useValue(blok.height);
+
+  return (
+    <ScrollView
+      className={className}
+      style={height === undefined ? {flex: 1} : {height: cssLength(height)}}
+      removeClippedSubviews
+      nestedScrollEnabled
+    >
+      {renderChildList(children, buildChild)}
+    </ScrollView>
+  );
+};
+
 export const ScrollAreaRender: BlokRender<Ui['ScrollArea']> = ({buildChild, component, schema}) => {
   const blok = useBlok(component, schema);
   const children = useValue(blok.children);

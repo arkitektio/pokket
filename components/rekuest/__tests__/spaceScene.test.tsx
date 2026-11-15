@@ -2,7 +2,7 @@ import {describe, expect, it, jest} from '@jest/globals';
 import * as React from 'react';
 import {GestureHandlerRootView} from 'react-native-gesture-handler';
 import {act} from 'react-test-renderer';
-import {resolveAnchors, routePoints} from '@/components/blok/catalog/run/math';
+import {routePoints} from '@/components/blok/catalog/run/math';
 import {shownTexts} from '@/components/blok/testing';
 import {ComponentContext, type SpaceFragment} from '@/lib/rekuest/api/graphql';
 import {SpaceScene, spaceHostOf, standingsOf} from '../space/SpaceScene';
@@ -54,23 +54,21 @@ describe('a space', () => {
     ]);
   });
 
-  it("anchors a run's devices at their placements, and trays one it does not place", () => {
+  it("is the room a run's Space is drawn into: its devices where they stand here, none drawn twice", () => {
     const host = spaceHostOf(space.placements);
-    const anchors = resolveAnchors(
-      [
-        {id: 'a1', name: 'arm'},
-        {id: 'a9', name: 'elsewhere'},
-      ],
-      host.placementOf,
-    );
-    expect(anchors.placed.map(({agent, matrix}) => [agent.id, matrix.elements[12]])).toEqual([['a1', 1]]);
-    expect(anchors.unplaced.map(agent => agent.id)).toEqual(['a9']);
+    const room = host.useRoom('room:any');
+    expect(room.poseOf('a1')?.[0][3]).toBe(1);
+    // A placement without a matrix, and an agent this space does not place: the blok's own `Placed` decides.
+    expect([room.poseOf('a3'), room.poseOf('a9')]).toEqual([null, null]);
+    // Nothing is arranged on the phone, and the space draws each device itself.
+    expect([room.save, room.reset]).toEqual([undefined, undefined]);
+    expect(host.renderAgent('a1', null)).toBeNull();
 
     const byKey = new Map([
       ['robot', [{id: 'a1', name: 'arm'}]],
       ['stitch', [{id: 'a2', name: 'stitcher'}]],
     ]);
-    const points = routePoints(['robot', 'stitch'], key => byKey.get(key) ?? [], host.placementOf);
+    const points = routePoints(['robot', 'stitch'], key => byKey.get(key) ?? [], room.poseOf);
     expect(points.map(point => point.x)).toEqual([1, 2]);
   });
 

@@ -1,7 +1,7 @@
 import {Matrix4, Quaternion, Vector3} from 'three';
 import {describe, expect, it} from '@jest/globals';
 import {fromMatrix4} from '../catalog/scene/affine';
-import {progressFraction, resolveAnchors, ROUTE_LIFT, routePoints, splitRoute, throughKeys} from '../catalog/run/math';
+import {progressFraction, ROUTE_LIFT, routePoints, splitRoute, throughKeys} from '../catalog/run/math';
 
 const arm = {id: 'a1', name: 'Arm'};
 const ot2 = {id: 'a2', name: 'OT-2'};
@@ -13,29 +13,6 @@ const turned = fromMatrix4(
 );
 const placements: Record<string, unknown> = {a1: turned, a2: fromMatrix4(new Matrix4().setPosition(3, 0, 0))};
 const placementOf = (id: string) => placements[id] ?? null;
-
-describe('where an At draws', () => {
-  it('stands at the placement of each placed agent, turned as it is', () => {
-    const {placed, unplaced} = resolveAnchors([arm], placementOf);
-    expect(unplaced).toEqual([]);
-    expect(placed).toHaveLength(1);
-    const position = new Vector3();
-    const rotation = new Quaternion();
-    placed[0].matrix.decompose(position, rotation, new Vector3());
-    expect(position.toArray()).toEqual([1, 0, 2]);
-    expect(rotation.angleTo(new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), Math.PI / 2))).toBeCloseTo(0);
-  });
-
-  it('sends an agent the space does not place to the tray', () => {
-    const {placed, unplaced} = resolveAnchors([arm, scope], placementOf);
-    expect(placed.map(anchor => anchor.agent)).toEqual([arm]);
-    expect(unplaced).toEqual([scope]);
-  });
-
-  it('draws at every agent of a key bound to several', () => {
-    expect(resolveAnchors([arm, ot2], placementOf).placed.map(anchor => anchor.agent.id)).toEqual(['a1', 'a2']);
-  });
-});
 
 describe('the keys a Route runs through', () => {
   it('reads them as BSX writes a list, as JSON, as plain text, or as a list', () => {

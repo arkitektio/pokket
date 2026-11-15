@@ -1,7 +1,7 @@
 import * as React from 'react';
 import * as THREE from 'three';
 import {View} from 'react-native';
-import {BlokSpaceHostProvider, type BlokSpaceHost} from '@/components/blok/catalog/run/host';
+import {BlokSpaceHostProvider, type BlokPose, type BlokRoom, type BlokSpaceHost} from '@/components/blok/catalog/run/host';
 import {toMatrix4} from '@/components/blok/catalog/scene/affine';
 import {SceneModelScopeProvider, SceneOwnerProvider, useSceneNotice, useSceneOverlay} from '@/components/blok/catalog/scene/context';
 import {BlokSceneInertProvider} from '@/components/blok/catalog/scene/host';
@@ -27,8 +27,8 @@ import {ActionBlokRenderer, RunHost} from '../run/ActionBlokRenderer';
  * What stands in it are 3D views: materialized bloks of the scene context.
  * Every one of them is rendered into the room's single scene, where its
  * `Scene` root only contributes what it holds, moved to where its placement
- * stands. A run of an action hosted here draws its action's `overlay` blok
- * over the agents it got, at their placements.
+ * stands. A run of an action hosted here draws its action's `Space` blok into
+ * this room, over the agents it got, where they stand here.
  */
 
 /** The edge of the box that stands in for a placement with nothing to show, in meters. */
@@ -85,10 +85,23 @@ export const standingsOf = (space: {
   ),
 ];
 
-/** Where each agent stands in the space, for an overlay's `Anchor` and `Route`. */
+const isPose = (value: unknown): value is BlokPose =>
+  Array.isArray(value) &&
+  value.length === 4 &&
+  value.every(row => Array.isArray(row) && row.length === 4 && row.every(cell => typeof cell === 'number'));
+
+/**
+ * The room a run's `Space` blok is drawn into here: this space, whatever room
+ * the blok names. A device stands where this space places it, and the space
+ * draws every device itself, so a `Placed` draws none again: it binds what it
+ * holds to the model that is already there. Nothing is arranged on the phone.
+ */
 export const spaceHostOf = (placements: readonly Pick<SpacePlacementFragment, 'agent' | 'affineMatrix'>[]): BlokSpaceHost => {
-  const byAgent = new Map(placements.map(placement => [placement.agent.id, placement.affineMatrix] as const));
-  return {placementOf: agentId => byAgent.get(agentId) ?? null};
+  const byAgent = new Map(
+    placements.flatMap(placement => (isPose(placement.affineMatrix) ? [[placement.agent.id, placement.affineMatrix] as const] : [])),
+  );
+  const room: BlokRoom = {poseOf: agentId => byAgent.get(agentId) ?? null};
+  return {useRoom: () => room, renderAgent: () => null};
 };
 
 const Marker = ({title, detail}: {title: string; detail: string}) => {
@@ -119,7 +132,7 @@ const Placed = ({item}: {item: Standing}) => {
   return (
     <group ref={setGroup} name={item.key}>
       {item.view ? (
-        // Its models stand for its agent: an overlay anchored at the agent binds to them.
+        // Its models stand for its agent: a run's `Placed` for that agent binds to them.
         <SceneOwnerProvider value={item.agentId}>
           {/* Two identical devices name their models alike: each view keeps its own. */}
           <SceneModelScopeProvider value={`${item.key}/`}>
@@ -134,8 +147,8 @@ const Placed = ({item}: {item: Standing}) => {
 };
 
 /**
- * The run layer: the overlay of the action a run belongs to, drawn over the
- * agents placed here, in the room's own coordinates.
+ * The run layer: the `Space` blok of the action a run belongs to, drawn over
+ * the agents placed here, in the room's own coordinates.
  */
 const RunLayer = ({run}: {run: SpaceRun}) => (
   <SceneModelScopeProvider value={`run:${run.run.task.id}/`}>

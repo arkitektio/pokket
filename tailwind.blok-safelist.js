@@ -7,8 +7,12 @@
  * list compiles the vocabulary blok authors reach for regardless.
  *
  * Only utilities React Native can draw are listed: no `grid-cols-*`,
- * `space-*`, `hover:` or breakpoints. A blok's typed props (`padding`,
- * `gap`, `tone`, …) remain the portable way to style it.
+ * `hover:` or breakpoints. A blok's typed props (`padding`, `gap`, `tone`, …)
+ * remain the portable way to style it.
+ *
+ * Two things no list can hold are translated when a blok is drawn instead
+ * (`components/blok/classes.ts`): a value in brackets (`w-[12rem]`,
+ * `bg-[#1e293b]`) and `space-x-*` / `space-y-*`.
  *
  * Test: components/blok/__tests__/tailwindSafelist.test.ts
  */

@@ -40,7 +40,7 @@ function SpaceContent({ id, taskId }: { id: string; taskId: string | null }) {
   useTabTitle(space?.name);
   // Followed here: the run may be someone else's, which no stream of ours carries.
   const { task } = useRunTask(taskId, { follow: true });
-  const run = useTaskActionBlok(task, ComponentContext.Overlay);
+  const run = useTaskActionBlok(task, ComponentContext.Scene);
   const agentNames = React.useMemo(
     () => new Map((space?.placements ?? []).map((placement) => [placement.agent.id, placement.agent.name] as const)),
     [space?.placements],

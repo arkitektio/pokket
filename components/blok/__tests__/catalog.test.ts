@@ -1,7 +1,8 @@
 import {describe, expect, it, jest} from '@jest/globals';
 import * as z from 'zod';
 import {isActionSchema} from '@arkitektio/bsx/runtime';
-import {baseCatalog, defaultBlokView, standardCatalog} from '@arkitektio/bsx/spec/catalogs';
+import {baseCatalog, defaultBlokView} from '@arkitektio/bsx/spec/catalogs';
+import {pokketBlokUi} from '../catalog';
 import {pokketBlokCatalog} from '../catalog';
 
 jest.mock('sonner-native', () => ({toast: {info: jest.fn(), error: jest.fn(), success: jest.fn()}}));
@@ -12,28 +13,28 @@ jest.mock('@rn-primitives/slot', () => {
 
 /**
  * Orkestrator's `bloks/catalog.test.ts`, for what pokket draws: every
- * component is the spec's (a standard catalog's, or the orkestrator module's,
- * for the few of its extras pokket draws too), with the spec's props, and the
- * language and the catalogs a phone renders whole are complete.
+ * component is the spec's (the base catalog's), with the spec's props, and the
+ * families of the base catalog a phone renders whole are complete.
  */
 
 const components = [...pokketBlokCatalog.components.values()];
 
-/** Standard catalogs pokket implements in full. */
-const COMPLETE = ['html', 'ui', 'logo', 'scene', 'structure'] as const;
+/** The families of the base catalog pokket draws in full; of `shadcn` only what a phone has an answer for. */
+const COMPLETE = ['language', 'run', 'html', 'ui', 'logo', 'scene', 'structure'] as const;
 
 /** Pokket's own components, beyond the spec: lovekit streams. */
 const POKKET_OWN = new Set(['StreamRender']);
 
 describe('the blok catalog', () => {
-  it('implements the language (base@2) whole', () => {
-    const missing = baseCatalog().components.filter(component => !pokketBlokCatalog.components.has(component.name));
+  it.each(COMPLETE)('draws every component of the %s family of the base catalog', name => {
+    const missing = baseCatalog().components.filter(component => component.group === name && !pokketBlokCatalog.components.has(component.name));
     expect(missing.map(component => component.name)).toEqual([]);
   });
 
-  it.each(COMPLETE)('implements every component of %s@1', name => {
-    const missing = standardCatalog(name).components.filter(component => !pokketBlokCatalog.components.has(component.name));
-    expect(missing.map(component => component.name)).toEqual([]);
+  it('draws the base catalog whole where a phone can: scenes and logos, not yet every html component', () => {
+    // The shadcn family is drawn in part (sheets, menus and charts have no answer here yet), so html is not whole.
+    expect(pokketBlokUi.contexts).toEqual(['SCENE', 'LOGO']);
+    expect(pokketBlokUi.claims).toEqual(['base@3']);
   });
 
   it('draws nothing the spec does not hold, with every prop the spec gives it', () => {

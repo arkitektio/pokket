@@ -73,23 +73,23 @@ describe('bloks drawn into a room', () => {
     act(() => renderer.unmount());
   });
 
-  it("draws a run's overlay anchored at its device with nothing of React Native's", async () => {
+  it("draws a run's Space, its device placed where the room keeps it, with nothing of React Native's", async () => {
     const overlay: ActionBlokFragment = {
       id: 'ab1',
-      context: ComponentContext.Overlay,
+      context: ComponentContext.Scene,
       blok: {
         id: 'b1',
-        context: ComponentContext.Overlay,
+        context: ComponentContext.Scene,
         heldByAction: true,
         module: {id: 'mod', name: 'tasks'},
         catalogs: [],
         locals: [],
         ...content([
           {
-            id: 'overlay',
-            component: 'Overlay',
-            props: [],
-            children: [{id: 'at', component: 'Anchor', props: [{key: 'dep', static_value: 'robot'}], children: []}],
+            id: 'space',
+            component: 'Space',
+            props: [{key: 'room', static_value: 'room:lab'}],
+            children: [{id: 'at', component: 'Placed', props: [{key: 'dep', static_value: 'robot'}], children: []}],
           },
         ]),
       },
@@ -112,14 +112,19 @@ describe('bloks drawn into a room', () => {
     const renderer = await renderInSession(
       inRoom(
         // The space places the arm the run got for `robot`.
-        <BlokSpaceHostProvider value={{placementOf: agentId => (agentId === 'r1' ? [[1, 0, 0, 2], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]] : null)}}>
+        <BlokSpaceHostProvider
+          value={{
+            useRoom: () => ({poseOf: (agentId: string) => (agentId === 'r1' ? [[1, 0, 0, 2], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]] : null)}),
+            renderAgent: () => null,
+          }}
+        >
           <ActionBlokRenderer actionBlok={overlay} run={runOfTask(task)} chrome="none" />
         </BlokSpaceHostProvider>,
       ),
     );
     await settle();
     expect(nativeViews(renderer)).toEqual([]);
-    expect(renderer.root.findAll(node => node.props.name === 'at:r1')).not.toHaveLength(0);
+    expect(renderer.root.findAll(node => node.props.name === 'placed:robot:r1')).not.toHaveLength(0);
     act(() => renderer.unmount());
   });
 });

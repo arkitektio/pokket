@@ -170,8 +170,8 @@ importers:
         specifier: ^3.13.9
         version: 3.14.1(@types/react@19.3.0)(graphql-ws@6.2.1(graphql@16.14.2)(ws@8.21.3))(graphql@16.14.2)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       '@arkitektio/bsx':
-        specifier: ^2.2.0
-        version: 2.2.0(cd584b84a2f0763b1e616911f253ac45)
+        specifier: ^5.0.0
+        version: 5.0.0(0df51f1230cae0341647b76b3d97ffa8)
       '@config-plugins/react-native-webrtc':
         specifier: ^15.0.0
         version: 15.0.2(expo@58.0.21)
@@ -524,9 +524,10 @@ packages:
     peerDependencies:
       graphql: '*'
 
-  '@arkitektio/bsx@2.2.0':
-    resolution: {integrity: sha512-YlQsMr8bAWwa+rjEi3uub3d5jCEYexH8COfsvCeTvQXdyFccPiPDjcASlHVWhsyo5EQjHHD3Xj92tIP14cqSSg==}
+  '@arkitektio/bsx@5.0.0':
+    resolution: {integrity: sha512-3uomOLJQMRm2/RjuqdkHhPg9GmyzecpWIPixan1SmgEL9KlzLCBdZMa2fZwqOUYq6aecgq8H2juzPHLqDXZA5w==}
     peerDependencies:
+      '@hookform/resolvers': ^5.2.2
       '@monaco-editor/react': ^4.7.0
       '@react-three/drei': ^10.7.0
       '@react-three/fiber': ^9.4.0
@@ -534,6 +535,8 @@ packages:
       blurhash: ^2.0.5
       class-variance-authority: ^0.7.1
       clsx: ^2.1.1
+      cmdk: ^1.1.1
+      date-fns: ^4.1.0
       embla-carousel-react: ^8.6.0
       graphql: ^16.8.0
       input-otp: ^1.4.2
@@ -543,6 +546,7 @@ packages:
       react: ^19.2.0
       react-day-picker: ^9.11.0
       react-dom: ^19.2.0
+      react-hook-form: ^7.70.0
       react-lazy-load-image-component: ^1.6.0
       react-resizable-panels: ^3.0.6
       recharts: ^2.15.0
@@ -553,6 +557,8 @@ packages:
       zod: ^4.0.0
       zustand: ^5.0.0
     peerDependenciesMeta:
+      '@hookform/resolvers':
+        optional: true
       '@monaco-editor/react':
         optional: true
       '@react-three/drei':
@@ -567,6 +573,10 @@ packages:
         optional: true
       clsx:
         optional: true
+      cmdk:
+        optional: true
+      date-fns:
+        optional: true
       embla-carousel-react:
         optional: true
       input-otp:
@@ -580,6 +590,8 @@ packages:
       react-day-picker:
         optional: true
       react-dom:
+        optional: true
+      react-hook-form:
         optional: true
       react-lazy-load-image-component:
         optional: true
@@ -8891,17 +8903,19 @@ snapshots:
       immutable: 5.1.9
       invariant: 2.2.4
 
-  '@arkitektio/bsx@2.2.0(cd584b84a2f0763b1e616911f253ac45)':
+  '@arkitektio/bsx@5.0.0(0df51f1230cae0341647b76b3d97ffa8)':
     dependencies:
       graphql: 16.14.2
       react: 19.3.0
       zod: 4.4.3
       zustand: 5.0.15(@types/react@19.3.0)(react@19.3.0)(use-sync-external-store@1.7.0(react@19.3.0))
     optionalDependencies:
+      '@hookform/resolvers': 5.9.1(@sinclair/typebox@0.27.12)(react-hook-form@7.89.0(@types/react@19.3.0)(react@19.3.0))(zod@4.4.3)
       '@react-three/fiber': 9.8.2(@types/react@19.3.0)(expo-asset@57.0.18(expo@58.0.21)(react-native@0.88.1(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1))(react@19.3.0)(supports-color@8.1.1)(typescript@6.0.3))(expo-file-system@58.0.13(expo@58.0.21)(react-native@0.88.1(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1)))(expo@58.0.21)(react-dom@19.3.0(react@19.3.0))(react-native@0.88.1(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1))(react@19.3.0)(three@0.186.1)
       class-variance-authority: 0.7.1
       clsx: 2.1.1
       react-dom: 19.3.0(react@19.3.0)
+      react-hook-form: 7.89.0(@types/react@19.3.0)(react@19.3.0)
       tailwind-merge: 3.6.0
       tailwindcss: 3.4.19(yaml@2.9.0)
       three: 0.186.1

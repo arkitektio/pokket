@@ -11,7 +11,7 @@ export {SceneOwnerProvider, useSceneNotice, useSceneOverlay} from './context';
  * The 3D vocabulary (scene@1, orkestrator's `bloks/scene`): three containers
  * place models, a transform places what it holds, eight children bind their
  * named nodes to state, and two handle interaction and the cards laid over the
- * scene. The run components (`Overlay`, `Anchor`, `Route`) are `../run`.
+ * scene. The run components (`Space`, `Placed`, `Route`) are `../run`.
  *
  * The contract (names, schemas, placement) is the package's `sceneCatalog`.
  * What draws it is three.js on the GPU, which most bloks never need: it is

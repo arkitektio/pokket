@@ -13,12 +13,12 @@ import {useThemeColors} from '@/lib/theme/BrandProvider';
 import {ActionBlokRenderer, RunAsk} from './ActionBlokRenderer';
 import {TaskBlokList, useTaskBloks} from './TaskBloks';
 
-/** "Open in space": the run drawn into its space, for an action with an overlay. */
+/** "Open in space": the run drawn into its space, for an action with a 3D blok (a `Space` that places its dependencies). */
 const OpenRunInSpace = ({task}: {task: RunTaskFragment}) => {
   const colors = useThemeColors();
-  const overlay = useTaskActionBlok(task, ComponentContext.Overlay);
-  const space = useRunSpace(overlay ? task : null);
-  if (!overlay || !space) return null;
+  const scene = useTaskActionBlok(task, ComponentContext.Scene);
+  const space = useRunSpace(scene ? task : null);
+  if (!scene || !space) return null;
   return (
     <Pressable
       accessibilityRole="button"
@@ -51,7 +51,7 @@ const HistoryToggle = ({travel}: {travel: BlokTravel}) => {
  * What a task shows of itself as bloks, on its screen (orkestrator's task
  * panel): its open asks, answered (or dismissed) in place; the html blok its
  * action declared, drawn for this run; the bloks it showed (asks and
- * informs); and the way to its space when its action draws an overlay.
+ * informs); and the way to its space when its action has a 3D blok.
  * Nothing for a task with none of these.
  *
  * `follow` polls while it runs, for a task the task stream does not carry (a child).

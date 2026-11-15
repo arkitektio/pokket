@@ -1,41 +1,13 @@
-import {Matrix4, Vector3} from 'three';
+import {Vector3} from 'three';
 import {toMatrix4} from '../scene/affine';
 import type {BlokRunAgent} from './host';
 
 /**
- * Where the agents of a run stand in the space it is drawn into: pure, so the
- * placement of an `At` and the line of a `Route` are worked out (and tested)
- * without a canvas.
+ * Where the agents of a run stand in the room they are placed in: pure, so
+ * the line of a `Route` is worked out (and tested) without a canvas.
  */
-
-/** An agent the space places, at its placement's matrix. */
-export type PlacedRunAgent = {agent: BlokRunAgent; matrix: Matrix4};
-
-export type RunAnchors = {
-  /** The agents bound to the key that stand in the space, in binding order. */
-  placed: PlacedRunAgent[];
-  /** The agents bound to the key the space does not place: shown in the side tray. */
-  unplaced: BlokRunAgent[];
-};
 
 const isPlaced = (affine: unknown): boolean => affine !== null && affine !== undefined;
-
-/**
- * Where an `<At dependency=key>` draws: at every agent the run binds the key
- * to that the space places, and in the tray for every one it does not.
- */
-export const resolveAnchors = (
-  agents: readonly BlokRunAgent[],
-  placementOf: (agentId: string) => unknown,
-): RunAnchors => {
-  const anchors: RunAnchors = {placed: [], unplaced: []};
-  for (const agent of agents) {
-    const affine = placementOf(agent.id);
-    if (isPlaced(affine)) anchors.placed.push({agent, matrix: toMatrix4(affine)});
-    else anchors.unplaced.push(agent);
-  }
-  return anchors;
-};
 
 /**
  * The dependency keys a `through` names: a list, or the text BSX writes for

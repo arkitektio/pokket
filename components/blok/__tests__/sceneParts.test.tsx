@@ -88,15 +88,16 @@ const catalog = pokketBlokCatalog;
 
 const prop = (key: string, value: unknown) => ({key, static_value: value});
 
-/** orkestrator's `run.test.tsx` overlay, as the catalog checks it (the phone opens no space to draw it into). */
-const overlay = [
+/** bsx's `run.test.tsx` space, as the catalog checks it. */
+const space = [
   {
     id: 'root',
-    component: 'Overlay',
+    component: 'Space',
+    props: [prop('room', 'room:lab')],
     children: [
       {
         id: 'robot',
-        component: 'Anchor',
+        component: 'Placed',
         props: [prop('dep', 'robot')],
         children: [
           {id: 'glow', component: 'Glow', props: [prop('on', true), prop('color', 'success')]},
@@ -110,24 +111,10 @@ const overlay = [
   },
 ];
 
-describe('scene@1 beyond a Scene', () => {
-  it('places an overlay, its anchors and what binds under them', () => {
-    const preflight = preflightBlokDocument(normalizeBlokComponentTree(overlay).roots, catalog);
+describe('the scene family beyond a Scene', () => {
+  it('places a space, its devices and what binds under them', () => {
+    const preflight = preflightBlokDocument(normalizeBlokComponentTree(space).roots, catalog);
     expect(preflight.errors).toEqual([]);
     expect(preflight.invalidNodes.size).toBe(0);
-  });
-
-  it('shows an overlay outside a space as a note that it belongs to a run', async () => {
-    let renderer!: ReactTestRenderer;
-    await act(async () => {
-      renderer = create(<BlokRenderer catalog={catalog} uiComponents={overlay} initialState={{task: {progress: 50}}} />);
-    });
-    const text = renderer.root
-      .findAll(node => (node.type as unknown) === 'Text')
-      .flatMap(node => node.children.filter((child): child is string => typeof child === 'string'))
-      .join(' ');
-    expect(text).toContain('An overlay is drawn into the space that hosts a run of its action');
-    expect(text).not.toContain('Unknown component');
-    await act(async () => renderer.unmount());
   });
 });

@@ -92,7 +92,7 @@ export const PopoutRender: BlokRender<Scene['Popout']> = ({component, buildChild
   const description = useValue(blok.description);
   const node = name ? model.instance.nodes.get(name) : model.instance.root;
   useSceneNotice(name && !node ? 'Unknown node' : null, `The model has no node '${name}'.`);
-  // Under an `Anchor` whose device the space does not place: nothing to point at,
+  // Under a `Placed` whose device has no model in the scene: nothing to point at,
   // so the card shows in the side tray, as long as it would show at all.
   const tray = useBlokTray();
 

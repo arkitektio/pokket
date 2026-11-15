@@ -29,6 +29,7 @@ import {
   type BlokViewer,
 } from '@arkitektio/bsx/runtime';
 import {pokketBlokCatalog} from './catalog';
+import {blokClassTexts, registerBlokClasses} from './classes';
 
 type BlokRendererProps = {
   uiComponents?: unknown;
@@ -110,10 +111,11 @@ export default function BlokRenderer({
   chrome = 'default',
   fill = false,
 }: BlokRendererProps) {
-  const preflight = React.useMemo(
-    () => preflightBlokDocument(uiComponents, catalog),
-    [catalog, uiComponents],
-  );
+  const preflight = React.useMemo(() => {
+    // What the build could not compile of the blok's classes (values in brackets, `space-*`) is made known first.
+    registerBlokClasses(blokClassTexts(uiComponents));
+    return preflightBlokDocument(uiComponents, catalog);
+  }, [catalog, uiComponents]);
 
   const tree = React.useMemo<BlokTree>(
     () => ({

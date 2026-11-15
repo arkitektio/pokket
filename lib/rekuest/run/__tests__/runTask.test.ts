@@ -72,6 +72,6 @@ describe('a run fed by the task stream', () => {
     const bound = runOfTask(run());
     expect(bound.self?.id).toBe('w1');
     expect(bound.binding.map(({key, agent}) => [key, agent.id])).toEqual([['robot', 'r1']]);
-    expect(actionBlokFor(run().actionBloks, ComponentContext.Overlay)).toBeNull();
+    expect(actionBlokFor(run().actionBloks, ComponentContext.Scene)).toBeNull();
   });
 });

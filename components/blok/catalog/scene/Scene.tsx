@@ -574,7 +574,11 @@ const SceneChildren = ({component, buildChild}: Pick<SceneRenderArgs, 'component
   </>
 );
 
-const StandaloneScene = ({component, schema, buildChild}: SceneRenderArgs) => {
+/**
+ * A scene of its own: the surface, sized and posed as the root's props say.
+ * `children` replaces what the root holds (a `Space` wraps its children in its room).
+ */
+export const SceneFrame = ({component, schema, buildChild, children}: SceneRenderArgs & {children?: React.ReactNode}) => {
   const blok = useBlok(component, schema);
   const camera = useValue(blok.camera) ?? 'iso';
   const grid = useValue(blok.grid) ?? true;
@@ -602,7 +606,7 @@ const StandaloneScene = ({component, schema, buildChild}: SceneRenderArgs) => {
       style={height === undefined ? undefined : {height}}
       onLayout={fill ? event => event.nativeEvent.layout.height === 0 && setCollapsed(true) : undefined}
     >
-      <SceneChildren component={component} buildChild={buildChild} />
+      {children ?? <SceneChildren component={component} buildChild={buildChild} />}
     </SceneSurface>
   );
 };
@@ -612,5 +616,5 @@ export const SceneRender = (args: SceneRenderArgs) =>
   useBlokSceneEmbedded() ? (
     <SceneChildren component={args.component} buildChild={args.buildChild} />
   ) : (
-    <StandaloneScene {...args} />
+    <SceneFrame {...args} />
   );
