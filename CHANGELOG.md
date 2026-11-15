@@ -1,3 +1,10 @@
+# [1.28.0](https://github.com/arkitektio/pokket/compare/v1.27.1...v1.28.0) (2026-11-15)
+
+
+### Features
+
+* **blok:** bsx 5: the base catalog, run parts in rooms, bracket classes ([6ea336b](https://github.com/arkitektio/pokket/commit/6ea336b03ed862ee6b98de83c180d57db50eb989))
+
 ## [1.27.1](https://github.com/arkitektio/pokket/compare/v1.27.0...v1.27.1) (2026-10-30)
 
 
