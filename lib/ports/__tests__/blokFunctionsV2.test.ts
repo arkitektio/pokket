@@ -18,7 +18,7 @@ describe('coverage', () => {
   it('implements every pure vocabulary function, and nothing else', () => {
     const declared = [...loadVocabulary().functions.values()].filter(fn => !fn.effect).map(fn => fn.name).sort();
     expect([...v2Functions.keys()].sort()).toEqual(declared);
-    expect(declared).toHaveLength(107);
+    expect(declared).toHaveLength(117);
     expect(undeclaredImplementations()).toEqual([]);
   });
 
@@ -125,12 +125,21 @@ describe('the null table', () => {
     ['list.pluck', {value: null, key: 'a'}, []],
     ['list.sort', {value: null}, []],
     ['list.range', {start: null, end: 3}, []],
+    ['list.where', {value: null, key: 'a'}, []],
+    ['list.find', {value: null, key: 'a'}, null],
+    ['list.count', {value: null, key: 'a'}, 0],
+    ['list.concat', {value: null, other: [1]}, [1]],
+    ['list.concat', {value: [1], other: null}, [1]],
     ['obj.get', {value: null, key: 'a', default: 7}, 7],
     ['obj.get', {value: null, key: 'a'}, null],
     ['obj.has', {value: null, key: 'a'}, false],
     ['obj.keys', {value: null}, []],
     ['obj.values', {value: null}, []],
     ['obj.entries', {value: null}, []],
+    ['obj.merge', {value: null, other: {a: 1}}, {a: 1}],
+    ['obj.merge', {value: {a: 1}, other: null}, {a: 1}],
+    ['obj.pick', {value: null, keys: ['a']}, {}],
+    ['obj.omit', {value: null, keys: ['a']}, {}],
     ['val.is_null', {value: null}, true],
     ['val.is_set', {value: null}, false],
     ['val.is_empty', {value: null}, true],
@@ -153,6 +162,9 @@ describe('the null table', () => {
     ['fmt.quantity', {value: null}, ''],
     ['time.diff', {start: null, end: NOW}, null],
     ['time.diff', {start: NOW, end: null}, null],
+    ['time.add', {value: null, seconds: 60}, null],
+    ['time.before', {a: null, b: NOW}, false],
+    ['time.after', {a: NOW, b: null}, false],
   ];
 
   it.each(nullCases)('%s(%j) is %j', (name, args, expected) => {

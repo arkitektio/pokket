@@ -71,7 +71,7 @@ describe('bloks drawn into a room', () => {
     await settle();
     expect(nativeViews(renderer)).toEqual([]);
     act(() => renderer.unmount());
-  });
+  }, 20_000); // the first test loads three and the renderer: slow on a cold runner
 
   it("draws a run's Space, its device placed where the room keeps it, with nothing of React Native's", async () => {
     const overlay: ActionBlokFragment = {
