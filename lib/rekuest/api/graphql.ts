@@ -2824,7 +2824,8 @@ export type JsonPatch = {
   __typename?: 'JSONPatch';
   op: JsonPatchOperation;
   path: Scalars['String']['output'];
-  value: Scalars['Args']['output'];
+  /** What the operation sets; nothing for a `remove`. */
+  value?: Maybe<Scalars['Args']['output']>;
 };
 
 export enum JsonPatchOperation {
@@ -3906,17 +3907,13 @@ export type Patch = {
   globalFutureRevision: Scalars['Int']['output'];
   id: Scalars['ID']['output'];
   interface: Scalars['String']['output'];
-  /** The value the patch replaced, when the agent reported it. */
-  oldValue?: Maybe<Scalars['Args']['output']>;
-  op: Scalars['String']['output'];
-  patch: JsonPatch;
-  path: Scalars['String']['output'];
+  /** What the update does, as RFC 6902 operations: apply them in order, and all of them before showing the state. */
+  ops: Array<JsonPatch>;
   /** The session identifier string this row belongs to. */
   sessionId?: Maybe<Scalars['String']['output']>;
   state: State;
   task?: Maybe<Task>;
   timestamp: Scalars['DateTime']['output'];
-  value: Scalars['Args']['output'];
 };
 
 /** The input for pausing a task. */
@@ -5922,12 +5919,10 @@ export type StatePatchEvent = {
   agentId: Scalars['ID']['output'];
   globalRevision: Scalars['Int']['output'];
   interface: Scalars['String']['output'];
-  op: Scalars['String']['output'];
-  path: Scalars['String']['output'];
+  ops: Array<JsonPatch>;
   sessionId?: Maybe<Scalars['String']['output']>;
   stateId: Scalars['ID']['output'];
   timestamp?: Maybe<Scalars['DateTime']['output']>;
-  value: Scalars['Args']['output'];
 };
 
 /** What the agent's state must hold for the task to run: the value at `path` (an RFC 6901 pointer into the state `state`) compared with `value` by `operator`. The agent tests it with the task's locks held; on a mismatch the task ends FAILED with code STATE_PRECONDITION and nothing of it runs. */
@@ -7460,11 +7455,11 @@ export type SpaceBlokPlacementFragment = { __typename?: 'SpacePlacement', id: st
 
 export type SpaceFragment = { __typename?: 'Space', id: string, name: string, placements: Array<{ __typename?: 'Placement', id: string, name: string, role: string, affineMatrix?: any | null, agent: { __typename?: 'Agent', id: string, name: string, connected: boolean }, blok?: { __typename?: 'MaterializedBlok', id: string, name?: string | null, blok: { __typename?: 'Blok', id: string, name: string, context: ComponentContext } } | null }>, blokPlacements: Array<{ __typename?: 'SpacePlacement', id: string, name?: string | null, affineMatrix?: any | null, blok: { __typename?: 'MaterializedBlok', id: string, name?: string | null, blok: { __typename?: 'Blok', id: string, name: string, context: ComponentContext } } }> };
 
-export type StatePatchEventFragment = { __typename?: 'StatePatchEvent', stateId: string, agentId: string, op: string, path: string, value: any, globalRevision: number, sessionId?: string | null, timestamp?: any | null, interface: string };
+export type StatePatchEventFragment = { __typename?: 'StatePatchEvent', stateId: string, agentId: string, ops: Array<{ __typename?: 'JSONPatch', op: JsonPatchOperation, path: string, value?: any | null }>, globalRevision: number, sessionId?: string | null, timestamp?: any | null, interface: string };
 
 export type StateSnapshotEventFragment = { __typename?: 'StateSnapshotEvent', stateId: string, agentId: string, interface: string, value: any, globalRevision: number, sessionId?: string | null, timestamp?: any | null };
 
-export type PatchFragment = { __typename?: 'Patch', id: string, op: string, path: string, value: any, interface: string, timestamp: any, globalFutureRevision: number };
+export type PatchFragment = { __typename?: 'Patch', id: string, ops: Array<{ __typename?: 'JSONPatch', op: JsonPatchOperation, path: string, value?: any | null }>, interface: string, timestamp: any, globalFutureRevision: number };
 
 export type ListTaskFragment = { __typename?: 'Task', id: string, reference?: string | null, latestEventKind: TaskEventKind, isDone: boolean, createdAt: any, finishedAt?: any | null, action: { __typename?: 'Action', id: string, name: string }, agent?: { __typename?: 'Agent', id: string, name: string } | null, events: Array<{ __typename?: 'TaskEvent', id: string, kind: TaskEventKind, level: LogLevel, message?: string | null, progress?: number | null, returns?: any | null, createdAt: any }> };
 
@@ -7702,7 +7697,7 @@ export type CheckoutAgentQueryVariables = Exact<{
 }>;
 
 
-export type CheckoutAgentQuery = { __typename?: 'Query', checkoutAgent: { __typename?: 'AgentWithValues', agentId: string, values: any, globalRevision: number, forwardPatches: Array<{ __typename?: 'Patch', id: string, op: string, path: string, value: any, interface: string, timestamp: any, globalFutureRevision: number }>, backwardPatches: Array<{ __typename?: 'Patch', id: string, op: string, path: string, value: any, interface: string, timestamp: any, globalFutureRevision: number }> } };
+export type CheckoutAgentQuery = { __typename?: 'Query', checkoutAgent: { __typename?: 'AgentWithValues', agentId: string, values: any, globalRevision: number, forwardPatches: Array<{ __typename?: 'Patch', id: string, ops: Array<{ __typename?: 'JSONPatch', op: JsonPatchOperation, path: string, value?: any | null }>, interface: string, timestamp: any, globalFutureRevision: number }>, backwardPatches: Array<{ __typename?: 'Patch', id: string, ops: Array<{ __typename?: 'JSONPatch', op: JsonPatchOperation, path: string, value?: any | null }>, interface: string, timestamp: any, globalFutureRevision: number }> } };
 
 export type CheckoutAgentRevisionQueryVariables = Exact<{
   agent: Scalars['ID']['input'];
@@ -7714,7 +7709,7 @@ export type CheckoutAgentRevisionQueryVariables = Exact<{
 }>;
 
 
-export type CheckoutAgentRevisionQuery = { __typename?: 'Query', checkoutAgent: { __typename?: 'AgentWithValues', agentId: string, values: any, globalRevision: number, forwardPatches: Array<{ __typename?: 'Patch', sessionId?: string | null, id: string, op: string, path: string, value: any, interface: string, timestamp: any, globalFutureRevision: number }>, backwardPatches: Array<{ __typename?: 'Patch', sessionId?: string | null, id: string, op: string, path: string, value: any, interface: string, timestamp: any, globalFutureRevision: number }> } };
+export type CheckoutAgentRevisionQuery = { __typename?: 'Query', checkoutAgent: { __typename?: 'AgentWithValues', agentId: string, values: any, globalRevision: number, forwardPatches: Array<{ __typename?: 'Patch', sessionId?: string | null, id: string, ops: Array<{ __typename?: 'JSONPatch', op: JsonPatchOperation, path: string, value?: any | null }>, interface: string, timestamp: any, globalFutureRevision: number }>, backwardPatches: Array<{ __typename?: 'Patch', sessionId?: string | null, id: string, ops: Array<{ __typename?: 'JSONPatch', op: JsonPatchOperation, path: string, value?: any | null }>, interface: string, timestamp: any, globalFutureRevision: number }> } };
 
 export type SessionBoundariesQueryVariables = Exact<{
   sessionId: Scalars['ID']['input'];
@@ -7751,7 +7746,7 @@ export type WatchStateSubscriptionVariables = Exact<{
 }>;
 
 
-export type WatchStateSubscription = { __typename?: 'Subscription', watchState: { __typename?: 'StatePatchEvent', stateId: string, agentId: string, op: string, path: string, value: any, globalRevision: number, sessionId?: string | null, timestamp?: any | null, interface: string } | { __typename?: 'StateSnapshotEvent', stateId: string, agentId: string, interface: string, value: any, globalRevision: number, sessionId?: string | null, timestamp?: any | null } };
+export type WatchStateSubscription = { __typename?: 'Subscription', watchState: { __typename?: 'StatePatchEvent', stateId: string, agentId: string, ops: Array<{ __typename?: 'JSONPatch', op: JsonPatchOperation, path: string, value?: any | null }>, globalRevision: number, sessionId?: string | null, timestamp?: any | null, interface: string } | { __typename?: 'StateSnapshotEvent', stateId: string, agentId: string, interface: string, value: any, globalRevision: number, sessionId?: string | null, timestamp?: any | null } };
 
 export type WatchTasksSubscriptionVariables = Exact<{ [key: string]: never; }>;
 
@@ -9003,9 +8998,11 @@ export const StatePatchEventFragmentDoc = gql`
     fragment StatePatchEvent on StatePatchEvent {
   stateId
   agentId
-  op
-  path
-  value
+  ops {
+    op
+    path
+    value
+  }
   globalRevision
   sessionId
   timestamp
@@ -9026,9 +9023,11 @@ export const StateSnapshotEventFragmentDoc = gql`
 export const PatchFragmentDoc = gql`
     fragment Patch on Patch {
   id
-  op
-  path
-  value
+  ops {
+    op
+    path
+    value
+  }
   interface
   timestamp
   globalFutureRevision

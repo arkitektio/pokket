@@ -1,9 +1,11 @@
 fragment StatePatchEvent on StatePatchEvent {
   stateId
   agentId
-  op
-  path
-  value
+  ops {
+    op
+    path
+    value
+  }
   globalRevision
   sessionId
   timestamp
@@ -23,9 +25,11 @@ fragment StateSnapshotEvent on StateSnapshotEvent {
 # One recorded change of an agent's state: what time travel replays.
 fragment Patch on Patch {
   id
-  op
-  path
-  value
+  ops {
+    op
+    path
+    value
+  }
   interface
   timestamp
   globalFutureRevision
