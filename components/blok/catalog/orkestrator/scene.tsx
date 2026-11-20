@@ -55,6 +55,8 @@ const ANNOTATION_LIMIT = 200;
 
 type SceneState = {
   scene: BlokSceneFragment;
+  /** Whether the scene is followed: its shape lists are read again too. */
+  live: boolean;
   /** The selected shape's id, or null. */
   selected: string | null;
   select: (annotationId: string | null) => void;
@@ -97,7 +99,7 @@ export const MikroSceneRender = ({component, buildChild}: BlokRenderArgs) => {
   }
 
   return (
-    <SceneWiring component={component} scene={scene}>
+    <SceneWiring component={component} scene={scene} live={live}>
       <View className={cn('min-w-0 gap-3', className)}>{renderChildList(component.children, buildChild)}</View>
     </SceneWiring>
   );
@@ -107,10 +109,12 @@ export const MikroSceneRender = ({component, buildChild}: BlokRenderArgs) => {
 const SceneWiring = ({
   component,
   scene,
+  live,
   children,
 }: {
   component: BlokRenderArgs['component'];
   scene: BlokSceneFragment;
+  live: boolean;
   children: React.ReactNode;
 }) => {
   const blok = useBlok(component, mikroSceneSchema);
@@ -137,7 +141,7 @@ const SceneWiring = ({
   useBoundWorld(useValue(blok.bindWorld), scene.worldCoordinateSystem?.id ?? null);
   useLayerChanges(layers, onLayersChange);
 
-  const state = React.useMemo(() => ({scene, selected, select}), [scene, selected, select]);
+  const state = React.useMemo(() => ({scene, live, selected, select}), [scene, live, selected, select]);
   return <MikroSceneContext.Provider value={state}>{children}</MikroSceneContext.Provider>;
 };
 
@@ -244,7 +248,7 @@ const AnnotationCard = ({collectionId, name, state}: {collectionId: string; name
   const {data, loading, error} = useGetBlokAnnotationCollectionQuery({
     variables: {id: collectionId, limit: ANNOTATION_LIMIT},
     // Shapes drawn elsewhere show up while the scene is followed.
-    pollInterval: LIVE_POLL_MS,
+    pollInterval: state.live ? LIVE_POLL_MS : 0,
   });
   const annotations = data?.annotationCollection.annotations ?? [];
   return (
