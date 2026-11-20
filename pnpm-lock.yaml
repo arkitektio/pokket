@@ -319,6 +319,9 @@ importers:
       graphql-ws:
         specifier: ^6.0.6
         version: 6.2.1(graphql@16.14.2)(ws@8.21.3)
+      hyparquet:
+        specifier: ^1.33.1
+        version: 1.33.1
       its-fine:
         specifier: 2.1.1
         version: 2.1.1(@types/react@19.3.0)(react@19.3.0)
@@ -5468,6 +5471,9 @@ packages:
   human-signals@8.0.1:
     resolution: {integrity: sha512-eKCa6bwnJhvxj14kZk5NCPc6Hb6BdsU9DZcOnmQKSnO1VKrfV0zCvtttPZUsBvjmNDn8rpcJfpwSYnHBjc95MQ==}
     engines: {node: '>=18.18.0'}
+
+  hyparquet@1.33.1:
+    resolution: {integrity: sha512-D623q+KpogNTsmb0sdWXKsi1zrgQTFf2A6MX0vKZChuG7kjA/O+ps7DDfSgGf0rs8SfFP7UqrsDYypxVmmgqZA==}
 
   hyphenate-style-name@1.1.0:
     resolution: {integrity: sha512-WDC/ui2VVRrz3jOVi+XtjqkDjiVjTtFaAGiW37k6b+ohyQ5wYDOGkvCZa8+H0nx3gyvv0+BST9xuOgIyGQ00gw==}
@@ -14921,6 +14927,8 @@ snapshots:
   human-signals@5.0.0: {}
 
   human-signals@8.0.1: {}
+
+  hyparquet@1.33.1: {}
 
   hyphenate-style-name@1.1.0: {}
 

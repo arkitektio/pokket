@@ -8,6 +8,8 @@
   "possibleTypes": {
     "ChartLayer": [
       "AnnotationChartLayer",
+      "DistributionChartLayer",
+      "PointsChartLayer",
       "SeriesChartLayer",
       "TraceChartLayer"
     ],
@@ -25,6 +27,10 @@
       "Folder",
       "MeshCollection",
       "TableDataset"
+    ],
+    "GridLayer": [
+      "CellsGridLayer",
+      "HeatmapGridLayer"
     ],
     "InViewSource": [
       "AnnotationCollection",
@@ -115,6 +121,7 @@
     ],
     "Visualization": [
       "Chart",
+      "Grid",
       "Scene"
     ],
     "_Entity": [
@@ -125,6 +132,7 @@
       "Annotation",
       "AnnotationChartLayer",
       "AnnotationCollection",
+      "AnnotationDerivation",
       "AnnotationLayer",
       "AnnotationLens",
       "ArrayDataset",
@@ -132,6 +140,7 @@
       "Axis",
       "BigFileStore",
       "ByDimensionTransformation",
+      "CellsGridLayer",
       "ChannelLabel",
       "Chart",
       "Client",
@@ -140,6 +149,7 @@
       "CoordinateSystem",
       "DataArray",
       "DerivationConflict",
+      "DistributionChartLayer",
       "FabriksStore",
       "File",
       "FileLink",
@@ -147,6 +157,8 @@
       "FixtureLayer",
       "FixtureLens",
       "Folder",
+      "Grid",
+      "HeatmapGridLayer",
       "IdentityTransformation",
       "ImageLayer",
       "IntensityLayer",
@@ -173,6 +185,8 @@
       "PhasorHistogram",
       "PhasorLayer",
       "PointLayer",
+      "PointsChartLayer",
+      "PositionLabel",
       "RgbLayer",
       "RotationTransformation",
       "ScaleTransformation",

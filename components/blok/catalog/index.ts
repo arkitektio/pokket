@@ -81,6 +81,7 @@ import {
   SvgTextRender,
 } from './logo';
 import {StreamRenderBlok} from './lovekit';
+import {orkestratorCatalog} from './orkestrator';
 import {
   AccordionContentRender,
   AccordionItemRender,
@@ -122,7 +123,9 @@ import {HeadingRender, KbdRender, MarkdownRender, TextRender, TimeRender} from '
  * `structure` families are drawn whole; of the `shadcn` family only what a
  * phone has an answer for yet, so a blok naming the rest (sheets, menus,
  * charts, resizable panels…) still renders, with an "Unknown component" card
- * in that node's place. Pokket's own catalog holds what the base does not:
+ * in that node's place. It draws the Orkestrator's catalog too (mikro's scene
+ * parts and table readers, `orkestrator/`), so a blok written for the
+ * Orkestrator renders here. Pokket's own catalog holds what neither has:
  * lovekit streams.
  *
  * The SVG components (`logo.tsx`) draw logo bloks: an agent's, an action's.
@@ -261,6 +264,7 @@ export const pokketBlokUi = declareBlokUi({
       },
       {partial: true},
     ),
+    orkestratorCatalog,
     ownBlokCatalog({name: 'pokket', description: "Pokket's own components: lovekit streams."}, [StreamRenderBlok]),
   ],
 });

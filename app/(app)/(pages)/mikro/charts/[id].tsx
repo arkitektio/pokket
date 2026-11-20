@@ -22,9 +22,10 @@ export default function ChartScreen() {
         <>
           <Heading title={chart.name} detail={chart.description} />
           <FactsCard>
-            <Fact label="Axis" value={chart.axis.longName || chart.axis.name} />
-            <Fact label="Axis type" value={humanize(chart.axis.type)} />
-            <Fact label="Unit" value={chart.axis.unit ? String(chart.axis.unit) : null} />
+            {/* A VALUES chart draws no world axis: its rows are placed at their values. */}
+            <Fact label="Axis" value={chart.axis ? chart.axis.longName || chart.axis.name : 'Values'} />
+            <Fact label="Axis type" value={chart.axis ? humanize(chart.axis.type) : null} />
+            <Fact label="Unit" value={chart.axis?.unit ? String(chart.axis.unit) : null} />
             <Fact label="Space" value={chart.worldCoordinateSystem.name} />
             <Fact label="Created" value={dayLabel(chart.createdAt)} />
             {chart.layers.map((layer, index) => (

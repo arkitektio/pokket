@@ -1,0 +1,115 @@
+# What the orkestrator catalog's mikro bloks read on the phone
+# (`components/blok/catalog/orkestrator`). The phone draws no layer: it lists
+# them, shows the scene's last picture, and lets a shape be picked from a list.
+
+fragment BlokSceneLens on ArrayLens {
+  id
+  label
+  dataset {
+    id
+  }
+}
+
+# A layer as a blok's event payloads read it (`layer`, `kind`, `lens`): the
+# array lens it draws is aliased, an annotation layer's lens being another type.
+fragment BlokSceneLayer on Layer {
+  __typename
+  id
+  kind
+  name
+  visible
+  order
+  ... on ImageLayer {
+    arrayLens: lens {
+      ...BlokSceneLens
+    }
+  }
+  ... on IntensityLayer {
+    arrayLens: lens {
+      ...BlokSceneLens
+    }
+  }
+  ... on RgbLayer {
+    arrayLens: lens {
+      ...BlokSceneLens
+    }
+  }
+  ... on PhasorLayer {
+    arrayLens: lens {
+      ...BlokSceneLens
+    }
+  }
+  ... on LabelLayer {
+    arrayLens: lens {
+      ...BlokSceneLens
+    }
+  }
+  ... on AnnotationLayer {
+    annotationCollection {
+      id
+      name
+    }
+  }
+}
+
+fragment BlokScene on Scene {
+  ...ListScene
+  worldCoordinateSystem {
+    id
+    name
+  }
+  layers {
+    ...BlokSceneLayer
+  }
+}
+
+fragment BlokAnnotation on Annotation {
+  id
+  name
+  kind
+}
+
+fragment BlokAnnotationCollection on AnnotationCollection {
+  id
+  name
+  annotations(pagination: { limit: $limit }) {
+    ...BlokAnnotation
+  }
+}
+
+# A TableDataset as the table bloks read it: its declared columns, and the
+# store its rows are in.
+fragment BlokTableColumn on Column {
+  id
+  name
+  longName
+  description
+  dtype
+  role
+  unit
+  axisType
+  order
+}
+
+fragment BlokTable on TableDataset {
+  id
+  name
+  columns {
+    ...BlokTableColumn
+  }
+  store {
+    id
+    sizeBytes
+  }
+}
+
+# The grant to read a table's parquet: short-lived, for its one object.
+fragment ParquetAccessGrant on ParquetAccessGrant {
+  accessKey
+  secretKey
+  sessionToken
+  region
+  bucket
+  key
+  expiresIn
+}

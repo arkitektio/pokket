@@ -1,0 +1,30 @@
+query GetBlokScene($id: ID!) {
+  scene(id: $id) {
+    ...BlokScene
+  }
+}
+
+query GetBlokAnnotationCollection($id: ID!, $limit: Int) {
+  annotationCollection(id: $id) {
+    ...BlokAnnotationCollection
+  }
+}
+
+query GetBlokTable($id: ID!) {
+  tableDataset(id: $id) {
+    ...BlokTable
+  }
+}
+
+# Asked for each read that has no live grant: the grant is minted per request.
+query GetTableAccess($id: ID!) {
+  tableDataset(id: $id) {
+    id
+    store {
+      id
+      accessGrant {
+        ...ParquetAccessGrant
+      }
+    }
+  }
+}

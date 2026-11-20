@@ -262,6 +262,10 @@ export type Annotation = {
   createdWithTransforms: Scalars['Int']['output'];
   /** The user that drew this annotation, or null when that user is gone or a client created it without one */
   creator?: Maybe<User>;
+  /** The shapes made from this one -- refined, converted, split out of it or merged from it -- oldest first, in any collection. How each was made is on its own `derivedFrom`. Shapes, never containers: data computed from this shape is `derivedResidents` */
+  derivedAnnotations: Array<Annotation>;
+  /** The shapes this one was made from, and how, in the order its creator named them: the other end of `derivedAnnotations`. Empty for a shape drawn from nothing. Shape to shape only -- what *data* a shape was computed from is its collection's `derivedFrom`, and what was computed from it is `derivedResidents` */
+  derivedFrom: Array<AnnotationDerivation>;
   /** The lenses cut to this annotation with `createLens(annotation:)`, oldest cut first. A record of the act, not a relation in space: a lens is immutable and a shape is not, so moving the shape afterwards leaves these where they were cut -- `lenses(filters: {overlapsAnnotation})` is the question about where things are now. One lens may be listed by several shapes, since a lens is one row per selection. What was *computed* from the shape is `derivedResidents` */
   derivedLenses: Array<ArrayLens>;
   /** Everything computed from this annotation, whatever kind of container it is: the data whose `derivedFrom` named this shape as an ANNOTATION source -- a crop written out as a dataset, an image straightened along a path, a table measured inside an ROI. The other end of those edges, exactly as `ArrayDataset.derivedResidents` is, and as kind-blind: the shape is usually named with no transform. A record of the act: editing the shape afterwards changes none of it. The edge itself, with the lens the pixels came from beside it, is on each child's own `derivedFrom` */
@@ -282,10 +286,14 @@ export type Annotation = {
   name: Scalars['String']['output'];
   /** Provenance entries for this annotation */
   provenanceEntries: Array<ProvenanceEntry>;
+  /** The ids of the shapes this one was made from, in declared order: `derivedFrom` without the links, cheap enough for every shape of a scene's list. Empty for a shape drawn from nothing. What a viewer reads to tell a refinement from the shape it refines */
+  sourceIds: Array<Scalars['ID']['output']>;
   /** The stroke (outline) color of the geometry, as RGBA */
   strokeColor?: Maybe<Array<Scalars['Int']['output']>>;
   /** The stroke width of the geometry, in the drawing space's units. One number for every direction, so it is a well-defined length only where that space's axes share a scale */
   strokeWidth: Scalars['Float']['output'];
+  /** The lens the shape was traced on -- the channel or layer the person was looking at, e.g. the marker a neurite was traced in. Metadata only: it neither pins the shape (`coordinates`) nor places it (the collection's own edges). Null when the drawer did not say, or the lens is gone */
+  tracedOn?: Maybe<Lens>;
   vectors: Array<Array<Scalars['Float']['output']>>;
 };
 
@@ -485,6 +493,24 @@ export type AnnotationCollectionOrder =
   |  { createdAt?: never; id: Ordering; name?: never; }
   |  { createdAt?: never; id?: never; name: Ordering; };
 
+/** That a shape was made from another shape, and how: a path refined, a rectangle converted to a polygon, a shape split or merged. A record of the act, never an edge in space -- both shapes are placed by their collections, and editing either afterwards changes nothing here */
+export type AnnotationDerivation = {
+  __typename?: 'AnnotationDerivation';
+  /** The shape that was made */
+  child: Annotation;
+  /** When the child was made from the source */
+  createdAt: Scalars['DateTime']['output'];
+  /** Who made the child, or null when that user is gone */
+  creator?: Maybe<User>;
+  id: Scalars['ID']['output'];
+  /** A free-form note on why or how, if one was given */
+  reason?: Maybe<Scalars['String']['output']>;
+  /** How the child came from the source */
+  relation: AnnotationRelation;
+  /** The shape it was made from. It cannot be deleted while this shape stands, unless the delete cascades to it */
+  source: Annotation;
+};
+
 /** The fields an ANNOTATION derivation reads. Published for codegen; the wire type is the flat DerivedFromInput */
 export type AnnotationDerivedFromInput = {
   annotation: Scalars['ID']['input'];
@@ -647,7 +673,7 @@ export type AnnotationLens = Lens & {
   /** The collection's annotations this lens keeps: those whose own reach -- vertices and pins, in the drawing space the windows are stated in -- meets every window. Every annotation for a whole lens. Decided per shape, so it costs a read of the collection */
   annotations: Array<Annotation>;
   /** The coordinate system the lens' selection is expressed in. A sliced array lens owns one (the space its slices cut out, with the derived edge recording the shift); every other lens selects within its container's own space and resolves to it */
-  coordinateSystem?: Maybe<CoordinateSystem>;
+  coordinateSystem: CoordinateSystem;
   /** When this selection was first asked for; a whole lens, when its container was made */
   createdAt: Scalars['DateTime']['output'];
   /** The task this selection was made under, if any */
@@ -660,15 +686,23 @@ export type AnnotationLens = Lens & {
   defaultScene?: Maybe<Scene>;
   /** This object's descriptors, a flat mapping of key to value: the facts about it that an action's port can `require` and a trigger can test (e.g. `@mikro/n_channels`). The keys are the ones mikro declares for this structure, and the values are the ones a signal about the object carries. Empty for a structure that declares none */
   descriptors: Scalars['JSON']['output'];
+  /** What this lens selects that its name does not already say, or empty: `y[0:32]` for a crop of the channel named 'GFP', nothing for that channel itself. An axis held to one position at an anchor whose label is in `name` is left out; an unnamed lens keeps its whole selection (`c[1:2], y[0:32]`), a whole lens has none */
+  detail: Scalars['String']['output'];
   id: Scalars['ID']['output'];
   /** What this lens selects over: an array by slices, or a table, a sparse dataset, a mesh, a network or an annotation collection by windows */
   kind: LensKind;
-  /** What to call this lens in a list, never empty: its `name` when it has one, else its container's name followed by what it selects of it (`cells.zarr · c[0:1]`); a whole lens is called by its container. What a picker shows for an option */
+  /** What to call this lens in a list on one line, never empty: its `title`, its `origin` when the title is not already it, and its `detail` (`GFP · cells.zarr · y[0:32]`); a whole lens is called by its container. The title comes first because a row is cut at its end. A reader that lays the parts out itself asks for them instead */
   label: Scalars['String']['output'];
-  /** What someone called this selection, or null when nobody has. A label only: it is no part of what the lens selects, and a client shows the selection -- or 'the whole container' -- in its place */
+  /** What this selection is called, or null when nothing names it: the labels at the positions it pins (a person's `setPositionLabel` over the channel label ingest recorded) and the name of the annotation it was cut to, e.g. 'GFP · nucleus 3'. Derived and kept by the server, never set: naming channel 1 names every lens through channel 1. No part of the lens' identity, which is its container and its selection. `nameAnchors` says where it comes from */
   name?: Maybe<Scalars['String']['output']>;
+  /** The coordinate anchors whose labels make up `name`, in the order they appear in it: those of the container whose every pinned axis this lens holds to the same position, the most specific only. Each carries the person's `positionLabel` and the recorded `channelLabel`; the first that says something is the one used. Empty for a lens no position names, and for a kind whose container carries no anchors */
+  nameAnchors: Array<CoordinateAnchor>;
+  /** The name of the container this lens selects over, never empty: what `title` falls back to, and what a picker groups a container's lenses under */
+  origin: Scalars['String']['output'];
   /** The scenes this lens is rendered in: those with a layer drawing through it or through any selection within it, of any kind. Derived, never stored, exactly as `ArrayDataset.scenes` is. A layer over one channel of a crop draws the crop, and a layer over any crop draws the whole lens -- so a whole lens answers for the whole container and a window or a crop for what it contains; a scene showing a selection that reaches outside this one is that selection's to report */
   scenes: Array<Scene>;
+  /** What a layer drawing this lens is called, never empty: its `name` when something names it, else its container's name. The short half of `label`: what a picker's row says under a heading that already names the container (`origin`) */
+  title: Scalars['String']['output'];
   /** The windows, in the one normalized spelling: container axis order, floats, an open side as null. Empty for the whole lens */
   windows: Array<Window>;
 };
@@ -677,9 +711,29 @@ export type AnnotationOrder =
   { id: Ordering; name?: never; }
   |  { id?: never; name: Ordering; };
 
+/** How a shape came from the shape it names in `derivedFrom`: the act, not the algorithm (that is the creating task's). A record of where a new shape came from -- editing a shape in place is its history, never a derivation */
+export enum AnnotationRelation {
+  /** The same thing drawn as another kind: a rectangle as a polygon, a polygon's outline as a path, a path closed into a polygon. The source must be of a different kind */
+  Converted = 'CONVERTED',
+  /** One shape joined from several sources. Every source is named, each as MERGED, and there are at least two */
+  Merged = 'MERGED',
+  /** The same kind of shape, its geometry improved: a path smoothed or snapped to an edge, a polygon re-traced. The source must be of the same kind */
+  Refined = 'REFINED',
+  /** One of several shapes cut out of the source. Its siblings name the same source */
+  Split = 'SPLIT'
+}
+
+/** One shape a new shape was made from, and how */
+export type AnnotationSourceInput = {
+  annotation: Scalars['ID']['input'];
+  reason?: InputMaybe<Scalars['String']['input']>;
+  relation: AnnotationRelation;
+};
+
 /** One shape of a bulk draw: the per-annotation subset of CreateAnnotationInput, without the collection/scene target */
 export type AnnotationSpecInput = {
   coordinates?: InputMaybe<Array<CoordinateInput>>;
+  derivedFrom?: InputMaybe<Array<AnnotationSourceInput>>;
   description?: InputMaybe<Scalars['String']['input']>;
   fillColor?: InputMaybe<Array<Scalars['Int']['input']>>;
   filled?: InputMaybe<Scalars['Boolean']['input']>;
@@ -687,6 +741,7 @@ export type AnnotationSpecInput = {
   name?: InputMaybe<Scalars['String']['input']>;
   strokeColor?: InputMaybe<Array<Scalars['Int']['input']>>;
   strokeWidth?: InputMaybe<Scalars['Float']['input']>;
+  tracedOn?: InputMaybe<Scalars['ID']['input']>;
   vectors: Array<Scalars['ThreeDVector']['input']>;
 };
 
@@ -792,6 +847,8 @@ export type ArrayDataset = {
   description?: Maybe<Scalars['String']['output']>;
   /** This object's descriptors, a flat mapping of key to value: the facts about it that an action's port can `require` and a trigger can test (e.g. `@mikro/n_channels`). The keys are the ones mikro declares for this structure, and the values are the ones a signal about the object carries. Empty for a structure that declares none */
   descriptors: Scalars['JSON']['output'];
+  /** The descriptors `createLens(input: {dataset: <this>, slices:})` would give the lens it returns, without making it: what that selection provides to an action's port (one plane of a stack is an IMAGE, a pinned frame or channel counts one). The slices are dataset indices, spelled as `createLens` takes them. Null where the cut would be refused -- an axis the dataset lacks, an axis sliced twice, a window that selects nothing */
+  descriptorsSliced?: Maybe<Scalars['JSON']['output']>;
   /** This dataset's stored vector, as `<model id>:<floats>`. Null until it has been indexed. */
   embedding?: Maybe<Scalars['Embedding']['output']>;
   /** The files written out of this dataset: an OME-TIFF export, a rendered snapshot registered as a file. The mirror of `sourceFiles` */
@@ -837,6 +894,12 @@ export type ArrayDatasetDataArraysArgs = {
   filters?: InputMaybe<DataArrayFilter>;
   ordering?: Array<DataArrayOrder>;
   pagination?: InputMaybe<OffsetPaginationInput>;
+};
+
+
+/** A multi-dimensional array dataset. Its dimensions and their types live on the axes of its INTRINSIC (pixel grid) coordinate system; physical units live on the physical spaces it has edges into; its pyramid levels are DataArrays, each mapping into its grid */
+export type ArrayDatasetDescriptorsSlicedArgs = {
+  slices: Array<SliceInput>;
 };
 
 
@@ -903,6 +966,8 @@ export type ArrayDatasetFilter = {
   /** Filter to the datasets computed from this one -- the deconvolutions, segmentations and projections that named a space of it as their parent. Every child, not just the ones it places: a fusion that named it second is listed, and so is a child whose derivation is UNMAPPABLE, since it still came from here */
   derivedFrom?: InputMaybe<Scalars['ID']['input']>;
   description?: InputMaybe<StrFilterLookup>;
+  /** Only objects at least one of these implementations can handle: their `Fits` as `Implementation.fits.compiledPath`, with their agent's hardware. */
+  fits?: InputMaybe<Array<FitsConstraintInput>>;
   /** Filter by the folder this dataset is filed in */
   folder?: InputMaybe<Scalars['ID']['input']>;
   /** Filter by a list of folder IDs */
@@ -1044,7 +1109,7 @@ export type ArrayLens = Lens & {
   /** Every column a label layer over this lens can be coloured or filtered by, with the control each one's role admits -- the same set `createLabelLayer(render: {colorBys: ...})` accepts. The nested form of the `labelColorByOptions` root query, which is where the search, narrowing and paging live; this one hands back the whole list. It walks the coordinate graph once per lens, so read it on a lens, not across a page of them */
   colorByOptions: Array<ColorByOption>;
   /** The coordinate system the lens' selection is expressed in. A sliced array lens owns one (the space its slices cut out, with the derived edge recording the shift); every other lens selects within its container's own space and resolves to it */
-  coordinateSystem?: Maybe<CoordinateSystem>;
+  coordinateSystem: CoordinateSystem;
   /** When this selection was first asked for; a whole lens, when its container was made */
   createdAt: Scalars['DateTime']['output'];
   /** The task this selection was made under, if any */
@@ -1062,15 +1127,21 @@ export type ArrayLens = Lens & {
   descriptors: Scalars['JSON']['output'];
   /** The descriptors `createLens(input: {lens: <this>, annotation:})` would give the lens it returns, without making it: what a crop of this lens to the shape's box provides to an action's port (one plane of a stack is an IMAGE, a pinned channel counts one). Null when the shape has no box or misses this lens -- the cut would be refused */
   descriptorsUnder?: Maybe<Scalars['JSON']['output']>;
+  /** What this lens selects that its name does not already say, or empty: `y[0:32]` for a crop of the channel named 'GFP', nothing for that channel itself. An axis held to one position at an anchor whose label is in `name` is left out; an unnamed lens keeps its whole selection (`c[1:2], y[0:32]`), a whole lens has none */
+  detail: Scalars['String']['output'];
   id: Scalars['ID']['output'];
   /** What this lens selects over: an array by slices, or a table, a sparse dataset, a mesh, a network or an annotation collection by windows */
   kind: LensKind;
-  /** What to call this lens in a list, never empty: its `name` when it has one, else its container's name followed by what it selects of it (`cells.zarr · c[0:1]`); a whole lens is called by its container. What a picker shows for an option */
+  /** What to call this lens in a list on one line, never empty: its `title`, its `origin` when the title is not already it, and its `detail` (`GFP · cells.zarr · y[0:32]`); a whole lens is called by its container. The title comes first because a row is cut at its end. A reader that lays the parts out itself asks for them instead */
   label: Scalars['String']['output'];
   /** The most recent picture of this lens' `defaultScene` -- the tile to put on this lens. A lens that nominates a scene shows that one; a crop that nominates nothing shows its dataset's (its whole lens'), so a crop nobody has staged yet still has a picture. Null when neither nominates a scene */
   latestSnapshot?: Maybe<SceneSnapshot>;
-  /** What someone called this selection, or null when nobody has. A label only: it is no part of what the lens selects, and a client shows the selection -- or 'the whole container' -- in its place */
+  /** What this selection is called, or null when nothing names it: the labels at the positions it pins (a person's `setPositionLabel` over the channel label ingest recorded) and the name of the annotation it was cut to, e.g. 'GFP · nucleus 3'. Derived and kept by the server, never set: naming channel 1 names every lens through channel 1. No part of the lens' identity, which is its container and its selection. `nameAnchors` says where it comes from */
   name?: Maybe<Scalars['String']['output']>;
+  /** The coordinate anchors whose labels make up `name`, in the order they appear in it: those of the container whose every pinned axis this lens holds to the same position, the most specific only. Each carries the person's `positionLabel` and the recorded `channelLabel`; the first that says something is the one used. Empty for a lens no position names, and for a kind whose container carries no anchors */
+  nameAnchors: Array<CoordinateAnchor>;
+  /** The name of the container this lens selects over, never empty: what `title` falls back to, and what a picker groups a container's lenses under */
+  origin: Scalars['String']['output'];
   /** Everything needed to reduce one axis of this lens to a phasor: the bin count and width, the period the transform runs over, the laser rate, the instrument-response correction and the persisted distribution. Null when the lens has no MICROTIME or SPECTRUM axis. Derived -- none of it is stored on the lens, and a phasor render node references it rather than copying it, so two layers over one dataset cannot disagree about the instrument */
   phasor?: Maybe<PhasorContext>;
   /** The scenes this lens is rendered in: those with a layer drawing through it or through any selection within it, of any kind. Derived, never stored, exactly as `ArrayDataset.scenes` is. A layer over one channel of a crop draws the crop, and a layer over any crop draws the whole lens -- so a whole lens answers for the whole container and a window or a crop for what it contains; a scene showing a selection that reaches outside this one is that selection's to report */
@@ -1083,8 +1154,14 @@ export type ArrayLens = Lens & {
   spec: Array<ArrayDatasetSpec>;
   /** Which of the lens' axes face screen x, y, z, time and intensity under the default convention (spatial axes by name when named x/y/z, else last is x). A suggestion for a bare lens, before anything places it: a viewer that has the lens' placement reads which axis faces which screen axis off that map and its own view, since the mapping is the view's, not the selection's */
   suggestedRenderAxes: RenderAxes;
+  /** What a layer drawing this lens is called, never empty: its `name` when something names it, else its container's name. The short half of `label`: what a picker's row says under a heading that already names the container (`origin`) */
+  title: Scalars['String']['output'];
   /** The edge from this lens' space back into its dataset's intrinsic pixel space. A crop is a translation of the slice starts; a stepped lens also rescales. Without this edge an ROI drawn on a cropped lens has no defined path back to its dataset. Null for an unsliced lens: its space IS the intrinsic space, and there is no shift to record */
   toParent?: Maybe<Transformation>;
+  /** This lens' voxel size: how far one step along each of its axes reaches, read along the edges to the first space with units. The `canonical` one of `voxelSizes` -- decided by the edges' validity, so a person's calibration outranks the pixel size a converter read from the file. Empty when the lens reaches no physical space, or none by a sane route. Every axis the route scales is listed (a time step too); a voxel's spatial size is the SPACE entries. Never raises, so it is the form to put in a fragment */
+  voxelSize: Array<AxisVoxelSize>;
+  /** Every physical space this lens reaches with the edges, each by its best route and with the voxel size that route gives, canonical first. Read when `voxelSize` is not what you expected: a rival calibration, its validity, its route, or why it was passed over (`problem`) */
+  voxelSizes: Array<VoxelSize>;
 };
 
 
@@ -1142,7 +1219,7 @@ export type AttributePlan = {
   sample: SampleStep;
 };
 
-/** Show a coordinate system, or one lens, without choosing how. A space with exactly one metric, unit-carrying axis becomes a chart; any other space with a time or space axis becomes a scene. Over a `coordinateSystem`, either is bootstrapped from what already resides in the space; over a `lens`, it shows that lens' selection and nothing else of its container, the choice read off the space the selection lives in. Both use that kind's default policy and register nothing into any space. Provide exactly one of the two. For a say in the kind or the policy, use `createChartFromCoordinateSystem`, `createSceneFromCoordinateSystem` or `createSceneFromLens` */
+/** Show a coordinate system, or one lens, without choosing how. A space with exactly one metric, unit-carrying axis becomes a chart; a space of two enumerating axes (genes against cells, objects against channels) a grid; any other space with a time or space axis a scene; a table lens whose rows have no place a chart of its measurements' values. Over a `coordinateSystem`, either is bootstrapped from what already resides in the space; over a `lens`, it shows that lens' selection and nothing else of its container, the choice read off the space the selection lives in. Both use that kind's default policy and register nothing into any space. Provide exactly one of the two. For a say in the kind or the policy, use `createChartFromCoordinateSystem`, `createSceneFromCoordinateSystem` or `createSceneFromLens` */
 export type AutoVisualizeInput = {
   coordinateSystem?: InputMaybe<Scalars['ID']['input']>;
   lens?: InputMaybe<Scalars['ID']['input']>;
@@ -1155,6 +1232,8 @@ export type Axis = {
   description?: Maybe<Scalars['String']['output']>;
   id: Scalars['ID']['output'];
   longName?: Maybe<Scalars['String']['output']>;
+  /** The metric group this axis is in: the axes that share one distance with it. What it declared, else 'space' for a SPACE axis, else null -- an axis that shares a distance with nothing. A rotation, a distance and a scene's render axes need one group; a per-axis scale, an offset and an affine map do not */
+  metricGroup?: Maybe<Scalars['String']['output']>;
   name: Scalars['String']['output'];
   order: Scalars['Int']['output'];
   type: AxisType;
@@ -1196,12 +1275,15 @@ export type AxisFilter = {
 export type AxisInput = {
   description?: InputMaybe<Scalars['String']['input']>;
   longName?: InputMaybe<Scalars['String']['input']>;
+  metricGroup?: InputMaybe<Scalars['String']['input']>;
   name: Scalars['String']['input'];
   type: AxisType;
 };
 
 /** The semantic kind of an axis. Axes are declared in the order the data has them -- for an array, its store's dimension order; for a table, its coordinate columns as declared -- and no ordering by type is required of them: the time, channel and phasor axes are found by type rather than by position. What the render axes are derived from is the relative order of the SPACE axes, the last being x. */
 export enum AxisType {
+  /** An enumerating axis whose positions are the values a column holds -- a condition, a genotype, a cluster id. It has no unit and no metric, exactly as an INDEX axis has none: nothing scales or offsets it, and a BY_DIMENSION passes it through with an IDENTITY part. The positions are not stored: they are whatever the values are. Never on an array's grid; declared on a coordinate system that enumerates by value. */
+  Category = 'CATEGORY',
   /** A categorical channel axis: its coordinates index acquisitions, not positions. Never downsampled. */
   Channel = 'CHANNEL',
   /** The value axis of a coordinate-valued array: its positions enumerate the components of an absolute output position. This is what makes the array readable as the `field` of a FIELD edge. A scalar-valued field (a label mask, whose one value is an object id) carries no value axis at all -- absent means scalar, and scalar means COORDINATE. */
@@ -1223,6 +1305,7 @@ export enum AxisType {
 }
 
 export enum AxisTypeChoices {
+  Category = 'CATEGORY',
   Channel = 'CHANNEL',
   Coordinate = 'COORDINATE',
   Displacement = 'DISPLACEMENT',
@@ -1233,6 +1316,21 @@ export enum AxisTypeChoices {
   Time = 'TIME',
   Value = 'VALUE'
 }
+
+/** How far one step along a lens axis reaches in a physical space: the voxel size along that axis */
+export type AxisVoxelSize = {
+  __typename?: 'AxisVoxelSize';
+  /** The lens axis */
+  axis: Scalars['String']['output'];
+  /** The physical axis it mostly lands on */
+  physicalAxis: Scalars['String']['output'];
+  /** How far one step along it reaches, in `unit`. A stepped lens' step is its own: `step: 2` reaches twice its dataset's voxel */
+  size: Scalars['Float']['output'];
+  /** That physical axis' kind. A calibration scales a time step or a spectral bin as well; a voxel's spatial size is the SPACE entries */
+  type: AxisType;
+  /** The unit of `size`: the unit of the physical axis it mostly lands on */
+  unit: Scalars['String']['output'];
+};
 
 /** Beam splitter */
 export type BeamSplitterElement = OpticalElement & {
@@ -1501,6 +1599,59 @@ export type CameraStateInput = {
   projectionScale?: InputMaybe<Scalars['Float']['input']>;
 };
 
+/** Rows of one kind that go with a delete without being lineage: layers, lenses, axes */
+export type CascadeCount = {
+  __typename?: 'CascadeCount';
+  /** How many */
+  count: Scalars['Int']['output'];
+  /** What they are, singular -- e.g. 'layer', 'annotation lens' */
+  label: Scalars['String']['output'];
+};
+
+/** A layer that draws a table's rows as cells: each row at its position along the grid's axes (the table's frame), coloured by the value of `valueColumn`. Example: a long-form `(cell, c, mean)` table, cells against channels coloured by `mean`; a plate's `(row, column)` wells coloured by a readout */
+export type CellsGridLayer = GridLayer & {
+  __typename?: 'CellsGridLayer';
+  /** This layer's placement composed into one affine map from its lens' space onto the grid's world: which of its positions is which row and column. Derived on read. Null when the layer is no longer placed */
+  asAffine?: Maybe<AffinePlacement>;
+  /** How a value becomes a colour */
+  colormap: ColorMap;
+  grid: Grid;
+  id: Scalars['ID']['output'];
+  kind: GridLayerKind;
+  /** The table lens whose rows are drawn: the rows its windows keep */
+  lens: TableLens;
+  /** The value drawn at the top of the colormap. Null lets the viewer choose */
+  max?: Maybe<Scalars['Float']['output']>;
+  /** The value drawn at the bottom of the colormap. Null lets the viewer choose */
+  min?: Maybe<Scalars['Float']['output']>;
+  name?: Maybe<Scalars['String']['output']>;
+  opacity: Scalars['Float']['output'];
+  order: Scalars['Int']['output'];
+  /** Whether this layer has a place in its grid's world, and if not, why not. Derived, never stored */
+  placement: PlacementState;
+  /** The table dataset whose rows are drawn: the container of the lens */
+  tableDataset: TableDataset;
+  /** The numeric column whose value colours each row's cell */
+  valueColumn: Scalars['String']['output'];
+  /** The unit of `valueColumn`, as the table declares it. Null when the column declares none */
+  valueUnit?: Maybe<Scalars['Unit']['output']>;
+  visible: Scalars['Boolean']['output'];
+  /** The lens' windows as row filters, always applied. Derived from the lens; empty for a whole lens */
+  windowFilters: Array<LabelFilterBy>;
+};
+
+
+/** A layer that draws a table's rows as cells: each row at its position along the grid's axes (the table's frame), coloured by the value of `valueColumn`. Example: a long-form `(cell, c, mean)` table, cells against channels coloured by `mean`; a plate's `(row, column)` wells coloured by a readout */
+export type CellsGridLayerAsAffineArgs = {
+  at?: InputMaybe<Array<CoordinateInput>>;
+};
+
+
+/** A layer that draws a table's rows as cells: each row at its position along the grid's axes (the table's frame), coloured by the value of `valueColumn`. Example: a long-form `(cell, c, mean)` table, cells against channels coloured by `mean`; a plate's `(row, column)` wells coloured by a readout */
+export type CellsGridLayerPlacementArgs = {
+  at?: InputMaybe<Array<CoordinateInput>>;
+};
+
 /** Input for changing an existing folder's name or parent */
 export type ChangeFolderInput = {
   /** The ID of the folder to change */
@@ -1536,11 +1687,11 @@ export type ChannelSourceNode = LayerRenderNode & {
   visible: Scalars['Boolean']['output'];
 };
 
-/** A composition of data laid out along one metric axis, with values read off it. The second kind of composition beside a scene: a scene is a place, a chart is an axis. It names data by id and owns none of it, and it carries no unit of its own -- the unit is its world axis's */
+/** A composition that shows **how much**: values drawn as position. The counterpart of a scene, which shows **where**: in a scene every screen axis is a world axis, data is placed by the graph's edges and values are drawn as appearance (a colour, a size); in a chart at most one axis is drawn from the world and every other position is a value. Every chart has a world -- the domain its layers' rows live in -- and every layer is placed into it. An **AXIS** chart draws its world, one metric axis with a unit, and lays TRACE, SERIES and ANNOTATION layers along it: a timelapse's intensity against `t`. A **VALUES** chart does not draw its world, which says whose rows -- a table's space, usually its INDEX axis -- and its POINTS and DISTRIBUTION layers draw those rows at the values of the columns they name: nuclei at `area` against `volume`, a histogram of `area` per `condition`. Two layers in one VALUES world are about the same rows (a table and the PCA derived from it). The same table lens may be drawn as a scene, at its `(y, x)` coloured by `area`, and as a chart at `(area, volume)`. A chart names data through lenses and owns none of it; if rotating its view would mix units, it is a chart, and if it would not, a scene */
 export type Chart = Visualization & {
   __typename?: 'Chart';
-  /** The one axis this chart is laid out along: its name, its metric type and its unit. The world's only axis, repeated here so a client drawing the chart need not unwrap a list of one */
-  axis: Axis;
+  /** The one measured axis this chart's along-axis layers (TRACE, SERIES, ANNOTATION) are laid along: its name, its type and its unit -- the world's only axis, repeated so a client need not unwrap a list of one. Null when the world is not one measured axis, and then only value layers can be drawn here. A renderer reads it to know whether an axis panel exists before any layer does */
+  axis?: Maybe<Axis>;
   createdAt: Scalars['DateTime']['output'];
   creator?: Maybe<User>;
   description?: Maybe<Scalars['String']['output']>;
@@ -1549,13 +1700,15 @@ export type Chart = Visualization & {
   id: Scalars['ID']['output'];
   /** The layers drawn in this chart, back to front (a heterogeneous list of layer kinds) */
   layers: Array<ChartLayer>;
+  /** How the layers share the screen, remembered with the chart: STACKED (one row or panel each), SHARED (overlaid where they read their axes alike) or OVERLAY (every along-axis layer in one plot) */
+  layout: ChartLayout;
   name: Scalars['String']['output'];
-  /** The space this chart is laid out along. Never owned by the chart: several charts can share it, it outlives each of them, and deleting a chart never deletes it. Ask it for `placedSystems` to learn what could be drawn here */
+  /** The domain this chart's layers live in: one measured axis its along-axis layers are laid along (`axis`), the space whose rows its value layers draw (a table's), or both at once (a table framed by `t`). Never owned by the chart: several charts can share it, it outlives each of them, and deleting a chart never deletes it. Ask it for `placedSystems` to learn what could be drawn here */
   worldCoordinateSystem: CoordinateSystem;
 };
 
 
-/** A composition of data laid out along one metric axis, with values read off it. The second kind of composition beside a scene: a scene is a place, a chart is an axis. It names data by id and owns none of it, and it carries no unit of its own -- the unit is its world axis's */
+/** A composition that shows **how much**: values drawn as position. The counterpart of a scene, which shows **where**: in a scene every screen axis is a world axis, data is placed by the graph's edges and values are drawn as appearance (a colour, a size); in a chart at most one axis is drawn from the world and every other position is a value. Every chart has a world -- the domain its layers' rows live in -- and every layer is placed into it. An **AXIS** chart draws its world, one metric axis with a unit, and lays TRACE, SERIES and ANNOTATION layers along it: a timelapse's intensity against `t`. A **VALUES** chart does not draw its world, which says whose rows -- a table's space, usually its INDEX axis -- and its POINTS and DISTRIBUTION layers draw those rows at the values of the columns they name: nuclei at `area` against `volume`, a histogram of `area` per `condition`. Two layers in one VALUES world are about the same rows (a table and the PCA derived from it). The same table lens may be drawn as a scene, at its `(y, x)` coloured by `area`, and as a chart at `(area, volume)`. A chart names data through lenses and owns none of it; if rotating its view would mix units, it is a chart, and if it would not, a scene */
 export type ChartLayersArgs = {
   filters?: InputMaybe<ChartLayerFilter>;
   ordering?: Array<ChartLayerOrder>;
@@ -1588,7 +1741,7 @@ export type ChartFilter = {
   search?: InputMaybe<Scalars['String']['input']>;
 };
 
-/** A layer drawn in a chart. It carries view state only. Where its data sits along the chart's axis -- `pathToWorld`, `asAffine`, `alongAxis`, `placement`, `placementValidity`, `placementInvariance` -- is derived from the graph on read and stored nowhere, so refining one registration moves every layer that looks through it. The concrete kind says what the layer reads: TraceChartLayer an array, SeriesChartLayer a table, AnnotationChartLayer drawn marks */
+/** A layer drawn in a chart. It carries view state only. A placed layer's position along the chart's axis -- `pathToWorld`, `asAffine`, `alongAxis`, `placement`, `placementValidity`, `placementInvariance` -- is derived from the graph on read and stored nowhere, so refining one registration moves every layer that looks through it. A value layer is placed the same way -- its rows into the chart's world, which says they are the same rows as the others' -- and drawn at the values of the columns it names. The concrete kind says what the layer reads: TraceChartLayer an array, SeriesChartLayer a table's value column, AnnotationChartLayer drawn marks -- along the chart's axis -- and PointsChartLayer and DistributionChartLayer a table's columns, by their values -- the kind says which, and one chart may hold both */
 export type ChartLayer = {
   /** The name of the source axis that runs along the chart's axis: for a trace, the axis of its lens the values are read along; for a series, the table's coordinate column; for an annotation layer, the axis of the drawing space that is the chart's own. **Not a setting.** It is the one source axis the composed placement reads the chart's axis from, so it follows the registration: re-register the data by another axis and this changes with no write to the layer. Null when the layer is no longer placed, or is placed by a map that reads the chart's axis from several source axes */
   alongAxis?: Maybe<Scalars['String']['output']>;
@@ -1614,37 +1767,37 @@ export type ChartLayer = {
 };
 
 
-/** A layer drawn in a chart. It carries view state only. Where its data sits along the chart's axis -- `pathToWorld`, `asAffine`, `alongAxis`, `placement`, `placementValidity`, `placementInvariance` -- is derived from the graph on read and stored nowhere, so refining one registration moves every layer that looks through it. The concrete kind says what the layer reads: TraceChartLayer an array, SeriesChartLayer a table, AnnotationChartLayer drawn marks */
+/** A layer drawn in a chart. It carries view state only. A placed layer's position along the chart's axis -- `pathToWorld`, `asAffine`, `alongAxis`, `placement`, `placementValidity`, `placementInvariance` -- is derived from the graph on read and stored nowhere, so refining one registration moves every layer that looks through it. A value layer is placed the same way -- its rows into the chart's world, which says they are the same rows as the others' -- and drawn at the values of the columns it names. The concrete kind says what the layer reads: TraceChartLayer an array, SeriesChartLayer a table's value column, AnnotationChartLayer drawn marks -- along the chart's axis -- and PointsChartLayer and DistributionChartLayer a table's columns, by their values -- the kind says which, and one chart may hold both */
 export type ChartLayerAlongAxisArgs = {
   at?: InputMaybe<Array<CoordinateInput>>;
 };
 
 
-/** A layer drawn in a chart. It carries view state only. Where its data sits along the chart's axis -- `pathToWorld`, `asAffine`, `alongAxis`, `placement`, `placementValidity`, `placementInvariance` -- is derived from the graph on read and stored nowhere, so refining one registration moves every layer that looks through it. The concrete kind says what the layer reads: TraceChartLayer an array, SeriesChartLayer a table, AnnotationChartLayer drawn marks */
+/** A layer drawn in a chart. It carries view state only. A placed layer's position along the chart's axis -- `pathToWorld`, `asAffine`, `alongAxis`, `placement`, `placementValidity`, `placementInvariance` -- is derived from the graph on read and stored nowhere, so refining one registration moves every layer that looks through it. A value layer is placed the same way -- its rows into the chart's world, which says they are the same rows as the others' -- and drawn at the values of the columns it names. The concrete kind says what the layer reads: TraceChartLayer an array, SeriesChartLayer a table's value column, AnnotationChartLayer drawn marks -- along the chart's axis -- and PointsChartLayer and DistributionChartLayer a table's columns, by their values -- the kind says which, and one chart may hold both */
 export type ChartLayerAsAffineArgs = {
   at?: InputMaybe<Array<CoordinateInput>>;
 };
 
 
-/** A layer drawn in a chart. It carries view state only. Where its data sits along the chart's axis -- `pathToWorld`, `asAffine`, `alongAxis`, `placement`, `placementValidity`, `placementInvariance` -- is derived from the graph on read and stored nowhere, so refining one registration moves every layer that looks through it. The concrete kind says what the layer reads: TraceChartLayer an array, SeriesChartLayer a table, AnnotationChartLayer drawn marks */
+/** A layer drawn in a chart. It carries view state only. A placed layer's position along the chart's axis -- `pathToWorld`, `asAffine`, `alongAxis`, `placement`, `placementValidity`, `placementInvariance` -- is derived from the graph on read and stored nowhere, so refining one registration moves every layer that looks through it. A value layer is placed the same way -- its rows into the chart's world, which says they are the same rows as the others' -- and drawn at the values of the columns it names. The concrete kind says what the layer reads: TraceChartLayer an array, SeriesChartLayer a table's value column, AnnotationChartLayer drawn marks -- along the chart's axis -- and PointsChartLayer and DistributionChartLayer a table's columns, by their values -- the kind says which, and one chart may hold both */
 export type ChartLayerPathToWorldArgs = {
   at?: InputMaybe<Array<CoordinateInput>>;
 };
 
 
-/** A layer drawn in a chart. It carries view state only. Where its data sits along the chart's axis -- `pathToWorld`, `asAffine`, `alongAxis`, `placement`, `placementValidity`, `placementInvariance` -- is derived from the graph on read and stored nowhere, so refining one registration moves every layer that looks through it. The concrete kind says what the layer reads: TraceChartLayer an array, SeriesChartLayer a table, AnnotationChartLayer drawn marks */
+/** A layer drawn in a chart. It carries view state only. A placed layer's position along the chart's axis -- `pathToWorld`, `asAffine`, `alongAxis`, `placement`, `placementValidity`, `placementInvariance` -- is derived from the graph on read and stored nowhere, so refining one registration moves every layer that looks through it. A value layer is placed the same way -- its rows into the chart's world, which says they are the same rows as the others' -- and drawn at the values of the columns it names. The concrete kind says what the layer reads: TraceChartLayer an array, SeriesChartLayer a table's value column, AnnotationChartLayer drawn marks -- along the chart's axis -- and PointsChartLayer and DistributionChartLayer a table's columns, by their values -- the kind says which, and one chart may hold both */
 export type ChartLayerPlacementArgs = {
   at?: InputMaybe<Array<CoordinateInput>>;
 };
 
 
-/** A layer drawn in a chart. It carries view state only. Where its data sits along the chart's axis -- `pathToWorld`, `asAffine`, `alongAxis`, `placement`, `placementValidity`, `placementInvariance` -- is derived from the graph on read and stored nowhere, so refining one registration moves every layer that looks through it. The concrete kind says what the layer reads: TraceChartLayer an array, SeriesChartLayer a table, AnnotationChartLayer drawn marks */
+/** A layer drawn in a chart. It carries view state only. A placed layer's position along the chart's axis -- `pathToWorld`, `asAffine`, `alongAxis`, `placement`, `placementValidity`, `placementInvariance` -- is derived from the graph on read and stored nowhere, so refining one registration moves every layer that looks through it. A value layer is placed the same way -- its rows into the chart's world, which says they are the same rows as the others' -- and drawn at the values of the columns it names. The concrete kind says what the layer reads: TraceChartLayer an array, SeriesChartLayer a table's value column, AnnotationChartLayer drawn marks -- along the chart's axis -- and PointsChartLayer and DistributionChartLayer a table's columns, by their values -- the kind says which, and one chart may hold both */
 export type ChartLayerPlacementInvarianceArgs = {
   at?: InputMaybe<Array<CoordinateInput>>;
 };
 
 
-/** A layer drawn in a chart. It carries view state only. Where its data sits along the chart's axis -- `pathToWorld`, `asAffine`, `alongAxis`, `placement`, `placementValidity`, `placementInvariance` -- is derived from the graph on read and stored nowhere, so refining one registration moves every layer that looks through it. The concrete kind says what the layer reads: TraceChartLayer an array, SeriesChartLayer a table, AnnotationChartLayer drawn marks */
+/** A layer drawn in a chart. It carries view state only. A placed layer's position along the chart's axis -- `pathToWorld`, `asAffine`, `alongAxis`, `placement`, `placementValidity`, `placementInvariance` -- is derived from the graph on read and stored nowhere, so refining one registration moves every layer that looks through it. A value layer is placed the same way -- its rows into the chart's world, which says they are the same rows as the others' -- and drawn at the values of the columns it names. The concrete kind says what the layer reads: TraceChartLayer an array, SeriesChartLayer a table's value column, AnnotationChartLayer drawn marks -- along the chart's axis -- and PointsChartLayer and DistributionChartLayer a table's columns, by their values -- the kind says which, and one chart may hold both */
 export type ChartLayerPlacementValidityArgs = {
   at?: InputMaybe<Array<CoordinateInput>>;
 };
@@ -1662,15 +1815,19 @@ export type ChartLayerFilter = {
   kind?: InputMaybe<ChartLayerKindChoices>;
 };
 
-/** The kind of a chart layer, which says what it reads -- never how it looks. TRACE reads an array along one axis; SERIES reads one column of a table against another; ANNOTATION reads drawn marks. A line, markers, both or steps is `ChartMark`, a setting on the layer. */
+/** The kind of a chart layer, which says what it reads -- never how it looks. Three are laid along the chart's world axis by the graph: TRACE reads an array along one axis, SERIES one value column of a table along its coordinate, ANNOTATION drawn marks. Two are drawn by their values, their rows placed in the chart's world: POINTS at two or three columns (a scatter), DISTRIBUTION summarising one column (a histogram, a box), once per value of a grouping column. One chart may hold both. A line, markers, a histogram or a box is `ChartMark`, a setting on the layer. */
 export enum ChartLayerKind {
   Annotation = 'ANNOTATION',
+  Distribution = 'DISTRIBUTION',
+  Points = 'POINTS',
   Series = 'SERIES',
   Trace = 'TRACE'
 }
 
 export enum ChartLayerKindChoices {
   Annotation = 'ANNOTATION',
+  Distribution = 'DISTRIBUTION',
+  Points = 'POINTS',
   Series = 'SERIES',
   Trace = 'TRACE'
 }
@@ -1679,12 +1836,31 @@ export type ChartLayerOrder =
   { id: Ordering; order?: never; }
   |  { id?: never; order: Ordering; };
 
-/** How a trace or a series is drawn. A look, not a kind: changing it changes nothing about what the layer reads. */
+/** How a chart's layers share the screen, remembered with the chart. STACKED: one row (an along-axis layer) or one panel (a value layer) per layer, each on its own scale. SHARED: layers measuring the same thing overlaid on one scale -- along the axis, the same value unit; by their values, one kind, one mark and the same x and y units -- and the rest beside them. OVERLAY: every along-axis layer in one plot, each on its own scale; value layers lay out as SHARED, since there a layer's scale is its axis */
+export enum ChartLayout {
+  Overlay = 'OVERLAY',
+  Shared = 'SHARED',
+  Stacked = 'STACKED'
+}
+
+/** How a layer is drawn. A look, not a kind: changing it changes nothing about what the layer reads. A trace or a series is a LINE, MARKERS, both or STEPS; points are MARKERS or a LINE through them in row order sorted along x; a distribution is a HISTOGRAM or a BOX. */
 export enum ChartMark {
+  Box = 'BOX',
+  Histogram = 'HISTOGRAM',
   Line = 'LINE',
   LineMarkers = 'LINE_MARKERS',
   Markers = 'MARKERS',
   Steps = 'STEPS'
+}
+
+/** The symbol each marker is drawn as. A look: it changes nothing about what the layer reads */
+export enum ChartMarkerShape {
+  Circle = 'CIRCLE',
+  Cross = 'CROSS',
+  Diamond = 'DIAMOND',
+  Plus = 'PLUS',
+  Square = 'SQUARE',
+  Triangle = 'TRIANGLE'
 }
 
 export type ChartOrder =
@@ -1938,6 +2114,8 @@ export type Column = {
   /** The table this column is declared on. Trivial when the column was read through its table, load-bearing when it was not -- an options list is flat, and a column with no table on it cannot be named in a `colorBy` */
   table: TableDataset;
   unit?: Maybe<Scalars['Unit']['output']>;
+  /** For a long-form table, the CHANNEL coordinate columns this column's value changes along, as declared. In a `(cell, c, volume, mean)` table a per-cell `volume` varies over nothing and is read once per cell; a per-channel `mean` varies over `c`. Null when undeclared: read as varying over every CHANNEL coordinate, which counts nothing twice that should not be */
+  variesOver?: Maybe<Array<Scalars['String']['output']>>;
 };
 
 /** The fields a COLUMN member of a colour picker entry reads. Published for codegen; the wire type is the flat LabelColorByInput / MeshColorByInput / NetworkColorByInput */
@@ -1970,6 +2148,7 @@ export type ColumnInput = {
   name: Scalars['String']['input'];
   role?: InputMaybe<ColumnRole>;
   unit?: InputMaybe<Scalars['Unit']['input']>;
+  variesOver?: InputMaybe<Array<Scalars['String']['input']>>;
 };
 
 export type ColumnOptionFilter = {
@@ -2026,6 +2205,7 @@ export type CoordinateAnchor = {
   __typename?: 'CoordinateAnchor';
   /** When the data at these coordinates was acquired */
   acquisitionWindow?: Maybe<AcquisitionWindow>;
+  /** The channel label ingest recorded at this coordinate */
   channelLabel?: Maybe<ChannelLabel>;
   /** The coordinates this anchor is pinned to, e.g. {'c': 0, 't': 5}. For an array dataset these are level-0 pixel indices, i.e. coordinates of its INTRINSIC system; for a table dataset they are values of its coordinate columns, keyed by column name; for a sparse dataset they are positions along its enumerated axes. An anchor that omits an axis is global along it */
   coordinates: Scalars['Any']['output'];
@@ -2039,6 +2219,8 @@ export type CoordinateAnchor = {
   omeMetadata?: Maybe<OmeMetadata>;
   phasorCalibrations: Array<PhasorCalibration>;
   phasorHistograms: Array<PhasorHistogram>;
+  /** What a person calls the data at this coordinate (`setPositionLabel`): read before `channelLabel` when a lens is named */
+  positionLabel?: Maybe<PositionLabel>;
   /** The sparse dataset this anchor pins into, or null otherwise */
   sparse?: Maybe<SparseDataset>;
   /** The table dataset this anchor pins into, or null otherwise */
@@ -2320,10 +2502,11 @@ export type CreateAnnotationCollectionInput = {
   sourceFiles?: InputMaybe<Array<SourceFileInput>>;
 };
 
-/** Input for drawing an annotation. Provide exactly one of `collection` (append to it) or `scene` (draw on the scene: its annotation collection is found, or minted on first use together with its coordinate system, its registration into the world, and its layer) */
+/** Input for drawing an annotation. Provide exactly one of `collection` (append to it) or `scene` (draw on the scene: its annotation collection is found, or minted on first use together with its coordinate system, its registration into the world, and its layer; a layer removed since is added back) */
 export type CreateAnnotationInput = {
   collection?: InputMaybe<Scalars['ID']['input']>;
   coordinates?: InputMaybe<Array<CoordinateInput>>;
+  derivedFrom?: InputMaybe<Array<AnnotationSourceInput>>;
   description?: InputMaybe<Scalars['String']['input']>;
   fillColor?: InputMaybe<Array<Scalars['Int']['input']>>;
   filled?: InputMaybe<Scalars['Boolean']['input']>;
@@ -2332,6 +2515,7 @@ export type CreateAnnotationInput = {
   scene?: InputMaybe<Scalars['ID']['input']>;
   strokeColor?: InputMaybe<Array<Scalars['Int']['input']>>;
   strokeWidth?: InputMaybe<Scalars['Float']['input']>;
+  tracedOn?: InputMaybe<Scalars['ID']['input']>;
   vectors: Array<Scalars['ThreeDVector']['input']>;
 };
 
@@ -2374,6 +2558,20 @@ export type CreateArrayDatasetInput = {
   sourceFiles?: InputMaybe<Array<SourceFileInput>>;
 };
 
+/** Input for drawing a table's rows in a grid: each row a cell at its position along the grid's axes -- the table's frame -- coloured by the value of `valueColumn` */
+export type CreateCellsGridLayerInput = {
+  colormap?: InputMaybe<ColorMap>;
+  grid: Scalars['ID']['input'];
+  lens: Scalars['ID']['input'];
+  max?: InputMaybe<Scalars['Float']['input']>;
+  min?: InputMaybe<Scalars['Float']['input']>;
+  name?: InputMaybe<Scalars['String']['input']>;
+  opacity?: InputMaybe<Scalars['Float']['input']>;
+  order?: InputMaybe<Scalars['Int']['input']>;
+  valueColumn?: InputMaybe<Scalars['String']['input']>;
+  visible?: InputMaybe<Scalars['Boolean']['input']>;
+};
+
 /** Bootstrap a chart over an existing coordinate system, drawing what is already laid along its axis: each array placed in it that is a trace, each table that is a series, each annotation collection. Authors no edges -- what places each layer is the registration already in the graph -- and leaves out anything placed in the space that no layer kind reads. Rerunning makes another chart over the same space */
 export type CreateChartFromCoordinateSystemInput = {
   coordinateSystem: Scalars['ID']['input'];
@@ -2381,11 +2579,12 @@ export type CreateChartFromCoordinateSystemInput = {
   policy?: ChartPolicyInput;
 };
 
-/** Input type for creating a chart: a composition of data laid out along one metric axis. The chart is created over a world -- an existing coordinate system adopted as it is, or one created from a single axis -- and starts with no layers */
+/** Input type for creating a chart over a world: an existing coordinate system adopted as it is, or one created from `axis`. The world is the domain the layers live in. TRACE, SERIES and ANNOTATION layers are laid along its one measured axis by the graph (intensity against `t`), so they need a world of exactly one; POINTS and DISTRIBUTION layers have their rows placed in it -- a table's space -- and are drawn at the values of the columns they name (`area` against `volume`). One chart may hold both. It starts with no layers */
 export type CreateChartInput = {
   axis?: InputMaybe<PhysicalAxisInput>;
   coordinateSystem?: InputMaybe<Scalars['ID']['input']>;
   description?: InputMaybe<Scalars['String']['input']>;
+  layout?: ChartLayout;
   name: Scalars['String']['input'];
 };
 
@@ -2410,6 +2609,21 @@ export type CreateCoordinateSystemInput = {
   name: Scalars['String']['input'];
   reference?: InputMaybe<Scalars['String']['input']>;
   registrations?: Array<RegistrationPathInput>;
+};
+
+/** Input for summarising the values of one column of a table's rows in a chart: a HISTOGRAM or a BOX, over every row or once per value of `groupColumn` -- the `area` of nuclei, one histogram per `condition`. The rows are placed in the chart's world (whose rows). Writes no edge */
+export type CreateDistributionChartLayerInput = {
+  bins?: InputMaybe<Scalars['Int']['input']>;
+  chart: Scalars['ID']['input'];
+  color?: InputMaybe<Array<Scalars['Float']['input']>>;
+  groupColumn?: InputMaybe<Scalars['String']['input']>;
+  lens: Scalars['ID']['input'];
+  mark?: InputMaybe<ChartMark>;
+  name?: InputMaybe<Scalars['String']['input']>;
+  opacity?: InputMaybe<Scalars['Float']['input']>;
+  order?: InputMaybe<Scalars['Int']['input']>;
+  valueColumn: Scalars['String']['input'];
+  visible?: InputMaybe<Scalars['Boolean']['input']>;
 };
 
 /** Input for registering a fixture: one binary glTF, in a unit-carrying coordinate system of its own */
@@ -2451,6 +2665,33 @@ export type CreateFolderInput = {
   name: Scalars['String']['input'];
   /** The ID of the parent folder to nest this folder under */
   parent?: InputMaybe<Scalars['ID']['input']>;
+};
+
+/** Bootstrap a grid over an existing space, drawing what already covers its axes: each sparse matrix and array as a heatmap, each table as cells coloured by its one numeric column. Authors no edges, and leaves out whatever its kind refuses */
+export type CreateGridFromCoordinateSystemInput = {
+  coordinateSystem: Scalars['ID']['input'];
+  name?: InputMaybe<Scalars['String']['input']>;
+  policy?: GridPolicyInput;
+};
+
+/** Input for creating a grid over an existing space whose one or two enumerating axes (INDEX, CHANNEL, CATEGORY) are its rows and columns -- a sparse dataset's own space, a long-form table's. Adopted as it is, never minted. It starts with no layers */
+export type CreateGridInput = {
+  coordinateSystem: Scalars['ID']['input'];
+  description?: InputMaybe<Scalars['String']['input']>;
+  name: Scalars['String']['input'];
+};
+
+/** Input for drawing an array or a sparse matrix in a grid: its lens leaves free exactly the grid's axes, placed in its world, and each position is a cell coloured by the value there */
+export type CreateHeatmapGridLayerInput = {
+  colormap?: InputMaybe<ColorMap>;
+  grid: Scalars['ID']['input'];
+  lens: Scalars['ID']['input'];
+  max?: InputMaybe<Scalars['Float']['input']>;
+  min?: InputMaybe<Scalars['Float']['input']>;
+  name?: InputMaybe<Scalars['String']['input']>;
+  opacity?: InputMaybe<Scalars['Float']['input']>;
+  order?: InputMaybe<Scalars['Int']['input']>;
+  visible?: InputMaybe<Scalars['Boolean']['input']>;
 };
 
 /** Create a single-channel intensity layer rendered through a colormap (e.g. a fluorescence channel) */
@@ -2499,8 +2740,6 @@ export type CreateLensInput = {
   dataset?: InputMaybe<Scalars['ID']['input']>;
   /** An array lens to cut from, in place of `dataset`: a crop of a crop. The slices are stated in this lens' own index space and composed through it; the result is the dataset's lens for the voxels that keeps */
   lens?: InputMaybe<Scalars['ID']['input']>;
-  /** What to call this selection. Applied when the lens has no name yet; a lens that already makes this selection and is named keeps its name: finding a selection is not a request to rename it, `updateLens` is */
-  name?: InputMaybe<Scalars['String']['input']>;
   /** Slices selecting a window of the dataset (or of the lens), one per axis to restrict. Omit, or pass an empty list, for everything: the dataset's whole lens, or the lens cut from. The same selection, however spelled, is the same lens */
   slices?: InputMaybe<Array<SliceInput>>;
 };
@@ -2662,6 +2901,24 @@ export type CreatePointLayerInput = {
   visible?: InputMaybe<Scalars['Boolean']['input']>;
 };
 
+/** Input for drawing a table's rows as points in a chart: each row at the values of `xColumn` and `yColumn` (and `zColumn` for depth) -- nuclei at their `area` and `volume`. The rows are placed in the chart's world (whose rows); the columns' units are its drawn axes, and a second layer's must convert to them. Writes no edge */
+export type CreatePointsChartLayerInput = {
+  chart: Scalars['ID']['input'];
+  color?: InputMaybe<Array<Scalars['Float']['input']>>;
+  lens: Scalars['ID']['input'];
+  lineWidth?: InputMaybe<Scalars['Float']['input']>;
+  mark?: InputMaybe<ChartMark>;
+  markerShape?: InputMaybe<ChartMarkerShape>;
+  markerSize?: InputMaybe<Scalars['Float']['input']>;
+  name?: InputMaybe<Scalars['String']['input']>;
+  opacity?: InputMaybe<Scalars['Float']['input']>;
+  order?: InputMaybe<Scalars['Int']['input']>;
+  visible?: InputMaybe<Scalars['Boolean']['input']>;
+  xColumn: Scalars['String']['input'];
+  yColumn: Scalars['String']['input'];
+  zColumn?: InputMaybe<Scalars['String']['input']>;
+};
+
 /** Create a layer that composites three single-channel lenses, each a crop of `lens`, as the red, green and blue components of one picture */
 export type CreateRgbLayerInput = {
   blueLens: Scalars['ID']['input'];
@@ -2714,6 +2971,7 @@ export type CreateSeriesChartLayerInput = {
   lens: Scalars['ID']['input'];
   lineWidth?: InputMaybe<Scalars['Float']['input']>;
   mark?: InputMaybe<ChartMark>;
+  markerShape?: InputMaybe<ChartMarkerShape>;
   markerSize?: InputMaybe<Scalars['Float']['input']>;
   name?: InputMaybe<Scalars['String']['input']>;
   opacity?: InputMaybe<Scalars['Float']['input']>;
@@ -2756,7 +3014,7 @@ export type CreateTableDatasetInput = {
   sourceFiles?: InputMaybe<Array<SourceFileInput>>;
 };
 
-/** Input for the lens making a selection over a table dataset, by windows on its coordinate columns */
+/** Input for the lens making a selection over a table dataset, by windows on its columns: a coordinate column bounds a region of space, a numeric measurement column is a gate (`area >= 50`) -- the rows whose value lies in the window */
 export type CreateTableLensInput = {
   /** A lens over the table dataset to select within, in place of the container: the windows then intersect with its own, and the result is the table dataset's lens for what that keeps */
   lens?: InputMaybe<Scalars['ID']['input']>;
@@ -2766,6 +3024,20 @@ export type CreateTableLensInput = {
   windows?: InputMaybe<Array<WindowInput>>;
 };
 
+/** Input for plotting a table's columns in one call: a chart over the table's space (whose rows) and one POINTS or DISTRIBUTION layer through the table's whole lens or a window of it, in one transaction, so a refused layer makes nothing. `area` against `volume` is `{kind: POINTS, xColumn: "area", yColumn: "volume"}`; a histogram of `area` per `condition` is `{kind: DISTRIBUTION, xColumn: "area", groupColumn: "condition"}` */
+export type CreateTablePlotInput = {
+  bins?: InputMaybe<Scalars['Int']['input']>;
+  groupColumn?: InputMaybe<Scalars['String']['input']>;
+  kind: ChartLayerKind;
+  lens?: InputMaybe<Scalars['ID']['input']>;
+  mark?: InputMaybe<ChartMark>;
+  name?: InputMaybe<Scalars['String']['input']>;
+  table: Scalars['ID']['input'];
+  xColumn: Scalars['String']['input'];
+  yColumn?: InputMaybe<Scalars['String']['input']>;
+  zColumn?: InputMaybe<Scalars['String']['input']>;
+};
+
 /** Input for drawing an array as a trace in a chart. The lens must leave one metric axis free -- the one the graph lays along the chart's axis -- and may leave one CHANNEL or INDEX axis free beside it, drawn as one line per position; every other axis must be sliced to a single position. The lens' data must already be registered into the chart's world: this writes no edge */
 export type CreateTraceChartLayerInput = {
   chart: Scalars['ID']['input'];
@@ -2773,6 +3045,7 @@ export type CreateTraceChartLayerInput = {
   lens: Scalars['ID']['input'];
   lineWidth?: InputMaybe<Scalars['Float']['input']>;
   mark?: InputMaybe<ChartMark>;
+  markerShape?: InputMaybe<ChartMarkerShape>;
   markerSize?: InputMaybe<Scalars['Float']['input']>;
   name?: InputMaybe<Scalars['String']['input']>;
   opacity?: InputMaybe<Scalars['Float']['input']>;
@@ -2902,19 +3175,55 @@ export type DeleteAnimationInput = {
 
 /** Input for deleting an annotation collection by ID */
 export type DeleteAnnotationCollectionInput = {
+  /** Also delete everything made from it -- the closure `preflightDelete<Model>` lists: derived data, data computed within a shape, shapes refined or converted from it, series converted out of a file, files exported from a dataset. Without it, a delete of something anything was made from is refused, naming what */
+  cascade?: Scalars['Boolean']['input'];
   /** The ID of the annotation collection to delete */
   id: Scalars['ID']['input'];
 };
 
 /** Input for deleting an annotation by ID */
 export type DeleteAnnotationInput = {
+  /** Also delete everything made from it -- the closure `preflightDelete<Model>` lists: derived data, data computed within a shape, shapes refined or converted from it, series converted out of a file, files exported from a dataset. Without it, a delete of something anything was made from is refused, naming what */
+  cascade?: Scalars['Boolean']['input'];
   id: Scalars['ID']['input'];
 };
 
 /** Input for deleting an array dataset by ID */
 export type DeleteArrayDatasetInput = {
+  /** Also delete everything made from it -- the closure `preflightDelete<Model>` lists: derived data, data computed within a shape, shapes refined or converted from it, series converted out of a file, files exported from a dataset. Without it, a delete of something anything was made from is refused, naming what */
+  cascade?: Scalars['Boolean']['input'];
   /** The ID of the array dataset to delete */
   id: Scalars['ID']['input'];
+};
+
+/** Why a delete cannot go ahead: one row it would delete that may not be deleted */
+export type DeleteBlocker = {
+  __typename?: 'DeleteBlocker';
+  /** Its ID */
+  id: Scalars['ID']['output'];
+  /** `<kind>:<id>` of the row that blocks */
+  key: Scalars['ID']['output'];
+  /** What it is */
+  kind: LineageNodeKind;
+  /** Why: not yours to delete, a guard (a layer draws through it, a picker names it) or a reference that must not be deleted with it */
+  reason: Scalars['String']['output'];
+};
+
+/** One thing a delete would take along: something made from what is deleted, directly or further down */
+export type DeleteCasualty = {
+  __typename?: 'DeleteCasualty';
+  /** Hops from what is deleted: 1 for something made from it directly */
+  depth: Scalars['Int']['output'];
+  /** Its ID, as its own query takes it */
+  id: Scalars['ID']['output'];
+  /** `<kind>:<id>`, as the lineage walk keys it */
+  key: Scalars['ID']['output'];
+  /** What it is */
+  kind: LineageNodeKind;
+  /** Its name */
+  name: Scalars['String']['output'];
+  /** The key of what it was made from on its nearest path */
+  parent: Scalars['ID']['output'];
 };
 
 /** Input for deleting a chart by ID. Deletes its layers and nothing they drew: the data, and the chart's world, are untouched */
@@ -2935,14 +3244,26 @@ export type DeleteCoordinateSystemInput = {
   id: Scalars['ID']['input'];
 };
 
+/** What to delete the derived data of: one object the lineage walk can stand on, by kind and id */
+export type DeleteDerivedInput = {
+  /** Its ID, as its own query takes it */
+  id: Scalars['ID']['input'];
+  /** What it is */
+  kind: LineageNodeKind;
+};
+
 /** Input for deleting a file by ID */
 export type DeleteFileInput = {
+  /** Also delete everything made from it -- the closure `preflightDelete<Model>` lists: derived data, data computed within a shape, shapes refined or converted from it, series converted out of a file, files exported from a dataset. Without it, a delete of something anything was made from is refused, naming what */
+  cascade?: Scalars['Boolean']['input'];
   /** The ID of the file to delete */
   id: Scalars['ID']['input'];
 };
 
 /** Input for deleting a fixture by ID */
 export type DeleteFixtureInput = {
+  /** Also delete everything made from it -- the closure `preflightDelete<Model>` lists: derived data, data computed within a shape, shapes refined or converted from it, series converted out of a file, files exported from a dataset. Without it, a delete of something anything was made from is refused, naming what */
+  cascade?: Scalars['Boolean']['input'];
   /** The ID of the fixture to delete */
   id: Scalars['ID']['input'];
 };
@@ -2950,6 +3271,18 @@ export type DeleteFixtureInput = {
 /** Input for deleting a folder by ID */
 export type DeleteFolderInput = {
   /** The ID of the folder to delete */
+  id: Scalars['ID']['input'];
+};
+
+/** Input for deleting a grid by ID. Deletes its layers and nothing they drew: the data, and the grid's world, are untouched */
+export type DeleteGridInput = {
+  /** The ID of the grid to delete */
+  id: Scalars['ID']['input'];
+};
+
+/** Input for deleting a grid layer by ID. Deletes the layer and nothing it drew */
+export type DeleteGridLayerInput = {
+  /** The ID of the grid layer to delete */
   id: Scalars['ID']['input'];
 };
 
@@ -2967,6 +3300,8 @@ export type DeleteLensInput = {
 
 /** Input for deleting a mesh collection by ID */
 export type DeleteMeshCollectionInput = {
+  /** Also delete everything made from it -- the closure `preflightDelete<Model>` lists: derived data, data computed within a shape, shapes refined or converted from it, series converted out of a file, files exported from a dataset. Without it, a delete of something anything was made from is refused, naming what */
+  cascade?: Scalars['Boolean']['input'];
   /** The ID of the mesh collection to delete */
   id: Scalars['ID']['input'];
 };
@@ -2978,8 +3313,29 @@ export type DeleteMetricInput = {
 
 /** Input for deleting a network collection by ID */
 export type DeleteNetworkCollectionInput = {
+  /** Also delete everything made from it -- the closure `preflightDelete<Model>` lists: derived data, data computed within a shape, shapes refined or converted from it, series converted out of a file, files exported from a dataset. Without it, a delete of something anything was made from is refused, naming what */
+  cascade?: Scalars['Boolean']['input'];
   /** The ID of the network collection to delete */
   id: Scalars['ID']['input'];
+};
+
+/** What deleting one object would cost, without deleting it: everything made from it (which a plain delete refuses over, and `cascade: true` takes along), what would stop the delete, and what else cascades with it */
+export type DeletePreflight = {
+  __typename?: 'DeletePreflight';
+  /** What stops the delete, with or without `cascade`. Empty when it may go ahead */
+  blockers: Array<DeleteBlocker>;
+  /** Other rows that would go with it, by kind, e.g. the layers drawing it and its lenses */
+  cascadeCounts: Array<CascadeCount>;
+  /** Everything made from it, transitively, nearest first. Non-empty means the delete needs `cascade: true` */
+  casualties: Array<DeleteCasualty>;
+  /** Whether the delete can go ahead -- with `cascade: true` when `needsCascade` */
+  deletable: Scalars['Boolean']['output'];
+  /** Whether a plain delete would be refused because something was made from it */
+  needsCascade: Scalars['Boolean']['output'];
+  /** `<kind>:<id>` of what would be deleted */
+  target: Scalars['ID']['output'];
+  /** Whether more was made from it than one delete may take along: refused even with `cascade`; delete from the leaves */
+  truncated: Scalars['Boolean']['output'];
 };
 
 /** Input for un-registering a source from a shared space by naming the source and the space, not the edge. Provide exactly one source -- the same selector registering it took */
@@ -3007,12 +3363,16 @@ export type DeleteSceneSnapshotInput = {
 
 /** Input for deleting a sparse dataset by ID */
 export type DeleteSparseDatasetInput = {
+  /** Also delete everything made from it -- the closure `preflightDelete<Model>` lists: derived data, data computed within a shape, shapes refined or converted from it, series converted out of a file, files exported from a dataset. Without it, a delete of something anything was made from is refused, naming what */
+  cascade?: Scalars['Boolean']['input'];
   /** The ID of the sparse dataset to delete */
   id: Scalars['ID']['input'];
 };
 
 /** Input for deleting a table dataset by ID */
 export type DeleteTableDatasetInput = {
+  /** Also delete everything made from it -- the closure `preflightDelete<Model>` lists: derived data, data computed within a shape, shapes refined or converted from it, series converted out of a file, files exported from a dataset. Without it, a delete of something anything was made from is refused, naming what */
+  cascade?: Scalars['Boolean']['input'];
   /** The ID of the table dataset to delete */
   id: Scalars['ID']['input'];
 };
@@ -3049,6 +3409,8 @@ export enum DerivationSourceKind {
   Lens = 'LENS',
   /** A mesh collection, through its vertex coordinate system. */
   MeshCollection = 'MESH_COLLECTION',
+  /** One object of a mesh collection: the data was computed from that one surface -- a crop to a cell's mesh, measurements over one organelle. The MESH_COLLECTION arm on the collection, and which object: the edge lands in the collection's vertex space and carries the object's id (the catalog's `object_id`), so two objects of one collection are two sources. What `meshObject(...).derivedResidents` reads back. */
+  MeshObject = 'MESH_OBJECT',
   /** A table dataset, through the space its coordinate columns declare -- the direction an image reconstructed from a table of SMLM localizations is derived. A table with no coordinate columns enumerates objects rather than places them, and its only honest edge is UNMAPPABLE. */
   TableDataset = 'TABLE_DATASET'
 }
@@ -3067,8 +3429,10 @@ export type DerivedFromInput = {
   kind: DerivationSourceKind;
   /** (LENS) The lens this data was computed from, of any kind but a network or sparse lens -- those are derived, never derived from. Every container arm below is this arm on the container's whole lens */
   lens?: InputMaybe<Scalars['ID']['input']>;
-  /** (MESH_COLLECTION) The mesh collection this data was computed from */
+  /** (MESH_COLLECTION, MESH_OBJECT) The mesh collection this data was computed from, or whose object it was */
   meshCollection?: InputMaybe<Scalars['ID']['input']>;
+  /** (MESH_OBJECT) Which object of `meshCollection` this data was computed from: its id in the collection's object catalog. The edge lands in the collection's vertex space and names the object */
+  meshObject?: InputMaybe<Scalars['Int']['input']>;
   /** (TABLE_DATASET) The table this data was computed from -- an SMLM localization table a reconstruction was rendered from, say */
   tableDataset?: InputMaybe<Scalars['ID']['input']>;
   /** How this data's own space maps back into the source's -- any creatable kind; the rank check holds you to it. **Omit it and the edge is UNMAPPABLE**: naming a source records the lineage and claims no geometry, which is the truth for a table of per-object measurements whose rows are not anywhere. State IDENTITY for an in-place operation, TRANSLATION for a crop, SCALE for a resample or for a localization table's nanometres into a reconstruction's pixels, BY_DIMENSION for a projection that drops an axis. Only a mappable edge carries placement: derived data sits where its source sits exactly when it says how */
@@ -3208,6 +3572,86 @@ export type DimensionPartInput = {
   outputAxes: Array<Scalars['String']['input']>;
   scale?: InputMaybe<Array<Scalars['Float']['input']>>;
   translation?: InputMaybe<Array<Scalars['Float']['input']>>;
+};
+
+/** A layer that summarises the values of one column of a table lens' rows: a HISTOGRAM (`bins`) or a BOX, over every row or once per value of `groupColumn` -- a condition, a cluster, a long-form channel. The rows are placed in the chart's world; their values are the horizontal axis. Example: the `area` of nuclei, one histogram per `condition` */
+export type DistributionChartLayer = ChartLayer & {
+  __typename?: 'DistributionChartLayer';
+  /** The name of the source axis that runs along the chart's axis: for a trace, the axis of its lens the values are read along; for a series, the table's coordinate column; for an annotation layer, the axis of the drawing space that is the chart's own. **Not a setting.** It is the one source axis the composed placement reads the chart's axis from, so it follows the registration: re-register the data by another axis and this changes with no write to the layer. Null when the layer is no longer placed, or is placed by a map that reads the chart's axis from several source axes */
+  alongAxis?: Maybe<Scalars['String']['output']>;
+  /** This layer's whole `pathToWorld` composed into one affine map: a single row, because the chart's world has a single axis. The coefficient on `alongAxis` is the scale from a step along the data to a step along the chart's axis, in the axis's unit, and the last entry is the offset. Derived on read. Null when `pathToWorld` is null; an error when a path exists but does not condense */
+  asAffine?: Maybe<AffinePlacement>;
+  /** How many bins a HISTOGRAM is cut into. Null lets the viewer choose */
+  bins?: Maybe<Scalars['Int']['output']>;
+  chart: Chart;
+  /** The colour the layer is drawn in, as RGBA. Null lets the viewer choose */
+  color?: Maybe<Array<Scalars['Float']['output']>>;
+  /** The column whose values split the rows into one summary each: a text or boolean attribute, a label, a group id, or a long-form CHANNEL coordinate. Null for one summary over every row */
+  groupColumn?: Maybe<Scalars['String']['output']>;
+  id: Scalars['ID']['output'];
+  kind: ChartLayerKind;
+  /** The table lens whose rows are summarised: the rows its selection keeps */
+  lens: TableLens;
+  /** How thick the outlines are, as a multiple of the chart's default: 1 is the default, 2 twice as thick, 0.5 half. Never pixels -- what the default is on screen is the viewer's. Null lets the viewer choose */
+  lineWidth?: Maybe<Scalars['Float']['output']>;
+  /** How the values are summarised: a HISTOGRAM or a BOX */
+  mark: ChartMark;
+  name?: Maybe<Scalars['String']['output']>;
+  opacity: Scalars['Float']['output'];
+  order: Scalars['Int']['output'];
+  /** The path of transformation edges from this layer's source coordinate system to its chart's world. Null when the layer is unregistered; empty when the source already is the world. `asAffine` is the same path composed */
+  pathToWorld?: Maybe<Array<PlacementStep>>;
+  /** Whether this layer has a place along its chart's axis, and if not, why not. UNREGISTERED is a gap to close; UNMAPPABLE is a fact to badge; CONDITIONAL is a placement to ask again for with `at`. Derived, never stored */
+  placement: PlacementState;
+  /** Which geometric properties survive the walk from this layer's data to the chart's world: the weakest edge on its path. Derived, never stored */
+  placementInvariance: TransformInvariance;
+  /** How much this layer's placement is actually known: the weakest edge on its path to the chart's world. Derived, never stored */
+  placementValidity: PlacementValidity;
+  /** The table dataset whose columns are read: the container of the lens */
+  tableDataset: TableDataset;
+  /** The numeric column whose values are summarised: the chart's horizontal axis */
+  valueColumn: Scalars['String']['output'];
+  /** The unit of `valueColumn`, as the table declares it: the chart's horizontal axis. Null when the column declares none */
+  valueUnit?: Maybe<Scalars['Unit']['output']>;
+  visible: Scalars['Boolean']['output'];
+  /** The lens' selection as row filters, always applied: a row is drawn when every one keeps it (`min <= column <= max`, an omitted side open). Derived from the lens; empty for a whole lens */
+  windowFilters: Array<LabelFilterBy>;
+};
+
+
+/** A layer that summarises the values of one column of a table lens' rows: a HISTOGRAM (`bins`) or a BOX, over every row or once per value of `groupColumn` -- a condition, a cluster, a long-form channel. The rows are placed in the chart's world; their values are the horizontal axis. Example: the `area` of nuclei, one histogram per `condition` */
+export type DistributionChartLayerAlongAxisArgs = {
+  at?: InputMaybe<Array<CoordinateInput>>;
+};
+
+
+/** A layer that summarises the values of one column of a table lens' rows: a HISTOGRAM (`bins`) or a BOX, over every row or once per value of `groupColumn` -- a condition, a cluster, a long-form channel. The rows are placed in the chart's world; their values are the horizontal axis. Example: the `area` of nuclei, one histogram per `condition` */
+export type DistributionChartLayerAsAffineArgs = {
+  at?: InputMaybe<Array<CoordinateInput>>;
+};
+
+
+/** A layer that summarises the values of one column of a table lens' rows: a HISTOGRAM (`bins`) or a BOX, over every row or once per value of `groupColumn` -- a condition, a cluster, a long-form channel. The rows are placed in the chart's world; their values are the horizontal axis. Example: the `area` of nuclei, one histogram per `condition` */
+export type DistributionChartLayerPathToWorldArgs = {
+  at?: InputMaybe<Array<CoordinateInput>>;
+};
+
+
+/** A layer that summarises the values of one column of a table lens' rows: a HISTOGRAM (`bins`) or a BOX, over every row or once per value of `groupColumn` -- a condition, a cluster, a long-form channel. The rows are placed in the chart's world; their values are the horizontal axis. Example: the `area` of nuclei, one histogram per `condition` */
+export type DistributionChartLayerPlacementArgs = {
+  at?: InputMaybe<Array<CoordinateInput>>;
+};
+
+
+/** A layer that summarises the values of one column of a table lens' rows: a HISTOGRAM (`bins`) or a BOX, over every row or once per value of `groupColumn` -- a condition, a cluster, a long-form channel. The rows are placed in the chart's world; their values are the horizontal axis. Example: the `area` of nuclei, one histogram per `condition` */
+export type DistributionChartLayerPlacementInvarianceArgs = {
+  at?: InputMaybe<Array<CoordinateInput>>;
+};
+
+
+/** A layer that summarises the values of one column of a table lens' rows: a HISTOGRAM (`bins`) or a BOX, over every row or once per value of `groupColumn` -- a condition, a cluster, a long-form channel. The rows are placed in the chart's world; their values are the horizontal axis. Example: the `area` of nuclei, one histogram per `condition` */
+export type DistributionChartLayerPlacementValidityArgs = {
+  at?: InputMaybe<Array<CoordinateInput>>;
 };
 
 /** How a viewer eases the camera along the travel into an animation waypoint. */
@@ -3511,7 +3955,7 @@ export type FileLink = {
   /** Provenance entries for this link */
   provenanceEntries: Array<ProvenanceEntry>;
   /** Which part of the file this link concerns -- the series of a multi-series LIF or CZI. Empty when the file holds one thing. Part of the link's identity, so a dataset fused from two series of one file has two links */
-  seriesIdentifier?: Maybe<Scalars['String']['output']>;
+  seriesIdentifier: Scalars['String']['output'];
   /** What the conversion did to the values: IDENTICAL for a lossless transcode, TRANSFORMED for a projection or a contrast-stretched export. Null when unstated */
   valueRelation?: Maybe<ValueRelation>;
 };
@@ -3768,6 +4212,14 @@ export type FinishZarrUploadInput = {
   valid?: Scalars['Boolean']['input'];
 };
 
+/** What one implementation can handle, as the rekuest server compiled its `Fits`: objects satisfying it are ones that implementation's agent can take. `path` comes from `Implementation.fits.compiledPath`, and only comparisons of numbers over declared descriptors and `$agent` are accepted. */
+export type FitsConstraintInput = {
+  /** The agent's hardware the path reads as `$agent`: numbers by name. */
+  agent?: InputMaybe<Scalars['JSON']['input']>;
+  /** The formula as a PostgreSQL jsonpath. */
+  path: Scalars['String']['input'];
+};
+
 /** A piece of hardware around the sample -- a coverslip, a dish, a holder -- stored as one binary glTF. Ask its `store` for an `accessGrant` and load the file whole; its space's axes carry the units its vertices are in */
 export type Fixture = {
   __typename?: 'Fixture';
@@ -3896,7 +4348,7 @@ export type FixtureLens = Lens & {
   /** The coordinate anchors inside this selection: an anchor global along an axis, or pinned inside the lens' range on it. Empty for a container kind that carries no anchors (meshes, networks, annotation collections) */
   activeAnchors: Array<CoordinateAnchor>;
   /** The coordinate system the lens' selection is expressed in. A sliced array lens owns one (the space its slices cut out, with the derived edge recording the shift); every other lens selects within its container's own space and resolves to it */
-  coordinateSystem?: Maybe<CoordinateSystem>;
+  coordinateSystem: CoordinateSystem;
   /** When this selection was first asked for; a whole lens, when its container was made */
   createdAt: Scalars['DateTime']['output'];
   /** The task this selection was made under, if any */
@@ -3909,17 +4361,25 @@ export type FixtureLens = Lens & {
   defaultScene?: Maybe<Scene>;
   /** This object's descriptors, a flat mapping of key to value: the facts about it that an action's port can `require` and a trigger can test (e.g. `@mikro/n_channels`). The keys are the ones mikro declares for this structure, and the values are the ones a signal about the object carries. Empty for a structure that declares none */
   descriptors: Scalars['JSON']['output'];
+  /** What this lens selects that its name does not already say, or empty: `y[0:32]` for a crop of the channel named 'GFP', nothing for that channel itself. An axis held to one position at an anchor whose label is in `name` is left out; an unnamed lens keeps its whole selection (`c[1:2], y[0:32]`), a whole lens has none */
+  detail: Scalars['String']['output'];
   /** The fixture this lens selects over */
   fixture: Fixture;
   id: Scalars['ID']['output'];
   /** What this lens selects over: an array by slices, or a table, a sparse dataset, a mesh, a network or an annotation collection by windows */
   kind: LensKind;
-  /** What to call this lens in a list, never empty: its `name` when it has one, else its container's name followed by what it selects of it (`cells.zarr · c[0:1]`); a whole lens is called by its container. What a picker shows for an option */
+  /** What to call this lens in a list on one line, never empty: its `title`, its `origin` when the title is not already it, and its `detail` (`GFP · cells.zarr · y[0:32]`); a whole lens is called by its container. The title comes first because a row is cut at its end. A reader that lays the parts out itself asks for them instead */
   label: Scalars['String']['output'];
-  /** What someone called this selection, or null when nobody has. A label only: it is no part of what the lens selects, and a client shows the selection -- or 'the whole container' -- in its place */
+  /** What this selection is called, or null when nothing names it: the labels at the positions it pins (a person's `setPositionLabel` over the channel label ingest recorded) and the name of the annotation it was cut to, e.g. 'GFP · nucleus 3'. Derived and kept by the server, never set: naming channel 1 names every lens through channel 1. No part of the lens' identity, which is its container and its selection. `nameAnchors` says where it comes from */
   name?: Maybe<Scalars['String']['output']>;
+  /** The coordinate anchors whose labels make up `name`, in the order they appear in it: those of the container whose every pinned axis this lens holds to the same position, the most specific only. Each carries the person's `positionLabel` and the recorded `channelLabel`; the first that says something is the one used. Empty for a lens no position names, and for a kind whose container carries no anchors */
+  nameAnchors: Array<CoordinateAnchor>;
+  /** The name of the container this lens selects over, never empty: what `title` falls back to, and what a picker groups a container's lenses under */
+  origin: Scalars['String']['output'];
   /** The scenes this lens is rendered in: those with a layer drawing through it or through any selection within it, of any kind. Derived, never stored, exactly as `ArrayDataset.scenes` is. A layer over one channel of a crop draws the crop, and a layer over any crop draws the whole lens -- so a whole lens answers for the whole container and a window or a crop for what it contains; a scene showing a selection that reaches outside this one is that selection's to report */
   scenes: Array<Scene>;
+  /** What a layer drawing this lens is called, never empty: its `name` when something names it, else its container's name. The short half of `label`: what a picker's row says under a heading that already names the container (`origin`) */
+  title: Scalars['String']['output'];
   /** The windows, in the one normalized spelling: container axis order, floats, an open side as null. Empty for the whole lens */
   windows: Array<Window>;
 };
@@ -3937,7 +4397,7 @@ export type Folder = {
   createdThrough?: Maybe<Task>;
   /** The assigner of the creating task, if any */
   createdThroughBy?: Maybe<User>;
-  creator?: Maybe<User>;
+  creator: User;
   description?: Maybe<Scalars['String']['output']>;
   /** This object's descriptors, a flat mapping of key to value: the facts about it that an action's port can `require` and a trigger can test (e.g. `@mikro/n_channels`). The keys are the ones mikro declares for this structure, and the values are the ones a signal about the object carries. Empty for a structure that declares none */
   descriptors: Scalars['JSON']['output'];
@@ -4263,6 +4723,222 @@ export enum GraphTarget {
   Node = 'NODE'
 }
 
+/** A composition that shows **which**: its rows and columns are the members of its world's one or two enumerating axes (INDEX, CHANNEL, CATEGORY), in order and with no distance between them, and a value is drawn as a cell's colour. Beside a scene, which shows *where* (screen axes a place), and a chart, which shows *how much* (values as position): row 3 of a grid comes after row 2, it is not one unit from it. Examples: a sparse matrix of genes against cells as a heatmap; a long-form table's mean per cell and channel; a plate's wells. It adopts its world -- the space whose members it lays out -- names data through lenses and owns none of it */
+export type Grid = Visualization & {
+  __typename?: 'Grid';
+  /** The axis whose members are the columns: the world's second axis. Null for a grid of one axis, a single column of rows */
+  columnAxis?: Maybe<Axis>;
+  createdAt: Scalars['DateTime']['output'];
+  creator?: Maybe<User>;
+  description?: Maybe<Scalars['String']['output']>;
+  /** This object's descriptors, a flat mapping of key to value: the facts about it that an action's port can `require` and a trigger can test (e.g. `@mikro/n_channels`). The keys are the ones mikro declares for this structure, and the values are the ones a signal about the object carries. Empty for a structure that declares none */
+  descriptors: Scalars['JSON']['output'];
+  id: Scalars['ID']['output'];
+  /** The layers drawn in this grid, back to front (a heterogeneous list of layer kinds) */
+  layers: Array<GridLayer>;
+  name: Scalars['String']['output'];
+  /** The axis whose members are the rows: the world's first axis */
+  rowAxis: Axis;
+  /** The space whose members this grid lays out: one or two enumerating axes, rows then columns. Never owned by the grid: several compositions can share it, and deleting a grid never deletes it */
+  worldCoordinateSystem: CoordinateSystem;
+};
+
+
+/** A composition that shows **which**: its rows and columns are the members of its world's one or two enumerating axes (INDEX, CHANNEL, CATEGORY), in order and with no distance between them, and a value is drawn as a cell's colour. Beside a scene, which shows *where* (screen axes a place), and a chart, which shows *how much* (values as position): row 3 of a grid comes after row 2, it is not one unit from it. Examples: a sparse matrix of genes against cells as a heatmap; a long-form table's mean per cell and channel; a plate's wells. It adopts its world -- the space whose members it lays out -- names data through lenses and owns none of it */
+export type GridLayersArgs = {
+  filters?: InputMaybe<GridLayerFilter>;
+  ordering?: Array<GridLayerOrder>;
+  pagination?: InputMaybe<OffsetPaginationInput>;
+};
+
+/** Numeric/aggregatable fields of Grid */
+export enum GridField {
+  Pk = 'PK'
+}
+
+export type GridFilter = {
+  AND?: InputMaybe<GridFilter>;
+  DISTINCT?: InputMaybe<Scalars['Boolean']['input']>;
+  NOT?: InputMaybe<GridFilter>;
+  OR?: InputMaybe<GridFilter>;
+  /** Filter to the grids laid out over this coordinate system */
+  coordinateSystem?: InputMaybe<Scalars['ID']['input']>;
+  /** Filter for items created after this datetime */
+  createdAfter?: InputMaybe<Scalars['DateTime']['input']>;
+  /** Filter for items created before this datetime */
+  createdBefore?: InputMaybe<Scalars['DateTime']['input']>;
+  id?: InputMaybe<Scalars['ID']['input']>;
+  /** Filter by list of IDs */
+  ids?: InputMaybe<Array<Scalars['ID']['input']>>;
+  name?: InputMaybe<StrFilterLookup>;
+  /** Filter to the objects satisfying every one of these descriptor constraints: the `requires` of a port, handed on unchanged, so a picker offers what the port accepts. Answered in SQL from the descriptors stored on every row. A key the structure does not declare is refused rather than ignored */
+  requires?: InputMaybe<Array<DescriptorConstraintInput>>;
+  /** Search by name (case-insensitive substring) */
+  search?: InputMaybe<Scalars['String']['input']>;
+};
+
+/** A layer drawn in a grid: a lens placed in the grid's world, covering its rows and columns, each cell coloured by a value. It carries view state only; where its data sits (`asAffine`, `placement`) is derived from the graph on read. The concrete kind says what it reads: HeatmapGridLayer an array or a sparse matrix, CellsGridLayer a table's rows */
+export type GridLayer = {
+  /** This layer's placement composed into one affine map from its lens' space onto the grid's world: which of its positions is which row and column. Derived on read. Null when the layer is no longer placed */
+  asAffine?: Maybe<AffinePlacement>;
+  /** How a value becomes a colour */
+  colormap: ColorMap;
+  grid: Grid;
+  id: Scalars['ID']['output'];
+  kind: GridLayerKind;
+  /** The value drawn at the top of the colormap. Null lets the viewer choose */
+  max?: Maybe<Scalars['Float']['output']>;
+  /** The value drawn at the bottom of the colormap. Null lets the viewer choose */
+  min?: Maybe<Scalars['Float']['output']>;
+  name?: Maybe<Scalars['String']['output']>;
+  opacity: Scalars['Float']['output'];
+  order: Scalars['Int']['output'];
+  /** Whether this layer has a place in its grid's world, and if not, why not. Derived, never stored */
+  placement: PlacementState;
+  visible: Scalars['Boolean']['output'];
+};
+
+
+/** A layer drawn in a grid: a lens placed in the grid's world, covering its rows and columns, each cell coloured by a value. It carries view state only; where its data sits (`asAffine`, `placement`) is derived from the graph on read. The concrete kind says what it reads: HeatmapGridLayer an array or a sparse matrix, CellsGridLayer a table's rows */
+export type GridLayerAsAffineArgs = {
+  at?: InputMaybe<Array<CoordinateInput>>;
+};
+
+
+/** A layer drawn in a grid: a lens placed in the grid's world, covering its rows and columns, each cell coloured by a value. It carries view state only; where its data sits (`asAffine`, `placement`) is derived from the graph on read. The concrete kind says what it reads: HeatmapGridLayer an array or a sparse matrix, CellsGridLayer a table's rows */
+export type GridLayerPlacementArgs = {
+  at?: InputMaybe<Array<CoordinateInput>>;
+};
+
+export type GridLayerFilter = {
+  AND?: InputMaybe<GridLayerFilter>;
+  DISTINCT?: InputMaybe<Scalars['Boolean']['input']>;
+  NOT?: InputMaybe<GridLayerFilter>;
+  OR?: InputMaybe<GridLayerFilter>;
+  /** Filter by the grid this layer is drawn in */
+  grid?: InputMaybe<Scalars['ID']['input']>;
+  id?: InputMaybe<Scalars['ID']['input']>;
+  /** Filter by list of IDs */
+  ids?: InputMaybe<Array<Scalars['ID']['input']>>;
+  kind?: InputMaybe<GridLayerKindChoices>;
+};
+
+/** The kind of a grid layer, which says what it reads. HEATMAP reads an array or a sparse matrix whose free axes are the grid's: one cell per position, its value the colour -- genes against cells. CELLS reads a table whose frame is the grid's axes: one cell per row, coloured by the value of a column -- the mean of each cell in each channel of a long-form table, or a value per well of a plate. */
+export enum GridLayerKind {
+  Cells = 'CELLS',
+  Heatmap = 'HEATMAP'
+}
+
+export enum GridLayerKindChoices {
+  Cells = 'CELLS',
+  Heatmap = 'HEATMAP'
+}
+
+export type GridLayerOrder =
+  { id: Ordering; order?: never; }
+  |  { id?: never; order: Ordering; };
+
+export type GridOrder =
+  { createdAt: Ordering; id?: never; name?: never; }
+  |  { createdAt?: never; id: Ordering; name?: never; }
+  |  { createdAt?: never; id?: never; name: Ordering; };
+
+/** How a grid is drawn from what is already placed in a space */
+export type GridPolicyInput = {
+  nchildren?: Scalars['Int']['input'];
+};
+
+export type GridStats = {
+  __typename?: 'GridStats';
+  /** Average */
+  avg?: Maybe<Scalars['Float']['output']>;
+  /** Total number of items in the selection */
+  count: Scalars['Int']['output'];
+  /** Number of distinct values for the field */
+  distinctCount: Scalars['Int']['output'];
+  /** Maximum */
+  max?: Maybe<Scalars['Float']['output']>;
+  /** Minimum */
+  min?: Maybe<Scalars['Float']['output']>;
+  /** Time-bucketed stats over a datetime field. */
+  series: Array<TimeBucket>;
+  /** Sum */
+  sum?: Maybe<Scalars['Float']['output']>;
+};
+
+
+export type GridStatsAvgArgs = {
+  field: GridField;
+};
+
+
+export type GridStatsDistinctCountArgs = {
+  field: GridField;
+};
+
+
+export type GridStatsMaxArgs = {
+  field: GridField;
+};
+
+
+export type GridStatsMinArgs = {
+  field: GridField;
+};
+
+
+export type GridStatsSeriesArgs = {
+  by: Granularity;
+  field: GridField;
+  timestampField: GridTimestampField;
+};
+
+
+export type GridStatsSumArgs = {
+  field: GridField;
+};
+
+/** Datetime fields of Grid for bucketing */
+export enum GridTimestampField {
+  CreatedAt = 'CREATED_AT'
+}
+
+/** A layer that draws an array or a sparse matrix as a heatmap: its lens leaves free exactly the grid's axes, and each position is a cell coloured by the value there. Example: a sparse matrix of genes against cells, read through its whole lens */
+export type HeatmapGridLayer = GridLayer & {
+  __typename?: 'HeatmapGridLayer';
+  /** This layer's placement composed into one affine map from its lens' space onto the grid's world: which of its positions is which row and column. Derived on read. Null when the layer is no longer placed */
+  asAffine?: Maybe<AffinePlacement>;
+  /** How a value becomes a colour */
+  colormap: ColorMap;
+  grid: Grid;
+  id: Scalars['ID']['output'];
+  kind: GridLayerKind;
+  /** The array or sparse lens whose values are drawn */
+  lens: Lens;
+  /** The value drawn at the top of the colormap. Null lets the viewer choose */
+  max?: Maybe<Scalars['Float']['output']>;
+  /** The value drawn at the bottom of the colormap. Null lets the viewer choose */
+  min?: Maybe<Scalars['Float']['output']>;
+  name?: Maybe<Scalars['String']['output']>;
+  opacity: Scalars['Float']['output'];
+  order: Scalars['Int']['output'];
+  /** Whether this layer has a place in its grid's world, and if not, why not. Derived, never stored */
+  placement: PlacementState;
+  visible: Scalars['Boolean']['output'];
+};
+
+
+/** A layer that draws an array or a sparse matrix as a heatmap: its lens leaves free exactly the grid's axes, and each position is a cell coloured by the value there. Example: a sparse matrix of genes against cells, read through its whole lens */
+export type HeatmapGridLayerAsAffineArgs = {
+  at?: InputMaybe<Array<CoordinateInput>>;
+};
+
+
+/** A layer that draws an array or a sparse matrix as a heatmap: its lens leaves free exactly the grid's axes, and each position is a cell coloured by the value there. Example: a sparse matrix of genes against cells, read through its whole lens */
+export type HeatmapGridLayerPlacementArgs = {
+  at?: InputMaybe<Array<CoordinateInput>>;
+};
+
 /** The type of change that was made. */
 export enum HistoryKind {
   Create = 'CREATE',
@@ -4301,6 +4977,13 @@ export enum HopCardinality {
   One = 'ONE'
 }
 
+/** Which way a hop crosses its fact. FORWARD: as declared -- a column's values are rows of the table it `references`, a matrix axis' positions are rows. REVERSE: a `references` read backwards -- every row of another table whose column names the held row (a cluster's members); MANY, binding the parent's INDEX into the child's referencing column. SAME_ROWS: the same row in another table, across an edge between the two tables' frames (the PCA row of a measurement row); the lookup's `keyMap`, when set, maps the held id onto the other INDEX first. REVERSE and SAME_ROWS appear only in a row's plan (`rowPlan`) */
+export enum HopDirection {
+  Forward = 'FORWARD',
+  Reverse = 'REVERSE',
+  SameRows = 'SAME_ROWS'
+}
+
 /** The schema fact one hop crosses. `column`: a `Column.references` hop -- the parent row's column whose values are row ids of the next table -- or, on a hop into a matrix, or a dense array, the parent table's INDEX column whose values are positions along `axis`. `axis`: the matrix axis crossed, in either direction, or the array axis entered. Whichever is set, its name is the name the hop's lookup binds under (`keyColumns[].axis` / `keyHeld`) */
 export type HopVia = {
   __typename?: 'HopVia';
@@ -4308,6 +4991,8 @@ export type HopVia = {
   axis?: Maybe<Scalars['String']['output']>;
   /** The column whose values are bound: the parent row's reference column, or its INDEX column when the hop enters a matrix or a dense array */
   column?: Maybe<Column>;
+  /** Which way the fact is crossed: FORWARD as declared, REVERSE a `references` read backwards (the child's referencing column binds the parent's INDEX), SAME_ROWS the same row in another table */
+  direction: HopDirection;
 };
 
 export type IdFilterLookup = {
@@ -4713,6 +5398,7 @@ export type LabelColorBy = {
   __typename?: 'LabelColorBy';
   colormap?: Maybe<ColorMap>;
   column?: Maybe<Scalars['String']['output']>;
+  hideBelowMin: Scalars['Boolean']['output'];
   joinPath: Array<JoinStep>;
   kind: ColorSourceKind;
   label?: Maybe<Scalars['String']['output']>;
@@ -4726,6 +5412,7 @@ export type LabelColorBy = {
 export type LabelColorByInput = {
   colormap?: InputMaybe<ColorMap>;
   column?: InputMaybe<Scalars['String']['input']>;
+  hideBelowMin?: Scalars['Boolean']['input'];
   joinPath?: Array<JoinStepInput>;
   kind?: ColorSourceKind;
   label?: InputMaybe<Scalars['String']['input']>;
@@ -5122,7 +5809,7 @@ export type Lens = {
   /** The coordinate anchors inside this selection: an anchor global along an axis, or pinned inside the lens' range on it. Empty for a container kind that carries no anchors (meshes, networks, annotation collections) */
   activeAnchors: Array<CoordinateAnchor>;
   /** The coordinate system the lens' selection is expressed in. A sliced array lens owns one (the space its slices cut out, with the derived edge recording the shift); every other lens selects within its container's own space and resolves to it */
-  coordinateSystem?: Maybe<CoordinateSystem>;
+  coordinateSystem: CoordinateSystem;
   /** When this selection was first asked for; a whole lens, when its container was made */
   createdAt: Scalars['DateTime']['output'];
   /** The task this selection was made under, if any */
@@ -5135,15 +5822,23 @@ export type Lens = {
   defaultScene?: Maybe<Scene>;
   /** This object's descriptors, a flat mapping of key to value: the facts about it that an action's port can `require` and a trigger can test (e.g. `@mikro/n_channels`). The keys are the ones mikro declares for this structure, and the values are the ones a signal about the object carries. Empty for a structure that declares none */
   descriptors: Scalars['JSON']['output'];
+  /** What this lens selects that its name does not already say, or empty: `y[0:32]` for a crop of the channel named 'GFP', nothing for that channel itself. An axis held to one position at an anchor whose label is in `name` is left out; an unnamed lens keeps its whole selection (`c[1:2], y[0:32]`), a whole lens has none */
+  detail: Scalars['String']['output'];
   id: Scalars['ID']['output'];
   /** What this lens selects over: an array by slices, or a table, a sparse dataset, a mesh, a network or an annotation collection by windows */
   kind: LensKind;
-  /** What to call this lens in a list, never empty: its `name` when it has one, else its container's name followed by what it selects of it (`cells.zarr · c[0:1]`); a whole lens is called by its container. What a picker shows for an option */
+  /** What to call this lens in a list on one line, never empty: its `title`, its `origin` when the title is not already it, and its `detail` (`GFP · cells.zarr · y[0:32]`); a whole lens is called by its container. The title comes first because a row is cut at its end. A reader that lays the parts out itself asks for them instead */
   label: Scalars['String']['output'];
-  /** What someone called this selection, or null when nobody has. A label only: it is no part of what the lens selects, and a client shows the selection -- or 'the whole container' -- in its place */
+  /** What this selection is called, or null when nothing names it: the labels at the positions it pins (a person's `setPositionLabel` over the channel label ingest recorded) and the name of the annotation it was cut to, e.g. 'GFP · nucleus 3'. Derived and kept by the server, never set: naming channel 1 names every lens through channel 1. No part of the lens' identity, which is its container and its selection. `nameAnchors` says where it comes from */
   name?: Maybe<Scalars['String']['output']>;
+  /** The coordinate anchors whose labels make up `name`, in the order they appear in it: those of the container whose every pinned axis this lens holds to the same position, the most specific only. Each carries the person's `positionLabel` and the recorded `channelLabel`; the first that says something is the one used. Empty for a lens no position names, and for a kind whose container carries no anchors */
+  nameAnchors: Array<CoordinateAnchor>;
+  /** The name of the container this lens selects over, never empty: what `title` falls back to, and what a picker groups a container's lenses under */
+  origin: Scalars['String']['output'];
   /** The scenes this lens is rendered in: those with a layer drawing through it or through any selection within it, of any kind. Derived, never stored, exactly as `ArrayDataset.scenes` is. A layer over one channel of a crop draws the crop, and a layer over any crop draws the whole lens -- so a whole lens answers for the whole container and a window or a crop for what it contains; a scene showing a selection that reaches outside this one is that selection's to report */
   scenes: Array<Scene>;
+  /** What a layer drawing this lens is called, never empty: its `name` when something names it, else its container's name. The short half of `label`: what a picker's row says under a heading that already names the container (`origin`) */
+  title: Scalars['String']['output'];
 };
 
 /** A box in any coordinate system an array dataset reaches -- micrometres in a physical space, a sibling dataset's grid through a shared world -- as the selection of a lens: the voxels whose cells the box meets, once the box is composed into the dataset's pixel grid */
@@ -5232,6 +5927,8 @@ export type LensFilter = {
   createdThroughTask?: InputMaybe<Scalars['String']['input']>;
   /** Filter to the array lenses over this dataset */
   dataset?: InputMaybe<Scalars['ID']['input']>;
+  /** Only objects at least one of these implementations can handle: their `Fits` as `Implementation.fits.compiledPath`, with their agent's hardware. */
+  fits?: InputMaybe<Array<FitsConstraintInput>>;
   /** Filter to the lenses over this fixture */
   fixture?: InputMaybe<Scalars['ID']['input']>;
   id?: InputMaybe<Scalars['ID']['input']>;
@@ -5455,11 +6152,13 @@ export type LineageAxis = {
 /** That one node was made from another. Always parent to child, the way provenance reads */
 export type LineageEdge = {
   __typename?: 'LineageEdge';
-  /** (DERIVATION) The shape the child was computed along or within, if the derivation named one */
+  /** (DERIVATION) The shape the child was computed along or within, if the derivation named one. Root a walk at it (`kind: ANNOTATION`) for the shape's own lineage */
   annotationId?: Maybe<Scalars['ID']['output']>;
+  /** (SHAPE_DERIVATION) How the child shape was made from the parent shape */
+  annotationRelation?: Maybe<AnnotationRelation>;
   /** Unique within the lineage and stable across walks */
   key: Scalars['ID']['output'];
-  /** A derivation between containers, an ingest from a file, or an export to one */
+  /** A derivation between containers or out of a shape, an ingest from a file, an export to one, or a shape made from a shape */
   kind: LineageEdgeKind;
   /** (DERIVATION) Whether this is the child's primary parent: the first edge its creator declared, the one that places it */
   primary: Scalars['Boolean']['output'];
@@ -5477,11 +6176,12 @@ export type LineageEdge = {
   valueRelation?: Maybe<ValueRelation>;
 };
 
-/** What a lineage edge records */
+/** What a lineage edge records: a derivation (between containers, or from a shape to data computed along or within it), an ingest, an export, or a shape made from a shape */
 export enum LineageEdgeKind {
   Derivation = 'DERIVATION',
   Export = 'EXPORT',
-  Ingest = 'INGEST'
+  Ingest = 'INGEST',
+  ShapeDerivation = 'SHAPE_DERIVATION'
 }
 
 /** The provenance component around one piece of data: every container it was computed from or that was computed from it, transitively, and the derivation edges between them. The lineage counterpart of `coordinateGraph`, and the difference is which edges are *walked*: that one crosses every edge touching a space, so a registration pulls in everything else registered into the same world -- the neighbourhood, not the provenance. This crosses derivation edges only, in both directions, because asking a source what came out of it and asking a product what went into it are the same graph read from two ends */
@@ -5543,8 +6243,9 @@ export type LineageNode = {
   taskId?: Maybe<Scalars['ID']['output']>;
 };
 
-/** What a lineage node is: one of the containers, or a file */
+/** What a lineage node is: one of the containers, a file, or a shape. A shape is reached only by walking from one -- rooted at it, or from a shape made from it -- never fanned out to from its collection */
 export enum LineageNodeKind {
+  Annotation = 'ANNOTATION',
   AnnotationCollection = 'ANNOTATION_COLLECTION',
   Dataset = 'DATASET',
   File = 'FILE',
@@ -5605,7 +6306,7 @@ export type LookupStep = {
   keyColumns: Array<PlanKeyColumn>;
   /** (SPARSE, ARRAY) The name the worker holds the value bound to `keyAxis` under -- what `keyColumns[].axis` is for a table. Equal to `keyAxis` on a landing, where the sample produced it under the axis' name; the parent row's column name on a hop into a matrix or an array */
   keyHeld?: Maybe<Scalars['String']['output']>;
-  /** (ARRAY) The held id as a position along `keyAxis`. A matrix axis *is* the row ids; a dense array's positions relate to them by whatever its derivation edge states (`cell_id = cell + 1`), and this is that edge already inverted. Do not re-derive it from the edge's steps */
+  /** (ARRAY) The held id as a position along `keyAxis`. A matrix axis *is* the row ids; a dense array's positions relate to them by whatever its derivation edge states (`cell_id = cell + 1`), and this is that edge already inverted. Do not re-derive it from the edge's steps. (TABLE, a SAME_ROWS hop) The held id as the target's INDEX value, when the edge between the two frames relabels it; null when the id is the same in both tables */
   keyMap?: Maybe<KeyMap>;
   /** Which shape this lookup is: `TABLE` for a row of a parquet, `SPARSE` for a slice of a matrix, `ARRAY` for one position of a dense array along `keyAxis`. The fields of the other shapes are null -- a flat discriminator rather than an interface, which over these would carry nothing in common */
   kind: Scalars['String']['output'];
@@ -5995,7 +6696,7 @@ export type MeshLens = Lens & {
   /** The coordinate anchors inside this selection: an anchor global along an axis, or pinned inside the lens' range on it. Empty for a container kind that carries no anchors (meshes, networks, annotation collections) */
   activeAnchors: Array<CoordinateAnchor>;
   /** The coordinate system the lens' selection is expressed in. A sliced array lens owns one (the space its slices cut out, with the derived edge recording the shift); every other lens selects within its container's own space and resolves to it */
-  coordinateSystem?: Maybe<CoordinateSystem>;
+  coordinateSystem: CoordinateSystem;
   /** When this selection was first asked for; a whole lens, when its container was made */
   createdAt: Scalars['DateTime']['output'];
   /** The task this selection was made under, if any */
@@ -6008,18 +6709,48 @@ export type MeshLens = Lens & {
   defaultScene?: Maybe<Scene>;
   /** This object's descriptors, a flat mapping of key to value: the facts about it that an action's port can `require` and a trigger can test (e.g. `@mikro/n_channels`). The keys are the ones mikro declares for this structure, and the values are the ones a signal about the object carries. Empty for a structure that declares none */
   descriptors: Scalars['JSON']['output'];
+  /** What this lens selects that its name does not already say, or empty: `y[0:32]` for a crop of the channel named 'GFP', nothing for that channel itself. An axis held to one position at an anchor whose label is in `name` is left out; an unnamed lens keeps its whole selection (`c[1:2], y[0:32]`), a whole lens has none */
+  detail: Scalars['String']['output'];
   id: Scalars['ID']['output'];
   /** What this lens selects over: an array by slices, or a table, a sparse dataset, a mesh, a network or an annotation collection by windows */
   kind: LensKind;
-  /** What to call this lens in a list, never empty: its `name` when it has one, else its container's name followed by what it selects of it (`cells.zarr · c[0:1]`); a whole lens is called by its container. What a picker shows for an option */
+  /** What to call this lens in a list on one line, never empty: its `title`, its `origin` when the title is not already it, and its `detail` (`GFP · cells.zarr · y[0:32]`); a whole lens is called by its container. The title comes first because a row is cut at its end. A reader that lays the parts out itself asks for them instead */
   label: Scalars['String']['output'];
   meshCollection: MeshCollection;
-  /** What someone called this selection, or null when nobody has. A label only: it is no part of what the lens selects, and a client shows the selection -- or 'the whole container' -- in its place */
+  /** What this selection is called, or null when nothing names it: the labels at the positions it pins (a person's `setPositionLabel` over the channel label ingest recorded) and the name of the annotation it was cut to, e.g. 'GFP · nucleus 3'. Derived and kept by the server, never set: naming channel 1 names every lens through channel 1. No part of the lens' identity, which is its container and its selection. `nameAnchors` says where it comes from */
   name?: Maybe<Scalars['String']['output']>;
+  /** The coordinate anchors whose labels make up `name`, in the order they appear in it: those of the container whose every pinned axis this lens holds to the same position, the most specific only. Each carries the person's `positionLabel` and the recorded `channelLabel`; the first that says something is the one used. Empty for a lens no position names, and for a kind whose container carries no anchors */
+  nameAnchors: Array<CoordinateAnchor>;
+  /** The name of the container this lens selects over, never empty: what `title` falls back to, and what a picker groups a container's lenses under */
+  origin: Scalars['String']['output'];
   /** The scenes this lens is rendered in: those with a layer drawing through it or through any selection within it, of any kind. Derived, never stored, exactly as `ArrayDataset.scenes` is. A layer over one channel of a crop draws the crop, and a layer over any crop draws the whole lens -- so a whole lens answers for the whole container and a window or a crop for what it contains; a scene showing a selection that reaches outside this one is that selection's to report */
   scenes: Array<Scene>;
+  /** What a layer drawing this lens is called, never empty: its `name` when something names it, else its container's name. The short half of `label`: what a picker's row says under a heading that already names the container (`origin`) */
+  title: Scalars['String']['output'];
   /** The windows, in the one normalized spelling: container axis order, floats, an open side as null. Empty for the whole lens */
   windows: Array<Window>;
+};
+
+/** One object of a mesh collection: a row of its object catalog, not a row here -- the meshes live in the collection's Parquet store. What the data computed from that one surface hangs off (a MESH_OBJECT derivation). Asked for with `meshObject(collection:, object:)` */
+export type MeshObject = {
+  __typename?: 'MeshObject';
+  /** The mesh collection the object belongs to */
+  collection: MeshCollection;
+  /** Everything computed from this one object: the data whose `derivedFrom` named it as a MESH_OBJECT source. The object-level twin of `Annotation.derivedResidents`, kind-blind like it. These are listed on the collection's own lineage too: an object is part of its collection */
+  derivedResidents: Array<Resident>;
+  /** `<collection>:<object>`: a stable handle, unique across collections */
+  id: Scalars['ID']['output'];
+  /** The object's id in the collection's object catalog: what a picked mesh reports */
+  objectId: Scalars['Int']['output'];
+};
+
+/** The fields a MESH_OBJECT derivation reads. Published for codegen; the wire type is the flat DerivedFromInput */
+export type MeshObjectDerivedFromInput = {
+  kind?: DerivationSourceKind;
+  meshCollection: Scalars['ID']['input'];
+  meshObject: Scalars['Int']['input'];
+  transform?: InputMaybe<TransformInput>;
+  valueRelation?: InputMaybe<ValueRelation>;
 };
 
 /** A mesh collection whose geometry carries the ids. **Nothing is sampled at a coordinate here**: an id rides on the geometry row, so a client that picked a surface is already holding one and goes straight to the lookup -- the mesh case of the rule that makes a plan worth caching, that it never costs a round-trip. `consumes` names the axes that pick resolved rather than axes to index anything with. The store is named for a headless worker that did not do the picking and must read the object catalog itself */
@@ -6205,7 +6936,7 @@ export type Mutation = {
   addToCollaboration: Collaboration;
   /** Attach unstructured metadata to a file */
   attachUnstructuredMeta: UnstructuredMeta;
-  /** Show a coordinate system as whichever composition fits it: a chart over a space with exactly one metric, unit-carrying axis, a scene over any other space with a time or space axis. Bootstrapped from what already resides in the space; authors no edges */
+  /** Show a coordinate system or a lens as whichever composition fits it: a chart over a space with exactly one metric, unit-carrying axis, a grid over two enumerating axes, a scene over any other space with a time or space axis. Bootstrapped from what already resides in the space; authors no edges */
   autoVisualize: Visualization;
   /** Delete every registration INTO a shared space in one call, returning the deleted edge ids. The space, the scenes over it (their layers drop to UNREGISTERED) and the space's own claims into wider spaces all survive. Guarded by the space's creator: clearing a space is the space-owner's act */
   clearCoordinateSystem: Array<Scalars['ID']['output']>;
@@ -6227,7 +6958,9 @@ export type Mutation = {
   createAnnotations: Array<Annotation>;
   /** Create a new dataset from array-like data with optional coordinate anchors and OME metadata */
   createArrayDataset: ArrayDataset;
-  /** Create a chart: a composition of data laid out along one metric axis. Over an existing coordinate system with exactly one metric, unit-carrying axis, or over one created from a single axis */
+  /** Draw a table's rows in a grid: one cell per row at its position along the grid's axes, coloured by a numeric column -- a long-form table's mean per cell and channel */
+  createCellsGridLayer: CellsGridLayer;
+  /** Create a chart over a world: values drawn as position. The world is an existing space or one created from `axis`; along-axis layers (traces, series, marks) are laid along its one metric, unit-carrying axis, value layers (scatters, histograms) draw the rows placed in it at the values of their columns. One chart may hold both */
   createChart: Chart;
   /** Bootstrap a chart over an existing coordinate system, drawing every array, table and annotation collection already laid along its axis. Authors no edges */
   createChartFromCoordinateSystem: Chart;
@@ -6237,6 +6970,8 @@ export type Mutation = {
   createCoordinateAnchor: CoordinateAnchor;
   /** Create a SHARED coordinate system (an ownerless space) and, in one call, author the edges registering any number of sources (datasets, table datasets, mesh collections, coordinate systems) into it */
   createCoordinateSystem: CoordinateSystem;
+  /** Summarise the values of one column of a table lens' rows in a chart: a histogram or a box, over every row or once per value of a grouping column such as a condition */
+  createDistributionChartLayer: DistributionChartLayer;
   /** Register a fixture -- a coverslip, a dish, a holder -- from an uploaded binary glTF, in a unit-carrying coordinate system of its own */
   createFixture: Fixture;
   /** Create a layer that renders a fixture in a scene */
@@ -6245,6 +6980,12 @@ export type Mutation = {
   createFixtureLens: FixtureLens;
   /** Create a new folder to organize data */
   createFolder: Folder;
+  /** Create a grid over an existing space whose one or two enumerating axes (INDEX, CHANNEL, CATEGORY) are its rows and columns: members in order, a value as each cell's colour */
+  createGrid: Grid;
+  /** Bootstrap a grid over an existing space, drawing each sparse matrix and array covering its axes as a heatmap and each table as cells. Authors no edges */
+  createGridFromCoordinateSystem: Grid;
+  /** Draw an array or a sparse matrix in a grid: one cell per position along the grid's axes, coloured by the value there -- genes against cells */
+  createHeatmapGridLayer: HeatmapGridLayer;
   /** Create an intensity layer: one channel of a lens through one colormap -- or one solid RGBA tint, for a colour that is a measured fact rather than a choice -- with contrast limits and gamma. The fluorescence workhorse, and its own kind -- its settings are fields, not a render graph, because there is nothing here to composite */
   createIntensityLayer: IntensityLayer;
   /** Create a label layer that renders an instance / segmentation map -- an array whose values are discrete object ids. Its own layer kind, not an image layer: ids take a hashed colour, a transparent background value and an optional `colorBy` over the table they key into, and none of an image's contrast limits, gamma or colormaps */
@@ -6277,6 +7018,8 @@ export type Mutation = {
   createPhasorLayer: PhasorLayer;
   /** Create a layer that renders a point cloud (e.g. SMLM localisations, centroids) from columns of a table */
   createPointLayer: PointLayer;
+  /** Draw a table lens' rows as points in a chart: placed in its world (whose rows), each drawn at the values of two columns (a scatter), or three for depth */
+  createPointsChartLayer: PointsChartLayer;
   /** Create an RGB layer: three channels of a lens as the red, green and blue components of one picture -- a photograph, a brightfield slide -- sharing one pair of contrast limits. Its own kind rather than a three-channel render graph, because as a graph it is indistinguishable from three fluorescence markers somebody tinted red, green and blue, which is the commoner reading. Never inferred from that shape: a bootstrapped scene reaches this kind only on evidence ingest recorded -- channels labelled red, green and blue, or arrays read out of a PNG -- so state it here for a photograph that arrived with neither */
   createRgbLayer: RgbLayer;
   /** Create a new scene over a world coordinate system: an adopted existing system, or an ordinary SHARED one created for it (never owned by the scene -- it outlives it) */
@@ -6295,8 +7038,10 @@ export type Mutation = {
   createSparseLens: SparseLens;
   /** Create a table dataset from a Parquet store. Its declared coordinate columns become the axes of a coordinate system it owns, which lets a localization table be placed in a scene; a table with no coordinate columns is a measurement table whose rows enumerate objects and whose lineage edge is UNMAPPABLE */
   createTableDataset: TableDataset;
-  /** The lens keeping these windows of a table dataset's coordinate columns: the one that exists, or a new one. It lives in the table's own space */
+  /** The lens keeping these windows of a table dataset's columns -- a coordinate (a region of space) or a numeric measurement (a gate, `area >= 50`): the one that exists, or a new one. It lives in the table's own space */
   createTableLens: TableLens;
+  /** Plot a table's columns in one call: a chart over the table's space and one POINTS or DISTRIBUTION layer drawing its rows at the values of the named columns. One transaction */
+  createTablePlot: Chart;
   /** Draw an array as a trace in a chart: a lens with one metric axis free, laid along the chart's axis by the graph, and optionally one CHANNEL or INDEX axis free as one line per position */
   createTraceChartLayer: TraceChartLayer;
   /** Create a layer that renders trajectories from columns of a table, grouped by a track id */
@@ -6323,12 +7068,18 @@ export type Mutation = {
   deleteCollaboration: Scalars['ID']['output'];
   /** Delete an unused shared coordinate system. Refused while any scene is rooted in it or any transformation edge touches it. This is the only door a shared space leaves through -- deleting a scene never deletes one. Other system kinds cascade with their owner and cannot be deleted directly */
   deleteCoordinateSystem: Scalars['ID']['output'];
+  /** Delete everything made from one object -- derived data, data computed within a shape, shapes refined or converted from it, series converted out of a file, files exported from a dataset, transitively -- and keep the object. Every row is held to its own owner and delete guards before anything goes; one refusal deletes nothing. Answers the `<kind>:<id>` keys deleted; nothing made from it deletes nothing (`preflightDeleteDerived` lists what it takes) */
+  deleteDerived: Array<Scalars['ID']['output']>;
   /** Delete an existing file */
   deleteFile: Scalars['ID']['output'];
   /** Delete an existing fixture */
   deleteFixture: Scalars['ID']['output'];
   /** Delete an existing folder */
   deleteFolder: Scalars['ID']['output'];
+  /** Delete a grid and its layers. The data they drew and the grid's world are untouched */
+  deleteGrid: Scalars['ID']['output'];
+  /** Delete a grid layer. Deletes nothing it drew */
+  deleteGridLayer: Scalars['ID']['output'];
   /** Delete an existing layer */
   deleteLayer: Scalars['ID']['output'];
   /** Delete a lens of any kind. Refused while a layer draws through it, and for a container's whole lens */
@@ -6477,6 +7228,8 @@ export type Mutation = {
   setDefaultScene: ArrayDataset;
   /** Nominate the scene to open for a lens, and take its thumbnail from. Null clears it. On an unsliced lens this writes its dataset's nomination: the lens is the dataset, looked at whole */
   setLensDefaultScene: Lens;
+  /** Name the positions a lens pins (a channel, a frame), or remove the name: how a lens is named. The name sits at the coordinate anchor of those positions, beside what ingest recorded there, and every lens pinning them -- this one, its crops, the sub-lens a scene draws the channel through -- is called by it (`Lens.name`). A crop is named by the annotation it was cut to, a container by its own name */
+  setPositionLabel: Lens;
   /** Delete a file link */
   unlinkFile: Scalars['ID']['output'];
   /** Re-author a camera tour: rename it, or replace its stops */
@@ -6487,22 +7240,26 @@ export type Mutation = {
   updateArrayDataset: ArrayDataset;
   /** Rename or re-describe a chart. Its world is fixed */
   updateChart: Chart;
-  /** Restyle a chart layer. View state only */
+  /** Restyle a chart layer of any kind: name, visibility, order, opacity, colour and its look */
   updateChartLayer: ChartLayer;
   /** Rename a shared coordinate system or anchor its clock. Shared spaces only -- an owned system's name is its container's business, and where data sits is an edge (updateTransformation), not a property of the space */
   updateCoordinateSystem: CoordinateSystem;
+  /** Retune a distribution: summarise another column, regroup or rebin it, switch between histogram and box, or restyle it */
+  updateDistributionChartLayer: DistributionChartLayer;
   /** Retune how a fixture layer is drawn: its material override, wireframe and compositing. A patch -- an omitted field keeps its value */
   updateFixtureLayer: FixtureLayer;
   /** Update folder metadata */
   updateFolder: Folder;
+  /** Rename or re-describe a grid. Its world is fixed */
+  updateGrid: Grid;
+  /** Restyle a grid layer. View state only */
+  updateGridLayer: GridLayer;
   /** Update an intensity layer's channel, colormap or tint, contrast limits, gamma, projection and compositing settings. A patch: what is not sent keeps its current value */
   updateIntensityLayer: IntensityLayer;
   /** Update a label layer's render settings -- the selection, contour, hashing seed or `colorBy`. A patch: what is not sent keeps its current value */
   updateLabelLayer: LabelLayer;
   /** Update a general image layer's lens, scene, compositing settings and render graph. Refuses every other kind, naming the mutation that does write its settings -- a layer's kind is fixed for the life of the row */
   updateLayer: ImageLayer;
-  /** Rename a lens, or clear its name. What it selects cannot change: a different selection is a different lens */
-  updateLens: Lens;
   /** Retune how a mesh layer is drawn: its material, wireframe, compositing, and which table column colours its objects. A patch -- an omitted field keeps its value */
   updateMeshLayer: MeshLayer;
   /** Retune how a network layer is drawn: its colour, its widths, whether direction and nodes are drawn, and the compositing it takes part in. A patch -- an omitted field keeps its value */
@@ -6511,14 +7268,20 @@ export type Mutation = {
   updatePhasorLayer: PhasorLayer;
   /** Retune a point layer after creation -- above all, switch or republish its colour picker. */
   updatePointLayer: PointLayer;
+  /** Retune a points layer: plot other columns or another table lens' rows, or restyle it */
+  updatePointsChartLayer: PointsChartLayer;
   /** Update an RGB layer's channel indices, contrast limits and compositing settings. A patch: what is not sent keeps its current value */
   updateRgbLayer: RgbLayer;
   /** Set a scene's viewer preferences: how a client should open it */
   updateScene: Scene;
+  /** Retune a series: read another value column or table lens against the chart's axis, or restyle it */
+  updateSeriesChartLayer: SeriesChartLayer;
   /** Rename a sparse dataset or redescribe it -- the whole of what is editable. Its stores, axes and coordinate system are fixed at creation; a recomputation is a new dataset */
   updateSparseDataset: SparseDataset;
   /** Rename a table dataset or redescribe it -- the whole of what is editable. Its store, columns and coordinate system are fixed at creation; a recomputation is a new table */
   updateTableDataset: TableDataset;
+  /** Retune a trace: draw another array lens along the chart's axis, or restyle it */
+  updateTraceChartLayer: TraceChartLayer;
   /** Retune a track layer after creation -- its line width, its colouring column and the compositing it takes part in. */
   updateTrackLayer: TrackLayer;
   /** Refine a transformation's parameters, bumping its version */
@@ -6598,6 +7361,11 @@ export type MutationCreateArrayDatasetArgs = {
 };
 
 
+export type MutationCreateCellsGridLayerArgs = {
+  input: CreateCellsGridLayerInput;
+};
+
+
 export type MutationCreateChartArgs = {
   input: CreateChartInput;
 };
@@ -6623,6 +7391,11 @@ export type MutationCreateCoordinateSystemArgs = {
 };
 
 
+export type MutationCreateDistributionChartLayerArgs = {
+  input: CreateDistributionChartLayerInput;
+};
+
+
 export type MutationCreateFixtureArgs = {
   input: CreateFixtureInput;
 };
@@ -6640,6 +7413,21 @@ export type MutationCreateFixtureLensArgs = {
 
 export type MutationCreateFolderArgs = {
   input: CreateFolderInput;
+};
+
+
+export type MutationCreateGridArgs = {
+  input: CreateGridInput;
+};
+
+
+export type MutationCreateGridFromCoordinateSystemArgs = {
+  input: CreateGridFromCoordinateSystemInput;
+};
+
+
+export type MutationCreateHeatmapGridLayerArgs = {
+  input: CreateHeatmapGridLayerInput;
 };
 
 
@@ -6723,6 +7511,11 @@ export type MutationCreatePointLayerArgs = {
 };
 
 
+export type MutationCreatePointsChartLayerArgs = {
+  input: CreatePointsChartLayerInput;
+};
+
+
 export type MutationCreateRgbLayerArgs = {
   input: CreateRgbLayerInput;
 };
@@ -6770,6 +7563,11 @@ export type MutationCreateTableDatasetArgs = {
 
 export type MutationCreateTableLensArgs = {
   input: CreateTableLensInput;
+};
+
+
+export type MutationCreateTablePlotArgs = {
+  input: CreateTablePlotInput;
 };
 
 
@@ -6838,6 +7636,11 @@ export type MutationDeleteCoordinateSystemArgs = {
 };
 
 
+export type MutationDeleteDerivedArgs = {
+  input: DeleteDerivedInput;
+};
+
+
 export type MutationDeleteFileArgs = {
   input: DeleteFileInput;
 };
@@ -6850,6 +7653,16 @@ export type MutationDeleteFixtureArgs = {
 
 export type MutationDeleteFolderArgs = {
   input: DeleteFolderInput;
+};
+
+
+export type MutationDeleteGridArgs = {
+  input: DeleteGridInput;
+};
+
+
+export type MutationDeleteGridLayerArgs = {
+  input: DeleteGridLayerInput;
 };
 
 
@@ -7203,6 +8016,11 @@ export type MutationSetLensDefaultSceneArgs = {
 };
 
 
+export type MutationSetPositionLabelArgs = {
+  input: SetPositionLabelInput;
+};
+
+
 export type MutationUnlinkFileArgs = {
   input: UnlinkFileInput;
 };
@@ -7238,6 +8056,11 @@ export type MutationUpdateCoordinateSystemArgs = {
 };
 
 
+export type MutationUpdateDistributionChartLayerArgs = {
+  input: UpdateDistributionChartLayerInput;
+};
+
+
 export type MutationUpdateFixtureLayerArgs = {
   input: UpdateFixtureLayerInput;
 };
@@ -7245,6 +8068,16 @@ export type MutationUpdateFixtureLayerArgs = {
 
 export type MutationUpdateFolderArgs = {
   input: ChangeFolderInput;
+};
+
+
+export type MutationUpdateGridArgs = {
+  input: UpdateGridInput;
+};
+
+
+export type MutationUpdateGridLayerArgs = {
+  input: UpdateGridLayerInput;
 };
 
 
@@ -7260,11 +8093,6 @@ export type MutationUpdateLabelLayerArgs = {
 
 export type MutationUpdateLayerArgs = {
   input: UpdateLayerInput;
-};
-
-
-export type MutationUpdateLensArgs = {
-  input: UpdateLensInput;
 };
 
 
@@ -7288,6 +8116,11 @@ export type MutationUpdatePointLayerArgs = {
 };
 
 
+export type MutationUpdatePointsChartLayerArgs = {
+  input: UpdatePointsChartLayerInput;
+};
+
+
 export type MutationUpdateRgbLayerArgs = {
   input: UpdateRgbLayerInput;
 };
@@ -7298,6 +8131,11 @@ export type MutationUpdateSceneArgs = {
 };
 
 
+export type MutationUpdateSeriesChartLayerArgs = {
+  input: UpdateSeriesChartLayerInput;
+};
+
+
 export type MutationUpdateSparseDatasetArgs = {
   input: UpdateSparseDatasetInput;
 };
@@ -7305,6 +8143,11 @@ export type MutationUpdateSparseDatasetArgs = {
 
 export type MutationUpdateTableDatasetArgs = {
   input: UpdateTableDatasetInput;
+};
+
+
+export type MutationUpdateTraceChartLayerArgs = {
+  input: UpdateTraceChartLayerInput;
 };
 
 
@@ -7574,7 +8417,7 @@ export type NetworkLens = Lens & {
   /** The coordinate anchors inside this selection: an anchor global along an axis, or pinned inside the lens' range on it. Empty for a container kind that carries no anchors (meshes, networks, annotation collections) */
   activeAnchors: Array<CoordinateAnchor>;
   /** The coordinate system the lens' selection is expressed in. A sliced array lens owns one (the space its slices cut out, with the derived edge recording the shift); every other lens selects within its container's own space and resolves to it */
-  coordinateSystem?: Maybe<CoordinateSystem>;
+  coordinateSystem: CoordinateSystem;
   /** When this selection was first asked for; a whole lens, when its container was made */
   createdAt: Scalars['DateTime']['output'];
   /** The task this selection was made under, if any */
@@ -7587,16 +8430,24 @@ export type NetworkLens = Lens & {
   defaultScene?: Maybe<Scene>;
   /** This object's descriptors, a flat mapping of key to value: the facts about it that an action's port can `require` and a trigger can test (e.g. `@mikro/n_channels`). The keys are the ones mikro declares for this structure, and the values are the ones a signal about the object carries. Empty for a structure that declares none */
   descriptors: Scalars['JSON']['output'];
+  /** What this lens selects that its name does not already say, or empty: `y[0:32]` for a crop of the channel named 'GFP', nothing for that channel itself. An axis held to one position at an anchor whose label is in `name` is left out; an unnamed lens keeps its whole selection (`c[1:2], y[0:32]`), a whole lens has none */
+  detail: Scalars['String']['output'];
   id: Scalars['ID']['output'];
   /** What this lens selects over: an array by slices, or a table, a sparse dataset, a mesh, a network or an annotation collection by windows */
   kind: LensKind;
-  /** What to call this lens in a list, never empty: its `name` when it has one, else its container's name followed by what it selects of it (`cells.zarr · c[0:1]`); a whole lens is called by its container. What a picker shows for an option */
+  /** What to call this lens in a list on one line, never empty: its `title`, its `origin` when the title is not already it, and its `detail` (`GFP · cells.zarr · y[0:32]`); a whole lens is called by its container. The title comes first because a row is cut at its end. A reader that lays the parts out itself asks for them instead */
   label: Scalars['String']['output'];
-  /** What someone called this selection, or null when nobody has. A label only: it is no part of what the lens selects, and a client shows the selection -- or 'the whole container' -- in its place */
+  /** What this selection is called, or null when nothing names it: the labels at the positions it pins (a person's `setPositionLabel` over the channel label ingest recorded) and the name of the annotation it was cut to, e.g. 'GFP · nucleus 3'. Derived and kept by the server, never set: naming channel 1 names every lens through channel 1. No part of the lens' identity, which is its container and its selection. `nameAnchors` says where it comes from */
   name?: Maybe<Scalars['String']['output']>;
+  /** The coordinate anchors whose labels make up `name`, in the order they appear in it: those of the container whose every pinned axis this lens holds to the same position, the most specific only. Each carries the person's `positionLabel` and the recorded `channelLabel`; the first that says something is the one used. Empty for a lens no position names, and for a kind whose container carries no anchors */
+  nameAnchors: Array<CoordinateAnchor>;
   networkCollection: NetworkCollection;
+  /** The name of the container this lens selects over, never empty: what `title` falls back to, and what a picker groups a container's lenses under */
+  origin: Scalars['String']['output'];
   /** The scenes this lens is rendered in: those with a layer drawing through it or through any selection within it, of any kind. Derived, never stored, exactly as `ArrayDataset.scenes` is. A layer over one channel of a crop draws the crop, and a layer over any crop draws the whole lens -- so a whole lens answers for the whole container and a window or a crop for what it contains; a scene showing a selection that reaches outside this one is that selection's to report */
   scenes: Array<Scene>;
+  /** What a layer drawing this lens is called, never empty: its `name` when something names it, else its container's name. The short half of `label`: what a picker's row says under a heading that already names the container (`origin`) */
+  title: Scalars['String']['output'];
   /** The windows, in the one normalized spelling: container axis order, floats, an open side as null. Empty for the whole lens */
   windows: Array<Window>;
 };
@@ -8222,9 +9073,10 @@ export type PhasorTransferInput = {
 export type PhysicalAxisInput = {
   description?: InputMaybe<Scalars['String']['input']>;
   longName?: InputMaybe<Scalars['String']['input']>;
+  metricGroup?: InputMaybe<Scalars['String']['input']>;
   name: Scalars['String']['input'];
   type: AxisType;
-  unit: Scalars['Unit']['input'];
+  unit?: InputMaybe<Scalars['Unit']['input']>;
 };
 
 /** Input for pinning or unpinning a folder for quick access */
@@ -8416,6 +9268,94 @@ export type PointLayerPlacementValidityArgs = {
   at?: InputMaybe<Array<CoordinateInput>>;
 };
 
+/** A layer that draws a table lens' rows at the values of its columns: each row a point at (`xColumn`, `yColumn`), and at `zColumn` too for depth -- a scatter. The rows are placed in the chart's world -- whose rows -- and drawn at their values: the position is the measurement, read from the row. A row with a null in a named column is not drawn. MARKERS, or a LINE through the rows sorted along x. Example: nuclei at (`area`, `volume`), through a lens that keeps `area >= 50` */
+export type PointsChartLayer = ChartLayer & {
+  __typename?: 'PointsChartLayer';
+  /** The name of the source axis that runs along the chart's axis: for a trace, the axis of its lens the values are read along; for a series, the table's coordinate column; for an annotation layer, the axis of the drawing space that is the chart's own. **Not a setting.** It is the one source axis the composed placement reads the chart's axis from, so it follows the registration: re-register the data by another axis and this changes with no write to the layer. Null when the layer is no longer placed, or is placed by a map that reads the chart's axis from several source axes */
+  alongAxis?: Maybe<Scalars['String']['output']>;
+  /** This layer's whole `pathToWorld` composed into one affine map: a single row, because the chart's world has a single axis. The coefficient on `alongAxis` is the scale from a step along the data to a step along the chart's axis, in the axis's unit, and the last entry is the offset. Derived on read. Null when `pathToWorld` is null; an error when a path exists but does not condense */
+  asAffine?: Maybe<AffinePlacement>;
+  chart: Chart;
+  /** The colour the layer is drawn in, as RGBA. Null lets the viewer choose */
+  color?: Maybe<Array<Scalars['Float']['output']>>;
+  id: Scalars['ID']['output'];
+  kind: ChartLayerKind;
+  /** The table lens whose rows are drawn: the rows its selection keeps */
+  lens: TableLens;
+  /** How thick lines are, as a multiple of the chart's default: 1 is the default, 2 twice as thick, 0.5 half. Never pixels -- what the default is on screen is the viewer's. Null lets the viewer choose */
+  lineWidth?: Maybe<Scalars['Float']['output']>;
+  /** How the rows are drawn: MARKERS, or a LINE through them sorted along x */
+  mark: ChartMark;
+  /** The symbol a marker is drawn as. Null lets the viewer choose (a circle) */
+  markerShape?: Maybe<ChartMarkerShape>;
+  /** How big markers are, as a multiple of the chart's default: 1 is the default, 2 twice as big, 0.5 half. Never pixels -- what the default is on screen is the viewer's. Null lets the viewer choose */
+  markerSize?: Maybe<Scalars['Float']['output']>;
+  name?: Maybe<Scalars['String']['output']>;
+  opacity: Scalars['Float']['output'];
+  order: Scalars['Int']['output'];
+  /** The path of transformation edges from this layer's source coordinate system to its chart's world. Null when the layer is unregistered; empty when the source already is the world. `asAffine` is the same path composed */
+  pathToWorld?: Maybe<Array<PlacementStep>>;
+  /** Whether this layer has a place along its chart's axis, and if not, why not. UNREGISTERED is a gap to close; UNMAPPABLE is a fact to badge; CONDITIONAL is a placement to ask again for with `at`. Derived, never stored */
+  placement: PlacementState;
+  /** Which geometric properties survive the walk from this layer's data to the chart's world: the weakest edge on its path. Derived, never stored */
+  placementInvariance: TransformInvariance;
+  /** How much this layer's placement is actually known: the weakest edge on its path to the chart's world. Derived, never stored */
+  placementValidity: PlacementValidity;
+  /** The table dataset whose columns are read: the container of the lens */
+  tableDataset: TableDataset;
+  visible: Scalars['Boolean']['output'];
+  /** The lens' selection as row filters, always applied: a row is drawn when every one keeps it (`min <= column <= max`, an omitted side open). Derived from the lens; empty for a whole lens */
+  windowFilters: Array<LabelFilterBy>;
+  /** The numeric column whose value is a row's horizontal position */
+  xColumn: Scalars['String']['output'];
+  /** The unit of `xColumn`, as the table declares it: the chart's horizontal axis. Null when the column declares none */
+  xUnit?: Maybe<Scalars['Unit']['output']>;
+  /** The numeric column whose value is a row's vertical position */
+  yColumn: Scalars['String']['output'];
+  /** The unit of `yColumn`, as the table declares it: the chart's vertical axis. Null when the column declares none */
+  yUnit?: Maybe<Scalars['Unit']['output']>;
+  /** The numeric column whose value is a row's depth, for a three-dimensional scatter. Null for a flat one */
+  zColumn?: Maybe<Scalars['String']['output']>;
+  /** The unit of `zColumn`, as the table declares it. Null for a flat scatter or a column that declares none */
+  zUnit?: Maybe<Scalars['Unit']['output']>;
+};
+
+
+/** A layer that draws a table lens' rows at the values of its columns: each row a point at (`xColumn`, `yColumn`), and at `zColumn` too for depth -- a scatter. The rows are placed in the chart's world -- whose rows -- and drawn at their values: the position is the measurement, read from the row. A row with a null in a named column is not drawn. MARKERS, or a LINE through the rows sorted along x. Example: nuclei at (`area`, `volume`), through a lens that keeps `area >= 50` */
+export type PointsChartLayerAlongAxisArgs = {
+  at?: InputMaybe<Array<CoordinateInput>>;
+};
+
+
+/** A layer that draws a table lens' rows at the values of its columns: each row a point at (`xColumn`, `yColumn`), and at `zColumn` too for depth -- a scatter. The rows are placed in the chart's world -- whose rows -- and drawn at their values: the position is the measurement, read from the row. A row with a null in a named column is not drawn. MARKERS, or a LINE through the rows sorted along x. Example: nuclei at (`area`, `volume`), through a lens that keeps `area >= 50` */
+export type PointsChartLayerAsAffineArgs = {
+  at?: InputMaybe<Array<CoordinateInput>>;
+};
+
+
+/** A layer that draws a table lens' rows at the values of its columns: each row a point at (`xColumn`, `yColumn`), and at `zColumn` too for depth -- a scatter. The rows are placed in the chart's world -- whose rows -- and drawn at their values: the position is the measurement, read from the row. A row with a null in a named column is not drawn. MARKERS, or a LINE through the rows sorted along x. Example: nuclei at (`area`, `volume`), through a lens that keeps `area >= 50` */
+export type PointsChartLayerPathToWorldArgs = {
+  at?: InputMaybe<Array<CoordinateInput>>;
+};
+
+
+/** A layer that draws a table lens' rows at the values of its columns: each row a point at (`xColumn`, `yColumn`), and at `zColumn` too for depth -- a scatter. The rows are placed in the chart's world -- whose rows -- and drawn at their values: the position is the measurement, read from the row. A row with a null in a named column is not drawn. MARKERS, or a LINE through the rows sorted along x. Example: nuclei at (`area`, `volume`), through a lens that keeps `area >= 50` */
+export type PointsChartLayerPlacementArgs = {
+  at?: InputMaybe<Array<CoordinateInput>>;
+};
+
+
+/** A layer that draws a table lens' rows at the values of its columns: each row a point at (`xColumn`, `yColumn`), and at `zColumn` too for depth -- a scatter. The rows are placed in the chart's world -- whose rows -- and drawn at their values: the position is the measurement, read from the row. A row with a null in a named column is not drawn. MARKERS, or a LINE through the rows sorted along x. Example: nuclei at (`area`, `volume`), through a lens that keeps `area >= 50` */
+export type PointsChartLayerPlacementInvarianceArgs = {
+  at?: InputMaybe<Array<CoordinateInput>>;
+};
+
+
+/** A layer that draws a table lens' rows at the values of its columns: each row a point at (`xColumn`, `yColumn`), and at `zColumn` too for depth -- a scatter. The rows are placed in the chart's world -- whose rows -- and drawn at their values: the position is the measurement, read from the row. A row with a null in a named column is not drawn. MARKERS, or a LINE through the rows sorted along x. Example: nuclei at (`area`, `volume`), through a lens that keeps `area >= 50` */
+export type PointsChartLayerPlacementValidityArgs = {
+  at?: InputMaybe<Array<CoordinateInput>>;
+};
+
 /** A polarization filter, at an angle */
 export type PolarizerElement = OpticalElement & {
   __typename?: 'PolarizerElement';
@@ -8467,6 +9407,18 @@ export type Pose3DInput = {
   position?: InputMaybe<Vec3Input>;
 };
 
+/** What a person calls the data at a coordinate anchor's positions, e.g. 'GFP'. Beside the channel label ingest recorded, and read before it: it is how a lens pinning those positions is named */
+export type PositionLabel = {
+  __typename?: 'PositionLabel';
+  /** When the name was last given */
+  createdAt: Scalars['DateTime']['output'];
+  /** Who gave the name */
+  creator?: Maybe<User>;
+  id: Scalars['ID']['output'];
+  /** The name */
+  label: Scalars['String']['output'];
+};
+
 /** How a viewer should open a scene: flat, volumetric, or its own choice. */
 export enum PreferredView {
   /** No preference stated -- the viewer decides, e.g. from whether the data has a z axis with depth. The default: a scene nobody has expressed a preference for should not claim one. */
@@ -8476,6 +9428,17 @@ export enum PreferredView {
   /** Open flat: the cross-section view, one slice at a time. */
   TwoD = 'TWO_D'
 }
+
+/** Which layer to preview, as the input of the create mutation that would make it: exactly one member. Keeping the preview is that same input sent to that mutation (`intensity` to `createIntensityLayer`, `mesh` to `createMeshLayer`, ...), which makes the identical layer */
+export type PreviewLayerInput =
+  { image: CreateLayerInput; intensity?: never; label?: never; mesh?: never; phasor?: never; rgb?: never; vector?: never; volume?: never; }
+  |  { image?: never; intensity: CreateIntensityLayerInput; label?: never; mesh?: never; phasor?: never; rgb?: never; vector?: never; volume?: never; }
+  |  { image?: never; intensity?: never; label: CreateLabelLayerInput; mesh?: never; phasor?: never; rgb?: never; vector?: never; volume?: never; }
+  |  { image?: never; intensity?: never; label?: never; mesh: CreateMeshLayerInput; phasor?: never; rgb?: never; vector?: never; volume?: never; }
+  |  { image?: never; intensity?: never; label?: never; mesh?: never; phasor: CreatePhasorLayerInput; rgb?: never; vector?: never; volume?: never; }
+  |  { image?: never; intensity?: never; label?: never; mesh?: never; phasor?: never; rgb: CreateRgbLayerInput; vector?: never; volume?: never; }
+  |  { image?: never; intensity?: never; label?: never; mesh?: never; phasor?: never; rgb?: never; vector: CreateVectorLayerInput; volume?: never; }
+  |  { image?: never; intensity?: never; label?: never; mesh?: never; phasor?: never; rgb?: never; vector?: never; volume: CreateVolumeLayerInput; };
 
 /** The 3D projection / rendering mode applied to a volumetric (z-stacked) render, whether that is an IMAGE layer's projection node or an INTENSITY layer's `projectionMode`. */
 export enum ProjectionMode {
@@ -8608,6 +9571,16 @@ export type Query = {
   folders: Array<Folder>;
   /** Get statistics about folders: counts and time-bucketed series over the folders of the current organization */
   foldersStats: FolderStats;
+  /** Get a single grid by ID */
+  grid: Grid;
+  /** Get a single grid layer by ID */
+  gridLayer: GridLayer;
+  /** List layers drawn in grids (a heterogeneous list of layer kinds) */
+  gridLayers: Array<GridLayer>;
+  /** List grids (compositions laying out the members of one or two enumerating axes: a heatmap of genes against cells, a table's cells against channels) */
+  grids: Array<Grid>;
+  /** Get statistics about grids: counts and time-bucketed series over the grids of the current organization */
+  gridsStats: GridStats;
   /** Every column a mask's objects can be coloured or filtered by: `colorByOptions` rooted on the lens a label layer renders instead of on a mesh collection, and the same answer for the same reason -- a mask's pixel values dereference into a table by exactly the FIELD edge a collection's ids do, so the walk, the measure-vs-categorical rule and the `joinPath` to pass back are one. **The set this returns is exactly the set `createLabelLayer(render: {colorBys: ...})` and `filterBys` accept.** The columns' *values* are not here: a picker wanting a class list or a numeric range reads them from the parquet it already has an `accessGrant` for */
   labelColorByOptions: Array<ColorByOption>;
   /** Every column a mask's objects can be filtered by -- **the same set `labelColorByOptions` returns**, under the name that reads right where a rule is being authored. One relation, one walk, two names, exactly as `filterByOptions` pairs with `colorByOptions` over a collection: what differs is what a control *means*, since MEASURE takes a `min`/`max` bound here and a colormap there. Everything returned is something `createLabelLayer(render: {filterBys: ...})` accepts */
@@ -8632,6 +9605,8 @@ export type Query = {
   meshCollection: MeshCollection;
   /** List mesh collections (immutable Parquet-backed mesh sets, each in a coordinate system of its own) */
   meshCollections: Array<MeshCollection>;
+  /** One object of a mesh collection, by its id in the collection's object catalog: what was computed from that one surface (`derivedResidents`) */
+  meshObject: MeshObject;
   /** Get a single metric by ID */
   metric: Metric;
   /** List metrics: values recorded about annotations and datasets, by apps and people */
@@ -8652,8 +9627,32 @@ export type Query = {
   networkFilterByOptions: Array<FilterByOption>;
   /** Get permissions for a specific object */
   permissions: Array<UserObjectPermission>;
+  /** What deleting this annotation (the shapes refined, converted, split or merged from it count) would cost, without deleting it: everything made from it (a plain delete is refused over it; `cascade: true` takes it along), what stops the delete, and what else goes with it */
+  preflightDeleteAnnotation: DeletePreflight;
+  /** What deleting this annotation collection (its shapes, and whatever was made from them elsewhere, count) would cost, without deleting it: everything made from it (a plain delete is refused over it; `cascade: true` takes it along), what stops the delete, and what else goes with it */
+  preflightDeleteAnnotationCollection: DeletePreflight;
+  /** What deleting this array dataset would cost, without deleting it: everything made from it (a plain delete is refused over it; `cascade: true` takes it along), what stops the delete, and what else goes with it */
+  preflightDeleteArrayDataset: DeletePreflight;
+  /** What `deleteDerived` would delete: everything made from this object, transitively, nearest first, with what would stop it and what else cascades. The object itself stays, so it is neither listed nor checked; `needsCascade` says whether anything was made from it at all */
+  preflightDeleteDerived: DeletePreflight;
+  /** What deleting this file (the series converted out of it count) would cost, without deleting it: everything made from it (a plain delete is refused over it; `cascade: true` takes it along), what stops the delete, and what else goes with it */
+  preflightDeleteFile: DeletePreflight;
+  /** What deleting this fixture would cost, without deleting it: everything made from it (a plain delete is refused over it; `cascade: true` takes it along), what stops the delete, and what else goes with it */
+  preflightDeleteFixture: DeletePreflight;
+  /** What deleting this mesh collection would cost, without deleting it: everything made from it (a plain delete is refused over it; `cascade: true` takes it along), what stops the delete, and what else goes with it */
+  preflightDeleteMeshCollection: DeletePreflight;
+  /** What deleting this network collection would cost, without deleting it: everything made from it (a plain delete is refused over it; `cascade: true` takes it along), what stops the delete, and what else goes with it */
+  preflightDeleteNetworkCollection: DeletePreflight;
+  /** What deleting this sparse dataset would cost, without deleting it: everything made from it (a plain delete is refused over it; `cascade: true` takes it along), what stops the delete, and what else goes with it */
+  preflightDeleteSparseDataset: DeletePreflight;
+  /** What deleting this table dataset would cost, without deleting it: everything made from it (a plain delete is refused over it; `cascade: true` takes it along), what stops the delete, and what else goes with it */
+  preflightDeleteTableDataset: DeletePreflight;
+  /** The layer a create mutation would make, built and not saved: every field resolves as it would on the saved layer -- `asAffine`, `pathToWorld`, the kind's render columns -- and nothing is written. Refused for exactly the reasons the create would refuse it. Its `id` is negative and names no row; keep it by sending the same input to the create. What a viewer draws while it stages a layer it has not decided to keep */
+  previewLayer: Layer;
   /** The newest parentless data, whatever its kind, newest first: what a home page lists. A root has no up-hop in `lineage` -- no derivation edge into another container and no file it was converted from; a file is one unless it was exported from a container. A file's converted series and a dataset's mask are not roots: they are reached from their parent, with `descendants`. Annotation collections are drawn rather than brought in and are never listed. `kinds` narrows it; the default is every other kind. `filters` narrows it further, by creator, collaboration, creation time and acquisition time */
   roots: Array<RootNode>;
+  /** What a picked row of a table reaches -- a point of a chart of values: the row itself, then every hop the schema allows from it, as `attributePlans` describes its chain, plus REVERSE references (a cluster's member rows) and SAME_ROWS crossings (the PCA row of a measurement row). No sample: the picked row's INDEX value is the id. Instructions, never values, and no id argument, so fetch it once per table. Refused for a table not keyed by one INDEX column */
+  rowPlan: RowPlan;
   /** Get a single scene by ID */
   scene: Scene;
   /** Get a single scene snapshot by ID */
@@ -8922,6 +9921,35 @@ export type QueryFoldersStatsArgs = {
 };
 
 
+export type QueryGridArgs = {
+  id: Scalars['ID']['input'];
+};
+
+
+export type QueryGridLayerArgs = {
+  id: Scalars['ID']['input'];
+};
+
+
+export type QueryGridLayersArgs = {
+  filters?: InputMaybe<GridLayerFilter>;
+  ordering?: Array<GridLayerOrder>;
+  pagination?: InputMaybe<OffsetPaginationInput>;
+};
+
+
+export type QueryGridsArgs = {
+  filters?: InputMaybe<GridFilter>;
+  ordering?: Array<GridOrder>;
+  pagination?: InputMaybe<OffsetPaginationInput>;
+};
+
+
+export type QueryGridsStatsArgs = {
+  filters?: InputMaybe<GridFilter>;
+};
+
+
 export type QueryLabelColorByOptionsArgs = {
   filters?: InputMaybe<ColumnOptionFilter>;
   lens: Scalars['ID']['input'];
@@ -8993,6 +10021,12 @@ export type QueryMeshCollectionsArgs = {
 };
 
 
+export type QueryMeshObjectArgs = {
+  collection: Scalars['ID']['input'];
+  object: Scalars['Int']['input'];
+};
+
+
 export type QueryMetricArgs = {
   id: Scalars['ID']['input'];
 };
@@ -9059,10 +10093,72 @@ export type QueryPermissionsArgs = {
 };
 
 
+export type QueryPreflightDeleteAnnotationArgs = {
+  id: Scalars['ID']['input'];
+};
+
+
+export type QueryPreflightDeleteAnnotationCollectionArgs = {
+  id: Scalars['ID']['input'];
+};
+
+
+export type QueryPreflightDeleteArrayDatasetArgs = {
+  id: Scalars['ID']['input'];
+};
+
+
+export type QueryPreflightDeleteDerivedArgs = {
+  id: Scalars['ID']['input'];
+  kind: LineageNodeKind;
+};
+
+
+export type QueryPreflightDeleteFileArgs = {
+  id: Scalars['ID']['input'];
+};
+
+
+export type QueryPreflightDeleteFixtureArgs = {
+  id: Scalars['ID']['input'];
+};
+
+
+export type QueryPreflightDeleteMeshCollectionArgs = {
+  id: Scalars['ID']['input'];
+};
+
+
+export type QueryPreflightDeleteNetworkCollectionArgs = {
+  id: Scalars['ID']['input'];
+};
+
+
+export type QueryPreflightDeleteSparseDatasetArgs = {
+  id: Scalars['ID']['input'];
+};
+
+
+export type QueryPreflightDeleteTableDatasetArgs = {
+  id: Scalars['ID']['input'];
+};
+
+
+export type QueryPreviewLayerArgs = {
+  input: PreviewLayerInput;
+};
+
+
 export type QueryRootsArgs = {
   filters?: InputMaybe<RootFilter>;
   kinds?: InputMaybe<Array<LineageNodeKind>>;
   pagination?: InputMaybe<OffsetPaginationInput>;
+};
+
+
+export type QueryRowPlanArgs = {
+  maxJoinDepth?: Scalars['Int']['input'];
+  table: Scalars['ID']['input'];
 };
 
 
@@ -9434,6 +10530,17 @@ export type RotationTransformationProvenanceEntriesArgs = {
   pagination?: InputMaybe<OffsetPaginationInput>;
 };
 
+/** What a picked row of a table reaches -- a point of a chart of values. There is no sample: the row's INDEX value IS the id, so a client holding it binds `key` and runs `hops` in order, exactly as it runs an `AttributePlan`'s after its sample. `hops[0]` is the row itself; later hops cross every fact the schema allows from it, including two only a row's plan takes: REVERSE references (a cluster's member rows) and SAME_ROWS crossings (the PCA row of a measurement row). Like an attribute plan it takes no id and reads no store, so fetch it once per table */
+export type RowPlan = {
+  __typename?: 'RowPlan';
+  /** The chain, in execution order. `hops[0]` is the row in its own table, bound from `key`; each later hop binds from its `parent` */
+  hops: Array<Hop>;
+  /** The INDEX column a row is found by: hold the picked row's value under `key.axis` */
+  key: PlanKeyColumn;
+  /** Whose rows these are */
+  table: TableDataset;
+};
+
 /** The sample */
 export type SampleElement = OpticalElement & {
   __typename?: 'SampleElement';
@@ -9548,7 +10655,7 @@ export type ScaleTransformationProvenanceEntriesArgs = {
   pagination?: InputMaybe<OffsetPaginationInput>;
 };
 
-/** A composition of layers over a shared world coordinate system. The scene carries no units of its own -- they are per-axis, on the axes of its world system */
+/** A composition that shows **where**: every screen axis is an axis of its world -- a place, with a time or space axis -- and each layer is placed there by the graph's edges, so refining a registration moves what is drawn. Values are drawn as appearance: an image's intensity as colour, a table's `area` as the colour or size of its points. The counterpart of a chart, which shows *how much*: there values are drawn as position. The same table lens may be drawn both ways -- nuclei at their `(y, x)` on the image here, at `(area, volume)` in a VALUES chart. If rotating the view makes sense, it is a scene. The scene carries no units of its own -- they are per-axis, on the axes of its world system */
 export type Scene = Visualization & {
   __typename?: 'Scene';
   /** The named camera tours through this composition */
@@ -9576,7 +10683,7 @@ export type Scene = Visualization & {
 };
 
 
-/** A composition of layers over a shared world coordinate system. The scene carries no units of its own -- they are per-axis, on the axes of its world system */
+/** A composition that shows **where**: every screen axis is an axis of its world -- a place, with a time or space axis -- and each layer is placed there by the graph's edges, so refining a registration moves what is drawn. Values are drawn as appearance: an image's intensity as colour, a table's `area` as the colour or size of its points. The counterpart of a chart, which shows *how much*: there values are drawn as position. The same table lens may be drawn both ways -- nuclei at their `(y, x)` on the image here, at `(area, volume)` in a VALUES chart. If rotating the view makes sense, it is a scene. The scene carries no units of its own -- they are per-axis, on the axes of its world system */
 export type SceneAnimationsArgs = {
   filters?: InputMaybe<AnimationFilter>;
   ordering?: Array<AnimationOrder>;
@@ -9584,7 +10691,7 @@ export type SceneAnimationsArgs = {
 };
 
 
-/** A composition of layers over a shared world coordinate system. The scene carries no units of its own -- they are per-axis, on the axes of its world system */
+/** A composition that shows **where**: every screen axis is an axis of its world -- a place, with a time or space axis -- and each layer is placed there by the graph's edges, so refining a registration moves what is drawn. Values are drawn as appearance: an image's intensity as colour, a table's `area` as the colour or size of its points. The counterpart of a chart, which shows *how much*: there values are drawn as position. The same table lens may be drawn both ways -- nuclei at their `(y, x)` on the image here, at `(area, volume)` in a VALUES chart. If rotating the view makes sense, it is a scene. The scene carries no units of its own -- they are per-axis, on the axes of its world system */
 export type SceneLayersArgs = {
   filters?: InputMaybe<LayerFilter>;
   ordering?: Array<LayerOrder>;
@@ -9592,7 +10699,7 @@ export type SceneLayersArgs = {
 };
 
 
-/** A composition of layers over a shared world coordinate system. The scene carries no units of its own -- they are per-axis, on the axes of its world system */
+/** A composition that shows **where**: every screen axis is an axis of its world -- a place, with a time or space axis -- and each layer is placed there by the graph's edges, so refining a registration moves what is drawn. Values are drawn as appearance: an image's intensity as colour, a table's `area` as the colour or size of its points. The counterpart of a chart, which shows *how much*: there values are drawn as position. The same table lens may be drawn both ways -- nuclei at their `(y, x)` on the image here, at `(area, volume)` in a VALUES chart. If rotating the view makes sense, it is a scene. The scene carries no units of its own -- they are per-axis, on the axes of its world system */
 export type SceneSnapshotsArgs = {
   filters?: InputMaybe<SceneSnapshotFilter>;
   ordering?: Array<SceneSnapshotOrder>;
@@ -9828,11 +10935,13 @@ export type SeriesChartLayer = ChartLayer & {
   kind: ChartLayerKind;
   /** The table lens this series reads through: the rows its windows keep */
   lens: TableLens;
-  /** Line width in screen pixels. Null lets the viewer choose */
+  /** How thick lines are, as a multiple of the chart's default: 1 is the default, 2 twice as thick, 0.5 half. Never pixels -- what the default is on screen is the viewer's. Null lets the viewer choose */
   lineWidth?: Maybe<Scalars['Float']['output']>;
   /** How the values are drawn: a line, markers, both, or steps */
   mark: ChartMark;
-  /** Marker size in screen pixels. Null lets the viewer choose */
+  /** The symbol a marker is drawn as. Null lets the viewer choose (a circle) */
+  markerShape?: Maybe<ChartMarkerShape>;
+  /** How big markers are, as a multiple of the chart's default: 1 is the default, 2 twice as big, 0.5 half. Never pixels -- what the default is on screen is the viewer's. Null lets the viewer choose */
   markerSize?: Maybe<Scalars['Float']['output']>;
   name?: Maybe<Scalars['String']['output']>;
   opacity: Scalars['Float']['output'];
@@ -9906,6 +11015,14 @@ export type SetLensDefaultSceneInput = {
   lens: Scalars['ID']['input'];
   /** The scene to nominate, or null to clear the nomination */
   scene?: InputMaybe<Scalars['ID']['input']>;
+};
+
+/** Input for naming the positions a lens pins -- the way a lens is named */
+export type SetPositionLabelInput = {
+  /** What to call them, or null (or blank) to remove the name */
+  label?: InputMaybe<Scalars['String']['input']>;
+  /** The lens whose pinned positions to name */
+  lens: Scalars['ID']['input'];
 };
 
 /** One named device setting, exactly one value slot filled */
@@ -10279,7 +11396,7 @@ export type SparseLens = Lens & {
   /** The coordinate anchors inside this selection: an anchor global along an axis, or pinned inside the lens' range on it. Empty for a container kind that carries no anchors (meshes, networks, annotation collections) */
   activeAnchors: Array<CoordinateAnchor>;
   /** The coordinate system the lens' selection is expressed in. A sliced array lens owns one (the space its slices cut out, with the derived edge recording the shift); every other lens selects within its container's own space and resolves to it */
-  coordinateSystem?: Maybe<CoordinateSystem>;
+  coordinateSystem: CoordinateSystem;
   /** When this selection was first asked for; a whole lens, when its container was made */
   createdAt: Scalars['DateTime']['output'];
   /** The task this selection was made under, if any */
@@ -10292,18 +11409,26 @@ export type SparseLens = Lens & {
   defaultScene?: Maybe<Scene>;
   /** This object's descriptors, a flat mapping of key to value: the facts about it that an action's port can `require` and a trigger can test (e.g. `@mikro/n_channels`). The keys are the ones mikro declares for this structure, and the values are the ones a signal about the object carries. Empty for a structure that declares none */
   descriptors: Scalars['JSON']['output'];
+  /** What this lens selects that its name does not already say, or empty: `y[0:32]` for a crop of the channel named 'GFP', nothing for that channel itself. An axis held to one position at an anchor whose label is in `name` is left out; an unnamed lens keeps its whole selection (`c[1:2], y[0:32]`), a whole lens has none */
+  detail: Scalars['String']['output'];
   id: Scalars['ID']['output'];
   /** What this lens selects over: an array by slices, or a table, a sparse dataset, a mesh, a network or an annotation collection by windows */
   kind: LensKind;
-  /** What to call this lens in a list, never empty: its `name` when it has one, else its container's name followed by what it selects of it (`cells.zarr · c[0:1]`); a whole lens is called by its container. What a picker shows for an option */
+  /** What to call this lens in a list on one line, never empty: its `title`, its `origin` when the title is not already it, and its `detail` (`GFP · cells.zarr · y[0:32]`); a whole lens is called by its container. The title comes first because a row is cut at its end. A reader that lays the parts out itself asks for them instead */
   label: Scalars['String']['output'];
-  /** What someone called this selection, or null when nobody has. A label only: it is no part of what the lens selects, and a client shows the selection -- or 'the whole container' -- in its place */
+  /** What this selection is called, or null when nothing names it: the labels at the positions it pins (a person's `setPositionLabel` over the channel label ingest recorded) and the name of the annotation it was cut to, e.g. 'GFP · nucleus 3'. Derived and kept by the server, never set: naming channel 1 names every lens through channel 1. No part of the lens' identity, which is its container and its selection. `nameAnchors` says where it comes from */
   name?: Maybe<Scalars['String']['output']>;
+  /** The coordinate anchors whose labels make up `name`, in the order they appear in it: those of the container whose every pinned axis this lens holds to the same position, the most specific only. Each carries the person's `positionLabel` and the recorded `channelLabel`; the first that says something is the one used. Empty for a lens no position names, and for a kind whose container carries no anchors */
+  nameAnchors: Array<CoordinateAnchor>;
+  /** The name of the container this lens selects over, never empty: what `title` falls back to, and what a picker groups a container's lenses under */
+  origin: Scalars['String']['output'];
   /** The scenes this lens is rendered in: those with a layer drawing through it or through any selection within it, of any kind. Derived, never stored, exactly as `ArrayDataset.scenes` is. A layer over one channel of a crop draws the crop, and a layer over any crop draws the whole lens -- so a whole lens answers for the whole container and a window or a crop for what it contains; a scene showing a selection that reaches outside this one is that selection's to report */
   scenes: Array<Scene>;
   sparseDataset: SparseDataset;
   /** What this selection structurally is: its matrix's `spec` vocabulary, read over what its windows leave free. Materialized when the lens is made, and what the `sparseSpec` filter reads. An axis a window pins to one position (min == max) no longer counts, so one feature of a MATRIX is a VECTOR -- and a SLICE when it pins exactly the axes the matrix identifies itself by and a layout makes the read contiguous, which is what a SPARSE colour or filter picker entry accepts */
   spec: Array<SparseDatasetSpec>;
+  /** What a layer drawing this lens is called, never empty: its `name` when something names it, else its container's name. The short half of `label`: what a picker's row says under a heading that already names the container (`origin`) */
+  title: Scalars['String']['output'];
   /** The windows, in the one normalized spelling: container axis order, floats, an open side as null. Empty for the whole lens */
   windows: Array<Window>;
 };
@@ -10474,6 +11599,8 @@ export type TableDataset = {
   /** The lens that selects this whole table dataset: what a viewer opens for it, and the handle to pass wherever a `Lens` is asked for and all of it is meant. Every table dataset is created with one */
   fullLens?: Maybe<TableLens>;
   id: Scalars['ID']['output'];
+  /** What this table describes: the containers whose contents ARE its row ids -- a label mask whose pixel values are the ids, a mesh collection whose objects are -- each with the table axis its ids land on (`produces`, the id column) and the axes that pass through by name. The other end of `keyedBy` at creation, and of `attributePlans` from the source's side. Empty for a table nothing keys: localizations placed by their own coordinates, or a table of per-dataset values */
+  keyedBy: Array<TableKey>;
   /** The lenses over this table dataset, oldest first: its whole lens and every window someone has cut. `windowed: true` keeps the windows, `windowed: false` the whole lens, which is also `fullLens` */
   lenses: Array<TableLens>;
   name: Scalars['String']['output'];
@@ -10489,6 +11616,8 @@ export type TableDataset = {
   spec: Array<TableDatasetSpec>;
   /** The Parquet store holding the rows. Request an access grant from it and read the Parquet directly */
   store: ParquetStore;
+  /** The compositions that draw this table: every scene and chart with a layer through any lens of it -- its whole lens or a window of it. Derived, never stored, kind by kind in registration order and oldest first within a kind */
+  visualizations: Array<Visualization>;
 };
 
 
@@ -10692,13 +11821,26 @@ export type TableIdentifiesInput = {
   table: Scalars['ID']['input'];
 };
 
-/** A selection over a table dataset by value windows on its coordinate columns: the rows kept. Lives in the table's own space */
+/** One container keying a table: its contents are the table's row ids (`TableDataset.keyedBy`) */
+export type TableKey = {
+  __typename?: 'TableKey';
+  /** Table axes the source shares by name (a per-frame mask's `t`), which select alongside the id */
+  passesThrough: Array<Scalars['String']['output']>;
+  /** The table axes its ids land on: the id column(s) a row is found by */
+  produces: Array<Scalars['String']['output']>;
+  /** The container whose contents are the ids: a label mask's dataset, a mesh collection */
+  source: Resident;
+  /** What each row IS, as a structure a client can open: `@mikro/meshobject` for a mesh collection's objects, whose id is `<collection>:<object>` (the `produces` value as the object, `MeshObject.id`). Null where a row has no structure of its own yet -- a label of a mask */
+  structure?: Maybe<Scalars['String']['output']>;
+};
+
+/** A selection over a table dataset by value windows on its columns: the rows kept. A window on a coordinate column bounds a region of space; one on a numeric measurement column is a gate (`area >= 50`), which bounds nothing in space. Lives in the table's own space */
 export type TableLens = Lens & {
   __typename?: 'TableLens';
   /** The coordinate anchors inside this selection: an anchor global along an axis, or pinned inside the lens' range on it. Empty for a container kind that carries no anchors (meshes, networks, annotation collections) */
   activeAnchors: Array<CoordinateAnchor>;
   /** The coordinate system the lens' selection is expressed in. A sliced array lens owns one (the space its slices cut out, with the derived edge recording the shift); every other lens selects within its container's own space and resolves to it */
-  coordinateSystem?: Maybe<CoordinateSystem>;
+  coordinateSystem: CoordinateSystem;
   /** When this selection was first asked for; a whole lens, when its container was made */
   createdAt: Scalars['DateTime']['output'];
   /** The task this selection was made under, if any */
@@ -10711,18 +11853,26 @@ export type TableLens = Lens & {
   defaultScene?: Maybe<Scene>;
   /** This object's descriptors, a flat mapping of key to value: the facts about it that an action's port can `require` and a trigger can test (e.g. `@mikro/n_channels`). The keys are the ones mikro declares for this structure, and the values are the ones a signal about the object carries. Empty for a structure that declares none */
   descriptors: Scalars['JSON']['output'];
+  /** What this lens selects that its name does not already say, or empty: `y[0:32]` for a crop of the channel named 'GFP', nothing for that channel itself. An axis held to one position at an anchor whose label is in `name` is left out; an unnamed lens keeps its whole selection (`c[1:2], y[0:32]`), a whole lens has none */
+  detail: Scalars['String']['output'];
   id: Scalars['ID']['output'];
   /** What this lens selects over: an array by slices, or a table, a sparse dataset, a mesh, a network or an annotation collection by windows */
   kind: LensKind;
-  /** What to call this lens in a list, never empty: its `name` when it has one, else its container's name followed by what it selects of it (`cells.zarr · c[0:1]`); a whole lens is called by its container. What a picker shows for an option */
+  /** What to call this lens in a list on one line, never empty: its `title`, its `origin` when the title is not already it, and its `detail` (`GFP · cells.zarr · y[0:32]`); a whole lens is called by its container. The title comes first because a row is cut at its end. A reader that lays the parts out itself asks for them instead */
   label: Scalars['String']['output'];
-  /** What someone called this selection, or null when nobody has. A label only: it is no part of what the lens selects, and a client shows the selection -- or 'the whole container' -- in its place */
+  /** What this selection is called, or null when nothing names it: the labels at the positions it pins (a person's `setPositionLabel` over the channel label ingest recorded) and the name of the annotation it was cut to, e.g. 'GFP · nucleus 3'. Derived and kept by the server, never set: naming channel 1 names every lens through channel 1. No part of the lens' identity, which is its container and its selection. `nameAnchors` says where it comes from */
   name?: Maybe<Scalars['String']['output']>;
+  /** The coordinate anchors whose labels make up `name`, in the order they appear in it: those of the container whose every pinned axis this lens holds to the same position, the most specific only. Each carries the person's `positionLabel` and the recorded `channelLabel`; the first that says something is the one used. Empty for a lens no position names, and for a kind whose container carries no anchors */
+  nameAnchors: Array<CoordinateAnchor>;
+  /** The name of the container this lens selects over, never empty: what `title` falls back to, and what a picker groups a container's lenses under */
+  origin: Scalars['String']['output'];
   /** The scenes this lens is rendered in: those with a layer drawing through it or through any selection within it, of any kind. Derived, never stored, exactly as `ArrayDataset.scenes` is. A layer over one channel of a crop draws the crop, and a layer over any crop draws the whole lens -- so a whole lens answers for the whole container and a window or a crop for what it contains; a scene showing a selection that reaches outside this one is that selection's to report */
   scenes: Array<Scene>;
   /** What this selection structurally is: its table's `spec` vocabulary, read over what its windows leave free. Materialized when the lens is made, and what the `tableSpec` filter reads. A coordinate column a window pins to one value (min == max) no longer counts: one frame of a [POINTS_2D, TIMED, TRACKED] table is [POINTS_2D, TRACKED], and one z-plane of a POINTS_3D table is POINTS_2D. A window that only bounds changes nothing -- the server never scans the rows, so it cannot say they stopped spreading. The whole lens answers what its table does */
   spec: Array<TableDatasetSpec>;
   tableDataset: TableDataset;
+  /** What a layer drawing this lens is called, never empty: its `name` when something names it, else its container's name. The short half of `label`: what a picker's row says under a heading that already names the container (`origin`) */
+  title: Scalars['String']['output'];
   /** The windows, in the one normalized spelling: container axis order, floats, an open side as null. Empty for the whole lens */
   windows: Array<Window>;
 };
@@ -10813,11 +11963,13 @@ export type TraceChartLayer = ChartLayer & {
   kind: ChartLayerKind;
   /** The array lens whose values are read */
   lens: ArrayLens;
-  /** Line width in screen pixels. Null lets the viewer choose */
+  /** How thick lines are, as a multiple of the chart's default: 1 is the default, 2 twice as thick, 0.5 half. Never pixels -- what the default is on screen is the viewer's. Null lets the viewer choose */
   lineWidth?: Maybe<Scalars['Float']['output']>;
   /** How the values are drawn: a line, markers, both, or steps */
   mark: ChartMark;
-  /** Marker size in screen pixels. Null lets the viewer choose */
+  /** The symbol a marker is drawn as. Null lets the viewer choose (a circle) */
+  markerShape?: Maybe<ChartMarkerShape>;
+  /** How big markers are, as a multiple of the chart's default: 1 is the default, 2 twice as big, 0.5 half. Never pixels -- what the default is on screen is the viewer's. Null lets the viewer choose */
   markerSize?: Maybe<Scalars['Float']['output']>;
   name?: Maybe<Scalars['String']['output']>;
   opacity: Scalars['Float']['output'];
@@ -11271,6 +12423,7 @@ export type UpdateAnnotationInput = {
   name?: InputMaybe<Scalars['String']['input']>;
   strokeColor?: InputMaybe<Array<Scalars['Int']['input']>>;
   strokeWidth?: InputMaybe<Scalars['Float']['input']>;
+  tracedOn?: InputMaybe<Scalars['ID']['input']>;
   vectors?: InputMaybe<Array<Scalars['ThreeDVector']['input']>>;
 };
 
@@ -11281,19 +12434,21 @@ export type UpdateArrayDatasetInput = {
   name?: InputMaybe<Scalars['String']['input']>;
 };
 
-/** Input for renaming or re-describing a chart. Its world is not editable: a chart along another axis is another chart */
+/** Input for renaming, re-describing or re-laying-out a chart. Its world is not editable: a chart over another space is another chart */
 export type UpdateChartInput = {
   description?: InputMaybe<Scalars['String']['input']>;
   id: Scalars['ID']['input'];
+  layout?: InputMaybe<ChartLayout>;
   name?: InputMaybe<Scalars['String']['input']>;
 };
 
-/** Input for restyling a chart layer. View state only: what the layer reads, and where its data sits along the chart's axis, are not settings -- the first is fixed at creation and the second is the graph's, changed by editing the registration */
+/** Input for restyling a chart layer of any kind: view state only. What a layer reads -- its lens and its columns -- is changed by its kind's own update (updateTraceChartLayer, updateSeriesChartLayer, updatePointsChartLayer, updateDistributionChartLayer); where its data sits along the chart's axis is the graph's, changed by editing the registration */
 export type UpdateChartLayerInput = {
   color?: InputMaybe<Array<Scalars['Float']['input']>>;
   id: Scalars['ID']['input'];
   lineWidth?: InputMaybe<Scalars['Float']['input']>;
   mark?: InputMaybe<ChartMark>;
+  markerShape?: InputMaybe<ChartMarkerShape>;
   markerSize?: InputMaybe<Scalars['Float']['input']>;
   name?: InputMaybe<Scalars['String']['input']>;
   opacity?: InputMaybe<Scalars['Float']['input']>;
@@ -11307,6 +12462,24 @@ export type UpdateCoordinateSystemInput = {
   id: Scalars['ID']['input'];
   name?: InputMaybe<Scalars['String']['input']>;
   reference?: InputMaybe<Scalars['String']['input']>;
+};
+
+/** Retune a distribution: summarise another column, group it otherwise, bin it otherwise, or draw it as a histogram or a box */
+export type UpdateDistributionChartLayerInput = {
+  bins?: InputMaybe<Scalars['Int']['input']>;
+  clearBins?: Scalars['Boolean']['input'];
+  clearGroupColumn?: Scalars['Boolean']['input'];
+  color?: InputMaybe<Array<Scalars['Float']['input']>>;
+  groupColumn?: InputMaybe<Scalars['String']['input']>;
+  id: Scalars['ID']['input'];
+  lens?: InputMaybe<Scalars['ID']['input']>;
+  lineWidth?: InputMaybe<Scalars['Float']['input']>;
+  mark?: InputMaybe<ChartMark>;
+  name?: InputMaybe<Scalars['String']['input']>;
+  opacity?: InputMaybe<Scalars['Float']['input']>;
+  order?: InputMaybe<Scalars['Int']['input']>;
+  valueColumn?: InputMaybe<Scalars['String']['input']>;
+  visible?: InputMaybe<Scalars['Boolean']['input']>;
 };
 
 /** Retune how a fixture layer is drawn. A patch: an omitted field keeps its value, and an explicit `null` for `materialColor` returns to the model's own materials. The model and the scene are not editable */
@@ -11325,6 +12498,25 @@ export type UpdateFixtureLayerInput = {
   visible?: InputMaybe<Scalars['Boolean']['input']>;
   /** Whether to draw the model as a wireframe */
   wireframe?: InputMaybe<Scalars['Boolean']['input']>;
+};
+
+/** Input for renaming or re-describing a grid. Its world is not editable: a grid over another space is another grid */
+export type UpdateGridInput = {
+  description?: InputMaybe<Scalars['String']['input']>;
+  id: Scalars['ID']['input'];
+  name?: InputMaybe<Scalars['String']['input']>;
+};
+
+/** Input for restyling a grid layer. View state only: what it reads is fixed at creation, and where it sits is the graph's */
+export type UpdateGridLayerInput = {
+  colormap?: InputMaybe<ColorMap>;
+  id: Scalars['ID']['input'];
+  max?: InputMaybe<Scalars['Float']['input']>;
+  min?: InputMaybe<Scalars['Float']['input']>;
+  name?: InputMaybe<Scalars['String']['input']>;
+  opacity?: InputMaybe<Scalars['Float']['input']>;
+  order?: InputMaybe<Scalars['Int']['input']>;
+  visible?: InputMaybe<Scalars['Boolean']['input']>;
 };
 
 /** Update an intensity layer's render settings. Every field is a patch: what is not sent keeps its current value */
@@ -11362,14 +12554,6 @@ export type UpdateLayerInput = {
   renderGraph?: InputMaybe<LayerRenderGraphInput>;
   scene?: InputMaybe<Scalars['ID']['input']>;
   visible?: InputMaybe<Scalars['Boolean']['input']>;
-};
-
-/** Input for renaming a lens -- the whole of what is editable about one */
-export type UpdateLensInput = {
-  /** The ID of the lens to update */
-  id: Scalars['ID']['input'];
-  /** The new name, or null (or blank) to clear it */
-  name?: InputMaybe<Scalars['String']['input']>;
 };
 
 /** Retune how a mesh layer is drawn. A patch: an OMITTED field keeps its current value, so switching the colouring cannot silently drop the material or the wireframe -- while an explicit `null` CLEARS the fields whose null means something. The collection and the scene are not editable -- a layer renders what it was created to render */
@@ -11466,6 +12650,25 @@ export type UpdatePointLayerInput = {
   visible?: InputMaybe<Scalars['Boolean']['input']>;
 };
 
+/** Retune a points layer: plot other columns, or another table lens' rows, or change how they are drawn */
+export type UpdatePointsChartLayerInput = {
+  clearZColumn?: Scalars['Boolean']['input'];
+  color?: InputMaybe<Array<Scalars['Float']['input']>>;
+  id: Scalars['ID']['input'];
+  lens?: InputMaybe<Scalars['ID']['input']>;
+  lineWidth?: InputMaybe<Scalars['Float']['input']>;
+  mark?: InputMaybe<ChartMark>;
+  markerShape?: InputMaybe<ChartMarkerShape>;
+  markerSize?: InputMaybe<Scalars['Float']['input']>;
+  name?: InputMaybe<Scalars['String']['input']>;
+  opacity?: InputMaybe<Scalars['Float']['input']>;
+  order?: InputMaybe<Scalars['Int']['input']>;
+  visible?: InputMaybe<Scalars['Boolean']['input']>;
+  xColumn?: InputMaybe<Scalars['String']['input']>;
+  yColumn?: InputMaybe<Scalars['String']['input']>;
+  zColumn?: InputMaybe<Scalars['String']['input']>;
+};
+
 /** Update an RGB layer's render settings. Every field is a patch: what is not sent keeps its current value */
 export type UpdateRgbLayerInput = {
   blueLens?: InputMaybe<Scalars['ID']['input']>;
@@ -11489,6 +12692,22 @@ export type UpdateSceneInput = {
   preferredView?: InputMaybe<PreferredView>;
 };
 
+/** Retune a series: read another value column, or another table lens, against the chart's axis */
+export type UpdateSeriesChartLayerInput = {
+  color?: InputMaybe<Array<Scalars['Float']['input']>>;
+  id: Scalars['ID']['input'];
+  lens?: InputMaybe<Scalars['ID']['input']>;
+  lineWidth?: InputMaybe<Scalars['Float']['input']>;
+  mark?: InputMaybe<ChartMark>;
+  markerShape?: InputMaybe<ChartMarkerShape>;
+  markerSize?: InputMaybe<Scalars['Float']['input']>;
+  name?: InputMaybe<Scalars['String']['input']>;
+  opacity?: InputMaybe<Scalars['Float']['input']>;
+  order?: InputMaybe<Scalars['Int']['input']>;
+  valueColumn?: InputMaybe<Scalars['String']['input']>;
+  visible?: InputMaybe<Scalars['Boolean']['input']>;
+};
+
 /** Input for renaming or redescribing a sparse dataset */
 export type UpdateSparseDatasetInput = {
   description?: InputMaybe<Scalars['String']['input']>;
@@ -11501,6 +12720,21 @@ export type UpdateTableDatasetInput = {
   description?: InputMaybe<Scalars['String']['input']>;
   id: Scalars['ID']['input'];
   name?: InputMaybe<Scalars['String']['input']>;
+};
+
+/** Retune a trace: draw another array lens along the chart's axis, or change how it is drawn */
+export type UpdateTraceChartLayerInput = {
+  color?: InputMaybe<Array<Scalars['Float']['input']>>;
+  id: Scalars['ID']['input'];
+  lens?: InputMaybe<Scalars['ID']['input']>;
+  lineWidth?: InputMaybe<Scalars['Float']['input']>;
+  mark?: InputMaybe<ChartMark>;
+  markerShape?: InputMaybe<ChartMarkerShape>;
+  markerSize?: InputMaybe<Scalars['Float']['input']>;
+  name?: InputMaybe<Scalars['String']['input']>;
+  opacity?: InputMaybe<Scalars['Float']['input']>;
+  order?: InputMaybe<Scalars['Int']['input']>;
+  visible?: InputMaybe<Scalars['Boolean']['input']>;
 };
 
 /** Retune a track layer after creation -- its line width, its colouring column and the compositing it takes part in */
@@ -11688,14 +12922,33 @@ export type VectorLayerPlacementValidityArgs = {
   at?: InputMaybe<Array<CoordinateInput>>;
 };
 
-/** A composition laid out over a coordinate system: a scene (a place) or a chart (one metric axis). It adopts the space as its world, names data by id and owns none of it. Only what every kind has is here -- the layers differ per kind, so select them on the concrete type */
+/** A composition: something that draws data through lenses, names it by id and owns none of it. A **scene** shows *where* -- every screen axis is an axis of its world, data is placed there by the graph's edges, and values are drawn as appearance (colour, size). A **chart** shows *how much* -- values are drawn as position, and at most one axis is drawn from its world: an AXIS chart draws its one axis (intensity against `t`), a VALUES chart draws its rows at the values of their columns (nuclei at `area` against `volume`), its world saying whose rows. Only what every kind has is here -- the layers differ per kind, so select them on the concrete type */
 export type Visualization = {
   /** This object's descriptors, a flat mapping of key to value: the facts about it that an action's port can `require` and a trigger can test (e.g. `@mikro/n_channels`). The keys are the ones mikro declares for this structure, and the values are the ones a signal about the object carries. Empty for a structure that declares none */
   descriptors: Scalars['JSON']['output'];
   id: Scalars['ID']['output'];
   name: Scalars['String']['output'];
-  /** The space this visualization is laid out over. Never owned by it: several can share the space, it outlives each of them, and deleting one never deletes it */
+  /** The space this visualization is laid out over: a scene's place, an AXIS chart's one axis, a VALUES chart's rows (a table's space, not drawn). Never owned by it: several can share the space, it outlives each of them, and deleting one never deletes it */
   worldCoordinateSystem: CoordinateSystem;
+};
+
+/** A lens' voxel size in one physical space it reaches with the edges: one of the first spaces on its way whose axes all carry units, by the best route there. Several can be reached and they can disagree -- an imported pixel size and a later calibration -- so each is listed, and exactly one is `canonical`: the best by the ranking placements use (the weakest `validity` on the route, highest first; then fewest hops; then the oldest edges). So a MANUAL calibration outranks the INFERRED one a converter read from the file, and a VALIDATED one outranks both. Nothing about it is stored: the edges decide */
+export type VoxelSize = {
+  __typename?: 'VoxelSize';
+  /** One entry per lens axis the route scales, in the lens' axis order. An axis in `a.u.` is not listed: it measures nothing */
+  axes: Array<AxisVoxelSize>;
+  /** Whether this is the lens' one voxel size, the one `ArrayLens.voxelSize` answers */
+  canonical: Scalars['Boolean']['output'];
+  /** How many edges the route takes, from the lens' own space */
+  hops: Scalars['Int']['output'];
+  /** Why this route cannot be a calibration -- it relates a SPACE axis to another kind of axis, measures space in arbitrary units, or does not compose -- or null. A route with a problem is never canonical */
+  problem?: Maybe<Scalars['String']['output']>;
+  /** The edges of the route, from the lens' own space to this one */
+  route: Array<Transformation>;
+  /** The physical space */
+  system: CoordinateSystem;
+  /** The weakest validity on the route: the first thing the ranking compares */
+  validity: PlacementValidity;
 };
 
 /** A retarder: a fraction of a wave, at an angle */
@@ -11812,7 +13065,7 @@ export type ZarrUploadGrant = {
   uploadFileName: Scalars['String']['output'];
 };
 
-export type _Entity = AcquisitionWindow | AffineTransformation | Animation | AnimationWaypoint | Annotation | AnnotationChartLayer | AnnotationCollection | AnnotationLayer | AnnotationLens | ArrayDataset | ArrayLens | Axis | BigFileStore | ByDimensionTransformation | ChannelLabel | Chart | Client | Column | CoordinateAnchor | CoordinateSystem | DataArray | DerivationConflict | FabriksStore | File | FileLink | Fixture | FixtureLayer | FixtureLens | Folder | IdentityTransformation | ImageLayer | IntensityLayer | KonnektionStore | KulisseStore | LabelLayer | LightPath | MapAxisTransformation | MediaStore | Membership | MeshCollection | MeshLayer | MeshLens | Metric | MetricTarget | NetworkCollection | NetworkLayer | NetworkLens | OmeMetadata | OptikitState | Organization | ParquetStore | PhasorCalibration | PhasorHistogram | PhasorLayer | PointLayer | RgbLayer | RotationTransformation | ScaleTransformation | Scene | SceneSnapshot | SequenceTransformation | SeriesChartLayer | SparseArray | SparseAxisReference | SparseDataset | SparseLens | SparseStore | TableDataset | TableLens | Task | TraceChartLayer | TrackLayer | TranslationTransformation | UnmappableTransformation | User | ValueHistogram | VectorLayer | ZarrStore;
+export type _Entity = AcquisitionWindow | AffineTransformation | Animation | AnimationWaypoint | Annotation | AnnotationChartLayer | AnnotationCollection | AnnotationDerivation | AnnotationLayer | AnnotationLens | ArrayDataset | ArrayLens | Axis | BigFileStore | ByDimensionTransformation | CellsGridLayer | ChannelLabel | Chart | Client | Column | CoordinateAnchor | CoordinateSystem | DataArray | DerivationConflict | DistributionChartLayer | FabriksStore | File | FileLink | Fixture | FixtureLayer | FixtureLens | Folder | Grid | HeatmapGridLayer | IdentityTransformation | ImageLayer | IntensityLayer | KonnektionStore | KulisseStore | LabelLayer | LightPath | MapAxisTransformation | MediaStore | Membership | MeshCollection | MeshLayer | MeshLens | Metric | MetricTarget | NetworkCollection | NetworkLayer | NetworkLens | OmeMetadata | OptikitState | Organization | ParquetStore | PhasorCalibration | PhasorHistogram | PhasorLayer | PointLayer | PointsChartLayer | PositionLabel | RgbLayer | RotationTransformation | ScaleTransformation | Scene | SceneSnapshot | SequenceTransformation | SeriesChartLayer | SparseArray | SparseAxisReference | SparseDataset | SparseLens | SparseStore | TableDataset | TableLens | Task | TraceChartLayer | TrackLayer | TranslationTransformation | UnmappableTransformation | User | ValueHistogram | VectorLayer | ZarrStore;
 
 export type _Service = {
   __typename?: '_Service';
@@ -11821,11 +13074,51 @@ export type _Service = {
 
 export type ListArrayDatasetFragment = { __typename?: 'ArrayDataset', id: string, name: string, description?: string | null, axisNames: Array<string>, shape: Array<number>, multiscale: boolean, spec: Array<ArrayDatasetSpec>, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null, fullLens?: { __typename?: 'ArrayLens', id: string } | null };
 
-export type DetailArrayDatasetFragment = { __typename?: 'ArrayDataset', id: string, name: string, description?: string | null, axisNames: Array<string>, shape: Array<number>, multiscale: boolean, spec: Array<ArrayDatasetSpec>, folder?: { __typename?: 'Folder', id: string, name: string } | null, scenes: Array<{ __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null }>, lenses: Array<{ __typename: 'ArrayLens', id: string, name?: string | null, kind: LensKind, createdAt: string, shape: Array<number>, axisNames: Array<string>, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null, coordinateSystem?: { __typename?: 'CoordinateSystem', id: string, name: string } | null, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null, slices: Array<{ __typename?: 'Slice', axis: string, start?: number | null, stop?: number | null, step?: number | null }>, dataset: { __typename?: 'ArrayDataset', id: string, name: string, axisNames: Array<string>, shape: Array<number> } }>, derivedFrom: Array<{ __typename?: 'AffineTransformation', id: string, kind: TransformKind } | { __typename?: 'ByDimensionTransformation', id: string, kind: TransformKind } | { __typename?: 'IdentityTransformation', id: string, kind: TransformKind } | { __typename?: 'MapAxisTransformation', id: string, kind: TransformKind } | { __typename?: 'RotationTransformation', id: string, kind: TransformKind } | { __typename?: 'ScaleTransformation', id: string, kind: TransformKind } | { __typename?: 'SequenceTransformation', id: string, kind: TransformKind } | { __typename?: 'TranslationTransformation', id: string, kind: TransformKind } | { __typename?: 'UnmappableTransformation', id: string, kind: TransformKind }>, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null, fullLens?: { __typename?: 'ArrayLens', id: string } | null };
+export type DetailArrayDatasetFragment = { __typename?: 'ArrayDataset', id: string, name: string, description?: string | null, axisNames: Array<string>, shape: Array<number>, multiscale: boolean, spec: Array<ArrayDatasetSpec>, folder?: { __typename?: 'Folder', id: string, name: string } | null, scenes: Array<{ __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null }>, lenses: Array<{ __typename: 'ArrayLens', id: string, name?: string | null, kind: LensKind, createdAt: string, shape: Array<number>, axisNames: Array<string>, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null, coordinateSystem: { __typename?: 'CoordinateSystem', id: string, name: string }, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null, slices: Array<{ __typename?: 'Slice', axis: string, start?: number | null, stop?: number | null, step?: number | null }>, dataset: { __typename?: 'ArrayDataset', id: string, name: string, axisNames: Array<string>, shape: Array<number> } }>, derivedFrom: Array<{ __typename?: 'AffineTransformation', id: string, kind: TransformKind } | { __typename?: 'ByDimensionTransformation', id: string, kind: TransformKind } | { __typename?: 'IdentityTransformation', id: string, kind: TransformKind } | { __typename?: 'MapAxisTransformation', id: string, kind: TransformKind } | { __typename?: 'RotationTransformation', id: string, kind: TransformKind } | { __typename?: 'ScaleTransformation', id: string, kind: TransformKind } | { __typename?: 'SequenceTransformation', id: string, kind: TransformKind } | { __typename?: 'TranslationTransformation', id: string, kind: TransformKind } | { __typename?: 'UnmappableTransformation', id: string, kind: TransformKind }>, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null, fullLens?: { __typename?: 'ArrayLens', id: string } | null };
+
+export type BlokSceneLensFragment = { __typename?: 'ArrayLens', id: string, label: string, dataset: { __typename?: 'ArrayDataset', id: string } };
+
+type BlokSceneLayer_AnnotationLayer_Fragment = { __typename: 'AnnotationLayer', id: string, kind: LayerKind, name?: string | null, visible: boolean, order: number, annotationCollection: { __typename?: 'AnnotationCollection', id: string, name: string } };
+
+type BlokSceneLayer_FixtureLayer_Fragment = { __typename: 'FixtureLayer', id: string, kind: LayerKind, name?: string | null, visible: boolean, order: number };
+
+type BlokSceneLayer_ImageLayer_Fragment = { __typename: 'ImageLayer', id: string, kind: LayerKind, name?: string | null, visible: boolean, order: number, arrayLens: { __typename?: 'ArrayLens', id: string, label: string, dataset: { __typename?: 'ArrayDataset', id: string } } };
+
+type BlokSceneLayer_IntensityLayer_Fragment = { __typename: 'IntensityLayer', id: string, kind: LayerKind, name?: string | null, visible: boolean, order: number, arrayLens: { __typename?: 'ArrayLens', id: string, label: string, dataset: { __typename?: 'ArrayDataset', id: string } } };
+
+type BlokSceneLayer_LabelLayer_Fragment = { __typename: 'LabelLayer', id: string, kind: LayerKind, name?: string | null, visible: boolean, order: number, arrayLens: { __typename?: 'ArrayLens', id: string, label: string, dataset: { __typename?: 'ArrayDataset', id: string } } };
+
+type BlokSceneLayer_MeshLayer_Fragment = { __typename: 'MeshLayer', id: string, kind: LayerKind, name?: string | null, visible: boolean, order: number };
+
+type BlokSceneLayer_NetworkLayer_Fragment = { __typename: 'NetworkLayer', id: string, kind: LayerKind, name?: string | null, visible: boolean, order: number };
+
+type BlokSceneLayer_PhasorLayer_Fragment = { __typename: 'PhasorLayer', id: string, kind: LayerKind, name?: string | null, visible: boolean, order: number, arrayLens: { __typename?: 'ArrayLens', id: string, label: string, dataset: { __typename?: 'ArrayDataset', id: string } } };
+
+type BlokSceneLayer_PointLayer_Fragment = { __typename: 'PointLayer', id: string, kind: LayerKind, name?: string | null, visible: boolean, order: number };
+
+type BlokSceneLayer_RgbLayer_Fragment = { __typename: 'RgbLayer', id: string, kind: LayerKind, name?: string | null, visible: boolean, order: number, arrayLens: { __typename?: 'ArrayLens', id: string, label: string, dataset: { __typename?: 'ArrayDataset', id: string } } };
+
+type BlokSceneLayer_TrackLayer_Fragment = { __typename: 'TrackLayer', id: string, kind: LayerKind, name?: string | null, visible: boolean, order: number };
+
+type BlokSceneLayer_VectorLayer_Fragment = { __typename: 'VectorLayer', id: string, kind: LayerKind, name?: string | null, visible: boolean, order: number };
+
+export type BlokSceneLayerFragment = BlokSceneLayer_AnnotationLayer_Fragment | BlokSceneLayer_FixtureLayer_Fragment | BlokSceneLayer_ImageLayer_Fragment | BlokSceneLayer_IntensityLayer_Fragment | BlokSceneLayer_LabelLayer_Fragment | BlokSceneLayer_MeshLayer_Fragment | BlokSceneLayer_NetworkLayer_Fragment | BlokSceneLayer_PhasorLayer_Fragment | BlokSceneLayer_PointLayer_Fragment | BlokSceneLayer_RgbLayer_Fragment | BlokSceneLayer_TrackLayer_Fragment | BlokSceneLayer_VectorLayer_Fragment;
+
+export type BlokSceneFragment = { __typename?: 'Scene', id: string, name: string, worldCoordinateSystem: { __typename?: 'CoordinateSystem', id: string, name: string }, layers: Array<{ __typename: 'AnnotationLayer', id: string, kind: LayerKind, name?: string | null, visible: boolean, order: number, annotationCollection: { __typename?: 'AnnotationCollection', id: string, name: string } } | { __typename: 'FixtureLayer', id: string, kind: LayerKind, name?: string | null, visible: boolean, order: number } | { __typename: 'ImageLayer', id: string, kind: LayerKind, name?: string | null, visible: boolean, order: number, arrayLens: { __typename?: 'ArrayLens', id: string, label: string, dataset: { __typename?: 'ArrayDataset', id: string } } } | { __typename: 'IntensityLayer', id: string, kind: LayerKind, name?: string | null, visible: boolean, order: number, arrayLens: { __typename?: 'ArrayLens', id: string, label: string, dataset: { __typename?: 'ArrayDataset', id: string } } } | { __typename: 'LabelLayer', id: string, kind: LayerKind, name?: string | null, visible: boolean, order: number, arrayLens: { __typename?: 'ArrayLens', id: string, label: string, dataset: { __typename?: 'ArrayDataset', id: string } } } | { __typename: 'MeshLayer', id: string, kind: LayerKind, name?: string | null, visible: boolean, order: number } | { __typename: 'NetworkLayer', id: string, kind: LayerKind, name?: string | null, visible: boolean, order: number } | { __typename: 'PhasorLayer', id: string, kind: LayerKind, name?: string | null, visible: boolean, order: number, arrayLens: { __typename?: 'ArrayLens', id: string, label: string, dataset: { __typename?: 'ArrayDataset', id: string } } } | { __typename: 'PointLayer', id: string, kind: LayerKind, name?: string | null, visible: boolean, order: number } | { __typename: 'RgbLayer', id: string, kind: LayerKind, name?: string | null, visible: boolean, order: number, arrayLens: { __typename?: 'ArrayLens', id: string, label: string, dataset: { __typename?: 'ArrayDataset', id: string } } } | { __typename: 'TrackLayer', id: string, kind: LayerKind, name?: string | null, visible: boolean, order: number } | { __typename: 'VectorLayer', id: string, kind: LayerKind, name?: string | null, visible: boolean, order: number }>, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null };
+
+export type BlokAnnotationFragment = { __typename?: 'Annotation', id: any, name: string, kind: AnnotationKind };
+
+export type BlokAnnotationCollectionFragment = { __typename?: 'AnnotationCollection', id: string, name: string, annotations: Array<{ __typename?: 'Annotation', id: any, name: string, kind: AnnotationKind }> };
+
+export type BlokTableColumnFragment = { __typename?: 'Column', id: string, name: string, longName?: string | null, description?: string | null, dtype: string, role: ColumnRole, unit?: any | null, axisType?: AxisType | null, order: number };
+
+export type BlokTableFragment = { __typename?: 'TableDataset', id: string, name: string, columns: Array<{ __typename?: 'Column', id: string, name: string, longName?: string | null, description?: string | null, dtype: string, role: ColumnRole, unit?: any | null, axisType?: AxisType | null, order: number }>, store: { __typename?: 'ParquetStore', id: string, sizeBytes?: number | null } };
+
+export type ParquetAccessGrantFragment = { __typename?: 'ParquetAccessGrant', accessKey: string, secretKey: string, sessionToken: string, region: string, bucket: string, key: string, expiresIn: number };
 
 export type ListFileFragment = { __typename?: 'File', id: string, name: string, size?: number | null, contentType?: string | null };
 
-export type DetailFileFragment = { __typename?: 'File', id: string, name: string, size?: number | null, contentType?: string | null, folder?: { __typename?: 'Folder', id: string, name: string } | null, derivedContainers: Array<{ __typename?: 'FileLink', id: string, seriesIdentifier?: string | null, container: { __typename: 'AnnotationCollection' } | { __typename: 'ArrayDataset', id: string, name: string } | { __typename: 'MeshCollection' } | { __typename: 'TableDataset', id: string, name: string } }> };
+export type DetailFileFragment = { __typename?: 'File', id: string, name: string, size?: number | null, contentType?: string | null, folder?: { __typename?: 'Folder', id: string, name: string } | null, derivedContainers: Array<{ __typename?: 'FileLink', id: string, seriesIdentifier: string, container: { __typename: 'AnnotationCollection' } | { __typename: 'ArrayDataset', id: string, name: string } | { __typename: 'MeshCollection' } | { __typename: 'TableDataset', id: string, name: string } }> };
 
 export type ListFolderFragment = { __typename?: 'Folder', id: string, name: string, description?: string | null, isDefault: boolean };
 
@@ -11835,19 +13128,19 @@ export type DimSliceFragment = { __typename?: 'Slice', axis: string, start?: num
 
 export type LensWindowFragment = { __typename?: 'Window', axis: string, min?: number | null, max?: number | null };
 
-type LensCore_AnnotationLens_Fragment = { __typename: 'AnnotationLens', id: string, name?: string | null, kind: LensKind, createdAt: string, coordinateSystem?: { __typename?: 'CoordinateSystem', id: string, name: string } | null, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null };
+type LensCore_AnnotationLens_Fragment = { __typename: 'AnnotationLens', id: string, name?: string | null, kind: LensKind, createdAt: string, coordinateSystem: { __typename?: 'CoordinateSystem', id: string, name: string }, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null };
 
-type LensCore_ArrayLens_Fragment = { __typename: 'ArrayLens', id: string, name?: string | null, kind: LensKind, createdAt: string, coordinateSystem?: { __typename?: 'CoordinateSystem', id: string, name: string } | null, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null };
+type LensCore_ArrayLens_Fragment = { __typename: 'ArrayLens', id: string, name?: string | null, kind: LensKind, createdAt: string, coordinateSystem: { __typename?: 'CoordinateSystem', id: string, name: string }, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null };
 
-type LensCore_FixtureLens_Fragment = { __typename: 'FixtureLens', id: string, name?: string | null, kind: LensKind, createdAt: string, coordinateSystem?: { __typename?: 'CoordinateSystem', id: string, name: string } | null, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null };
+type LensCore_FixtureLens_Fragment = { __typename: 'FixtureLens', id: string, name?: string | null, kind: LensKind, createdAt: string, coordinateSystem: { __typename?: 'CoordinateSystem', id: string, name: string }, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null };
 
-type LensCore_MeshLens_Fragment = { __typename: 'MeshLens', id: string, name?: string | null, kind: LensKind, createdAt: string, coordinateSystem?: { __typename?: 'CoordinateSystem', id: string, name: string } | null, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null };
+type LensCore_MeshLens_Fragment = { __typename: 'MeshLens', id: string, name?: string | null, kind: LensKind, createdAt: string, coordinateSystem: { __typename?: 'CoordinateSystem', id: string, name: string }, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null };
 
-type LensCore_NetworkLens_Fragment = { __typename: 'NetworkLens', id: string, name?: string | null, kind: LensKind, createdAt: string, coordinateSystem?: { __typename?: 'CoordinateSystem', id: string, name: string } | null, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null };
+type LensCore_NetworkLens_Fragment = { __typename: 'NetworkLens', id: string, name?: string | null, kind: LensKind, createdAt: string, coordinateSystem: { __typename?: 'CoordinateSystem', id: string, name: string }, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null };
 
-type LensCore_SparseLens_Fragment = { __typename: 'SparseLens', id: string, name?: string | null, kind: LensKind, createdAt: string, coordinateSystem?: { __typename?: 'CoordinateSystem', id: string, name: string } | null, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null };
+type LensCore_SparseLens_Fragment = { __typename: 'SparseLens', id: string, name?: string | null, kind: LensKind, createdAt: string, coordinateSystem: { __typename?: 'CoordinateSystem', id: string, name: string }, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null };
 
-type LensCore_TableLens_Fragment = { __typename: 'TableLens', id: string, name?: string | null, kind: LensKind, createdAt: string, coordinateSystem?: { __typename?: 'CoordinateSystem', id: string, name: string } | null, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null };
+type LensCore_TableLens_Fragment = { __typename: 'TableLens', id: string, name?: string | null, kind: LensKind, createdAt: string, coordinateSystem: { __typename?: 'CoordinateSystem', id: string, name: string }, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null };
 
 export type LensCoreFragment = LensCore_AnnotationLens_Fragment | LensCore_ArrayLens_Fragment | LensCore_FixtureLens_Fragment | LensCore_MeshLens_Fragment | LensCore_NetworkLens_Fragment | LensCore_SparseLens_Fragment | LensCore_TableLens_Fragment;
 
@@ -11867,35 +13160,35 @@ type LensSubject_TableLens_Fragment = { __typename: 'TableLens', windows: Array<
 
 export type LensSubjectFragment = LensSubject_AnnotationLens_Fragment | LensSubject_ArrayLens_Fragment | LensSubject_FixtureLens_Fragment | LensSubject_MeshLens_Fragment | LensSubject_NetworkLens_Fragment | LensSubject_SparseLens_Fragment | LensSubject_TableLens_Fragment;
 
-type ListLens_AnnotationLens_Fragment = { __typename: 'AnnotationLens', id: string, name?: string | null, kind: LensKind, createdAt: string, coordinateSystem?: { __typename?: 'CoordinateSystem', id: string, name: string } | null, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null, windows: Array<{ __typename?: 'Window', axis: string, min?: number | null, max?: number | null }>, annotationCollection: { __typename?: 'AnnotationCollection', id: string, name: string } };
+type ListLens_AnnotationLens_Fragment = { __typename: 'AnnotationLens', id: string, name?: string | null, kind: LensKind, createdAt: string, coordinateSystem: { __typename?: 'CoordinateSystem', id: string, name: string }, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null, windows: Array<{ __typename?: 'Window', axis: string, min?: number | null, max?: number | null }>, annotationCollection: { __typename?: 'AnnotationCollection', id: string, name: string } };
 
-type ListLens_ArrayLens_Fragment = { __typename: 'ArrayLens', id: string, name?: string | null, kind: LensKind, createdAt: string, shape: Array<number>, axisNames: Array<string>, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null, coordinateSystem?: { __typename?: 'CoordinateSystem', id: string, name: string } | null, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null, slices: Array<{ __typename?: 'Slice', axis: string, start?: number | null, stop?: number | null, step?: number | null }>, dataset: { __typename?: 'ArrayDataset', id: string, name: string, axisNames: Array<string>, shape: Array<number> } };
+type ListLens_ArrayLens_Fragment = { __typename: 'ArrayLens', id: string, name?: string | null, kind: LensKind, createdAt: string, shape: Array<number>, axisNames: Array<string>, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null, coordinateSystem: { __typename?: 'CoordinateSystem', id: string, name: string }, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null, slices: Array<{ __typename?: 'Slice', axis: string, start?: number | null, stop?: number | null, step?: number | null }>, dataset: { __typename?: 'ArrayDataset', id: string, name: string, axisNames: Array<string>, shape: Array<number> } };
 
-type ListLens_FixtureLens_Fragment = { __typename: 'FixtureLens', id: string, name?: string | null, kind: LensKind, createdAt: string, coordinateSystem?: { __typename?: 'CoordinateSystem', id: string, name: string } | null, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null };
+type ListLens_FixtureLens_Fragment = { __typename: 'FixtureLens', id: string, name?: string | null, kind: LensKind, createdAt: string, coordinateSystem: { __typename?: 'CoordinateSystem', id: string, name: string }, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null };
 
-type ListLens_MeshLens_Fragment = { __typename: 'MeshLens', id: string, name?: string | null, kind: LensKind, createdAt: string, coordinateSystem?: { __typename?: 'CoordinateSystem', id: string, name: string } | null, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null, windows: Array<{ __typename?: 'Window', axis: string, min?: number | null, max?: number | null }>, meshCollection: { __typename?: 'MeshCollection', id: string, name?: string | null } };
+type ListLens_MeshLens_Fragment = { __typename: 'MeshLens', id: string, name?: string | null, kind: LensKind, createdAt: string, coordinateSystem: { __typename?: 'CoordinateSystem', id: string, name: string }, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null, windows: Array<{ __typename?: 'Window', axis: string, min?: number | null, max?: number | null }>, meshCollection: { __typename?: 'MeshCollection', id: string, name?: string | null } };
 
-type ListLens_NetworkLens_Fragment = { __typename: 'NetworkLens', id: string, name?: string | null, kind: LensKind, createdAt: string, coordinateSystem?: { __typename?: 'CoordinateSystem', id: string, name: string } | null, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null, windows: Array<{ __typename?: 'Window', axis: string, min?: number | null, max?: number | null }>, networkCollection: { __typename?: 'NetworkCollection', id: string, name?: string | null } };
+type ListLens_NetworkLens_Fragment = { __typename: 'NetworkLens', id: string, name?: string | null, kind: LensKind, createdAt: string, coordinateSystem: { __typename?: 'CoordinateSystem', id: string, name: string }, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null, windows: Array<{ __typename?: 'Window', axis: string, min?: number | null, max?: number | null }>, networkCollection: { __typename?: 'NetworkCollection', id: string, name?: string | null } };
 
-type ListLens_SparseLens_Fragment = { __typename: 'SparseLens', id: string, name?: string | null, kind: LensKind, createdAt: string, coordinateSystem?: { __typename?: 'CoordinateSystem', id: string, name: string } | null, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null, windows: Array<{ __typename?: 'Window', axis: string, min?: number | null, max?: number | null }>, sparseDataset: { __typename?: 'SparseDataset', id: string, name: string } };
+type ListLens_SparseLens_Fragment = { __typename: 'SparseLens', id: string, name?: string | null, kind: LensKind, createdAt: string, coordinateSystem: { __typename?: 'CoordinateSystem', id: string, name: string }, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null, windows: Array<{ __typename?: 'Window', axis: string, min?: number | null, max?: number | null }>, sparseDataset: { __typename?: 'SparseDataset', id: string, name: string } };
 
-type ListLens_TableLens_Fragment = { __typename: 'TableLens', id: string, name?: string | null, kind: LensKind, createdAt: string, coordinateSystem?: { __typename?: 'CoordinateSystem', id: string, name: string } | null, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null, windows: Array<{ __typename?: 'Window', axis: string, min?: number | null, max?: number | null }>, tableDataset: { __typename?: 'TableDataset', id: string, name: string } };
+type ListLens_TableLens_Fragment = { __typename: 'TableLens', id: string, name?: string | null, kind: LensKind, createdAt: string, coordinateSystem: { __typename?: 'CoordinateSystem', id: string, name: string }, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null, windows: Array<{ __typename?: 'Window', axis: string, min?: number | null, max?: number | null }>, tableDataset: { __typename?: 'TableDataset', id: string, name: string } };
 
 export type ListLensFragment = ListLens_AnnotationLens_Fragment | ListLens_ArrayLens_Fragment | ListLens_FixtureLens_Fragment | ListLens_MeshLens_Fragment | ListLens_NetworkLens_Fragment | ListLens_SparseLens_Fragment | ListLens_TableLens_Fragment;
 
-type DetailLens_AnnotationLens_Fragment = { __typename: 'AnnotationLens', id: string, name?: string | null, kind: LensKind, createdAt: string, coordinateSystem?: { __typename?: 'CoordinateSystem', id: string, name: string } | null, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null, windows: Array<{ __typename?: 'Window', axis: string, min?: number | null, max?: number | null }>, annotationCollection: { __typename?: 'AnnotationCollection', id: string, name: string } };
+type DetailLens_AnnotationLens_Fragment = { __typename: 'AnnotationLens', id: string, name?: string | null, kind: LensKind, createdAt: string, coordinateSystem: { __typename?: 'CoordinateSystem', id: string, name: string }, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null, windows: Array<{ __typename?: 'Window', axis: string, min?: number | null, max?: number | null }>, annotationCollection: { __typename?: 'AnnotationCollection', id: string, name: string } };
 
-type DetailLens_ArrayLens_Fragment = { __typename: 'ArrayLens', id: string, name?: string | null, kind: LensKind, createdAt: string, shape: Array<number>, axisNames: Array<string>, scenes: Array<{ __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null }>, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null, coordinateSystem?: { __typename?: 'CoordinateSystem', id: string, name: string } | null, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null, slices: Array<{ __typename?: 'Slice', axis: string, start?: number | null, stop?: number | null, step?: number | null }>, dataset: { __typename?: 'ArrayDataset', id: string, name: string, axisNames: Array<string>, shape: Array<number> } };
+type DetailLens_ArrayLens_Fragment = { __typename: 'ArrayLens', id: string, name?: string | null, kind: LensKind, createdAt: string, shape: Array<number>, axisNames: Array<string>, scenes: Array<{ __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null }>, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null, coordinateSystem: { __typename?: 'CoordinateSystem', id: string, name: string }, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null, slices: Array<{ __typename?: 'Slice', axis: string, start?: number | null, stop?: number | null, step?: number | null }>, dataset: { __typename?: 'ArrayDataset', id: string, name: string, axisNames: Array<string>, shape: Array<number> } };
 
-type DetailLens_FixtureLens_Fragment = { __typename: 'FixtureLens', id: string, name?: string | null, kind: LensKind, createdAt: string, coordinateSystem?: { __typename?: 'CoordinateSystem', id: string, name: string } | null, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null };
+type DetailLens_FixtureLens_Fragment = { __typename: 'FixtureLens', id: string, name?: string | null, kind: LensKind, createdAt: string, coordinateSystem: { __typename?: 'CoordinateSystem', id: string, name: string }, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null };
 
-type DetailLens_MeshLens_Fragment = { __typename: 'MeshLens', id: string, name?: string | null, kind: LensKind, createdAt: string, coordinateSystem?: { __typename?: 'CoordinateSystem', id: string, name: string } | null, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null, windows: Array<{ __typename?: 'Window', axis: string, min?: number | null, max?: number | null }>, meshCollection: { __typename?: 'MeshCollection', id: string, name?: string | null } };
+type DetailLens_MeshLens_Fragment = { __typename: 'MeshLens', id: string, name?: string | null, kind: LensKind, createdAt: string, coordinateSystem: { __typename?: 'CoordinateSystem', id: string, name: string }, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null, windows: Array<{ __typename?: 'Window', axis: string, min?: number | null, max?: number | null }>, meshCollection: { __typename?: 'MeshCollection', id: string, name?: string | null } };
 
-type DetailLens_NetworkLens_Fragment = { __typename: 'NetworkLens', id: string, name?: string | null, kind: LensKind, createdAt: string, coordinateSystem?: { __typename?: 'CoordinateSystem', id: string, name: string } | null, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null, windows: Array<{ __typename?: 'Window', axis: string, min?: number | null, max?: number | null }>, networkCollection: { __typename?: 'NetworkCollection', id: string, name?: string | null } };
+type DetailLens_NetworkLens_Fragment = { __typename: 'NetworkLens', id: string, name?: string | null, kind: LensKind, createdAt: string, coordinateSystem: { __typename?: 'CoordinateSystem', id: string, name: string }, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null, windows: Array<{ __typename?: 'Window', axis: string, min?: number | null, max?: number | null }>, networkCollection: { __typename?: 'NetworkCollection', id: string, name?: string | null } };
 
-type DetailLens_SparseLens_Fragment = { __typename: 'SparseLens', id: string, name?: string | null, kind: LensKind, createdAt: string, coordinateSystem?: { __typename?: 'CoordinateSystem', id: string, name: string } | null, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null, windows: Array<{ __typename?: 'Window', axis: string, min?: number | null, max?: number | null }>, sparseDataset: { __typename?: 'SparseDataset', id: string, name: string } };
+type DetailLens_SparseLens_Fragment = { __typename: 'SparseLens', id: string, name?: string | null, kind: LensKind, createdAt: string, coordinateSystem: { __typename?: 'CoordinateSystem', id: string, name: string }, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null, windows: Array<{ __typename?: 'Window', axis: string, min?: number | null, max?: number | null }>, sparseDataset: { __typename?: 'SparseDataset', id: string, name: string } };
 
-type DetailLens_TableLens_Fragment = { __typename: 'TableLens', id: string, name?: string | null, kind: LensKind, createdAt: string, coordinateSystem?: { __typename?: 'CoordinateSystem', id: string, name: string } | null, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null, windows: Array<{ __typename?: 'Window', axis: string, min?: number | null, max?: number | null }>, tableDataset: { __typename?: 'TableDataset', id: string, name: string } };
+type DetailLens_TableLens_Fragment = { __typename: 'TableLens', id: string, name?: string | null, kind: LensKind, createdAt: string, coordinateSystem: { __typename?: 'CoordinateSystem', id: string, name: string }, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null, windows: Array<{ __typename?: 'Window', axis: string, min?: number | null, max?: number | null }>, tableDataset: { __typename?: 'TableDataset', id: string, name: string } };
 
 export type DetailLensFragment = DetailLens_AnnotationLens_Fragment | DetailLens_ArrayLens_Fragment | DetailLens_FixtureLens_Fragment | DetailLens_MeshLens_Fragment | DetailLens_NetworkLens_Fragment | DetailLens_SparseLens_Fragment | DetailLens_TableLens_Fragment;
 
@@ -11905,9 +13198,9 @@ export type ListTableDatasetFragment = { __typename?: 'TableDataset', id: string
 
 export type DetailTableDatasetFragment = { __typename?: 'TableDataset', id: string, name: string, description?: string | null, axisNames: Array<string>, columns: Array<{ __typename?: 'Column', id: string, name: string, longName?: string | null, dtype: string, role: ColumnRole, unit?: any | null, order: number }> };
 
-export type ListChartFragment = { __typename?: 'Chart', id: string, name: string, description?: string | null, createdAt: string, axis: { __typename?: 'Axis', id: string, order: number, name: string, type: AxisType, unit?: any | null, longName?: string | null } };
+export type ListChartFragment = { __typename?: 'Chart', id: string, name: string, description?: string | null, createdAt: string, axis?: { __typename?: 'Axis', id: string, order: number, name: string, type: AxisType, unit?: any | null, longName?: string | null } | null };
 
-export type DetailChartFragment = { __typename?: 'Chart', id: string, name: string, description?: string | null, createdAt: string, worldCoordinateSystem: { __typename?: 'CoordinateSystem', id: string, name: string }, layers: Array<{ __typename: 'AnnotationChartLayer', id: string, name?: string | null } | { __typename: 'SeriesChartLayer', id: string, name?: string | null } | { __typename: 'TraceChartLayer', id: string, name?: string | null }>, axis: { __typename?: 'Axis', id: string, order: number, name: string, type: AxisType, unit?: any | null, longName?: string | null } };
+export type DetailChartFragment = { __typename?: 'Chart', id: string, name: string, description?: string | null, createdAt: string, worldCoordinateSystem: { __typename?: 'CoordinateSystem', id: string, name: string }, layers: Array<{ __typename: 'AnnotationChartLayer', id: string, name?: string | null } | { __typename: 'DistributionChartLayer', id: string, name?: string | null } | { __typename: 'PointsChartLayer', id: string, name?: string | null } | { __typename: 'SeriesChartLayer', id: string, name?: string | null } | { __typename: 'TraceChartLayer', id: string, name?: string | null }>, axis?: { __typename?: 'Axis', id: string, order: number, name: string, type: AxisType, unit?: any | null, longName?: string | null } | null };
 
 export type ListAnnotationFragment = { __typename?: 'Annotation', id: any, name: string, kind: AnnotationKind, coordinates: Array<{ __typename?: 'Coordinate', name: string, value: number }>, collection: { __typename?: 'AnnotationCollection', id: string, name: string, scene?: { __typename?: 'Scene', id: string, name: string } | null } };
 
@@ -11957,19 +13250,48 @@ export type RequestGeneralMediaAccessMutationVariables = Exact<{
 
 export type RequestGeneralMediaAccessMutation = { __typename?: 'Mutation', requestGeneralMediaAccess: { __typename?: 'GeneralMediaAccessGrant', accessKey: string, secretKey: string, sessionToken: string, expiresIn: number, region: string, bucket: string } };
 
+export type GetBlokSceneQueryVariables = Exact<{
+  id: Scalars['ID']['input'];
+}>;
+
+
+export type GetBlokSceneQuery = { __typename?: 'Query', scene: { __typename?: 'Scene', id: string, name: string, worldCoordinateSystem: { __typename?: 'CoordinateSystem', id: string, name: string }, layers: Array<{ __typename: 'AnnotationLayer', id: string, kind: LayerKind, name?: string | null, visible: boolean, order: number, annotationCollection: { __typename?: 'AnnotationCollection', id: string, name: string } } | { __typename: 'FixtureLayer', id: string, kind: LayerKind, name?: string | null, visible: boolean, order: number } | { __typename: 'ImageLayer', id: string, kind: LayerKind, name?: string | null, visible: boolean, order: number, arrayLens: { __typename?: 'ArrayLens', id: string, label: string, dataset: { __typename?: 'ArrayDataset', id: string } } } | { __typename: 'IntensityLayer', id: string, kind: LayerKind, name?: string | null, visible: boolean, order: number, arrayLens: { __typename?: 'ArrayLens', id: string, label: string, dataset: { __typename?: 'ArrayDataset', id: string } } } | { __typename: 'LabelLayer', id: string, kind: LayerKind, name?: string | null, visible: boolean, order: number, arrayLens: { __typename?: 'ArrayLens', id: string, label: string, dataset: { __typename?: 'ArrayDataset', id: string } } } | { __typename: 'MeshLayer', id: string, kind: LayerKind, name?: string | null, visible: boolean, order: number } | { __typename: 'NetworkLayer', id: string, kind: LayerKind, name?: string | null, visible: boolean, order: number } | { __typename: 'PhasorLayer', id: string, kind: LayerKind, name?: string | null, visible: boolean, order: number, arrayLens: { __typename?: 'ArrayLens', id: string, label: string, dataset: { __typename?: 'ArrayDataset', id: string } } } | { __typename: 'PointLayer', id: string, kind: LayerKind, name?: string | null, visible: boolean, order: number } | { __typename: 'RgbLayer', id: string, kind: LayerKind, name?: string | null, visible: boolean, order: number, arrayLens: { __typename?: 'ArrayLens', id: string, label: string, dataset: { __typename?: 'ArrayDataset', id: string } } } | { __typename: 'TrackLayer', id: string, kind: LayerKind, name?: string | null, visible: boolean, order: number } | { __typename: 'VectorLayer', id: string, kind: LayerKind, name?: string | null, visible: boolean, order: number }>, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } };
+
+export type GetBlokAnnotationCollectionQueryVariables = Exact<{
+  id: Scalars['ID']['input'];
+  limit?: InputMaybe<Scalars['Int']['input']>;
+}>;
+
+
+export type GetBlokAnnotationCollectionQuery = { __typename?: 'Query', annotationCollection: { __typename?: 'AnnotationCollection', id: string, name: string, annotations: Array<{ __typename?: 'Annotation', id: any, name: string, kind: AnnotationKind }> } };
+
+export type GetBlokTableQueryVariables = Exact<{
+  id: Scalars['ID']['input'];
+}>;
+
+
+export type GetBlokTableQuery = { __typename?: 'Query', tableDataset: { __typename?: 'TableDataset', id: string, name: string, columns: Array<{ __typename?: 'Column', id: string, name: string, longName?: string | null, description?: string | null, dtype: string, role: ColumnRole, unit?: any | null, axisType?: AxisType | null, order: number }>, store: { __typename?: 'ParquetStore', id: string, sizeBytes?: number | null } } };
+
+export type GetTableAccessQueryVariables = Exact<{
+  id: Scalars['ID']['input'];
+}>;
+
+
+export type GetTableAccessQuery = { __typename?: 'Query', tableDataset: { __typename?: 'TableDataset', id: string, store: { __typename?: 'ParquetStore', id: string, accessGrant: { __typename?: 'ParquetAccessGrant', accessKey: string, secretKey: string, sessionToken: string, region: string, bucket: string, key: string, expiresIn: number } } } };
+
 export type GetArrayDatasetQueryVariables = Exact<{
   id: Scalars['ID']['input'];
 }>;
 
 
-export type GetArrayDatasetQuery = { __typename?: 'Query', arrayDataset: { __typename?: 'ArrayDataset', id: string, name: string, description?: string | null, axisNames: Array<string>, shape: Array<number>, multiscale: boolean, spec: Array<ArrayDatasetSpec>, folder?: { __typename?: 'Folder', id: string, name: string } | null, scenes: Array<{ __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null }>, lenses: Array<{ __typename: 'ArrayLens', id: string, name?: string | null, kind: LensKind, createdAt: string, shape: Array<number>, axisNames: Array<string>, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null, coordinateSystem?: { __typename?: 'CoordinateSystem', id: string, name: string } | null, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null, slices: Array<{ __typename?: 'Slice', axis: string, start?: number | null, stop?: number | null, step?: number | null }>, dataset: { __typename?: 'ArrayDataset', id: string, name: string, axisNames: Array<string>, shape: Array<number> } }>, derivedFrom: Array<{ __typename?: 'AffineTransformation', id: string, kind: TransformKind } | { __typename?: 'ByDimensionTransformation', id: string, kind: TransformKind } | { __typename?: 'IdentityTransformation', id: string, kind: TransformKind } | { __typename?: 'MapAxisTransformation', id: string, kind: TransformKind } | { __typename?: 'RotationTransformation', id: string, kind: TransformKind } | { __typename?: 'ScaleTransformation', id: string, kind: TransformKind } | { __typename?: 'SequenceTransformation', id: string, kind: TransformKind } | { __typename?: 'TranslationTransformation', id: string, kind: TransformKind } | { __typename?: 'UnmappableTransformation', id: string, kind: TransformKind }>, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null, fullLens?: { __typename?: 'ArrayLens', id: string } | null } };
+export type GetArrayDatasetQuery = { __typename?: 'Query', arrayDataset: { __typename?: 'ArrayDataset', id: string, name: string, description?: string | null, axisNames: Array<string>, shape: Array<number>, multiscale: boolean, spec: Array<ArrayDatasetSpec>, folder?: { __typename?: 'Folder', id: string, name: string } | null, scenes: Array<{ __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null }>, lenses: Array<{ __typename: 'ArrayLens', id: string, name?: string | null, kind: LensKind, createdAt: string, shape: Array<number>, axisNames: Array<string>, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null, coordinateSystem: { __typename?: 'CoordinateSystem', id: string, name: string }, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null, slices: Array<{ __typename?: 'Slice', axis: string, start?: number | null, stop?: number | null, step?: number | null }>, dataset: { __typename?: 'ArrayDataset', id: string, name: string, axisNames: Array<string>, shape: Array<number> } }>, derivedFrom: Array<{ __typename?: 'AffineTransformation', id: string, kind: TransformKind } | { __typename?: 'ByDimensionTransformation', id: string, kind: TransformKind } | { __typename?: 'IdentityTransformation', id: string, kind: TransformKind } | { __typename?: 'MapAxisTransformation', id: string, kind: TransformKind } | { __typename?: 'RotationTransformation', id: string, kind: TransformKind } | { __typename?: 'ScaleTransformation', id: string, kind: TransformKind } | { __typename?: 'SequenceTransformation', id: string, kind: TransformKind } | { __typename?: 'TranslationTransformation', id: string, kind: TransformKind } | { __typename?: 'UnmappableTransformation', id: string, kind: TransformKind }>, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null, fullLens?: { __typename?: 'ArrayLens', id: string } | null } };
 
 export type GetLensQueryVariables = Exact<{
   id: Scalars['ID']['input'];
 }>;
 
 
-export type GetLensQuery = { __typename?: 'Query', lens: { __typename: 'AnnotationLens', id: string, name?: string | null, kind: LensKind, createdAt: string, coordinateSystem?: { __typename?: 'CoordinateSystem', id: string, name: string } | null, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null, windows: Array<{ __typename?: 'Window', axis: string, min?: number | null, max?: number | null }>, annotationCollection: { __typename?: 'AnnotationCollection', id: string, name: string } } | { __typename: 'ArrayLens', id: string, name?: string | null, kind: LensKind, createdAt: string, shape: Array<number>, axisNames: Array<string>, scenes: Array<{ __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null }>, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null, coordinateSystem?: { __typename?: 'CoordinateSystem', id: string, name: string } | null, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null, slices: Array<{ __typename?: 'Slice', axis: string, start?: number | null, stop?: number | null, step?: number | null }>, dataset: { __typename?: 'ArrayDataset', id: string, name: string, axisNames: Array<string>, shape: Array<number> } } | { __typename: 'FixtureLens', id: string, name?: string | null, kind: LensKind, createdAt: string, coordinateSystem?: { __typename?: 'CoordinateSystem', id: string, name: string } | null, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null } | { __typename: 'MeshLens', id: string, name?: string | null, kind: LensKind, createdAt: string, coordinateSystem?: { __typename?: 'CoordinateSystem', id: string, name: string } | null, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null, windows: Array<{ __typename?: 'Window', axis: string, min?: number | null, max?: number | null }>, meshCollection: { __typename?: 'MeshCollection', id: string, name?: string | null } } | { __typename: 'NetworkLens', id: string, name?: string | null, kind: LensKind, createdAt: string, coordinateSystem?: { __typename?: 'CoordinateSystem', id: string, name: string } | null, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null, windows: Array<{ __typename?: 'Window', axis: string, min?: number | null, max?: number | null }>, networkCollection: { __typename?: 'NetworkCollection', id: string, name?: string | null } } | { __typename: 'SparseLens', id: string, name?: string | null, kind: LensKind, createdAt: string, coordinateSystem?: { __typename?: 'CoordinateSystem', id: string, name: string } | null, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null, windows: Array<{ __typename?: 'Window', axis: string, min?: number | null, max?: number | null }>, sparseDataset: { __typename?: 'SparseDataset', id: string, name: string } } | { __typename: 'TableLens', id: string, name?: string | null, kind: LensKind, createdAt: string, coordinateSystem?: { __typename?: 'CoordinateSystem', id: string, name: string } | null, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null, windows: Array<{ __typename?: 'Window', axis: string, min?: number | null, max?: number | null }>, tableDataset: { __typename?: 'TableDataset', id: string, name: string } } };
+export type GetLensQuery = { __typename?: 'Query', lens: { __typename: 'AnnotationLens', id: string, name?: string | null, kind: LensKind, createdAt: string, coordinateSystem: { __typename?: 'CoordinateSystem', id: string, name: string }, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null, windows: Array<{ __typename?: 'Window', axis: string, min?: number | null, max?: number | null }>, annotationCollection: { __typename?: 'AnnotationCollection', id: string, name: string } } | { __typename: 'ArrayLens', id: string, name?: string | null, kind: LensKind, createdAt: string, shape: Array<number>, axisNames: Array<string>, scenes: Array<{ __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null }>, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null, coordinateSystem: { __typename?: 'CoordinateSystem', id: string, name: string }, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null, slices: Array<{ __typename?: 'Slice', axis: string, start?: number | null, stop?: number | null, step?: number | null }>, dataset: { __typename?: 'ArrayDataset', id: string, name: string, axisNames: Array<string>, shape: Array<number> } } | { __typename: 'FixtureLens', id: string, name?: string | null, kind: LensKind, createdAt: string, coordinateSystem: { __typename?: 'CoordinateSystem', id: string, name: string }, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null } | { __typename: 'MeshLens', id: string, name?: string | null, kind: LensKind, createdAt: string, coordinateSystem: { __typename?: 'CoordinateSystem', id: string, name: string }, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null, windows: Array<{ __typename?: 'Window', axis: string, min?: number | null, max?: number | null }>, meshCollection: { __typename?: 'MeshCollection', id: string, name?: string | null } } | { __typename: 'NetworkLens', id: string, name?: string | null, kind: LensKind, createdAt: string, coordinateSystem: { __typename?: 'CoordinateSystem', id: string, name: string }, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null, windows: Array<{ __typename?: 'Window', axis: string, min?: number | null, max?: number | null }>, networkCollection: { __typename?: 'NetworkCollection', id: string, name?: string | null } } | { __typename: 'SparseLens', id: string, name?: string | null, kind: LensKind, createdAt: string, coordinateSystem: { __typename?: 'CoordinateSystem', id: string, name: string }, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null, windows: Array<{ __typename?: 'Window', axis: string, min?: number | null, max?: number | null }>, sparseDataset: { __typename?: 'SparseDataset', id: string, name: string } } | { __typename: 'TableLens', id: string, name?: string | null, kind: LensKind, createdAt: string, coordinateSystem: { __typename?: 'CoordinateSystem', id: string, name: string }, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null, windows: Array<{ __typename?: 'Window', axis: string, min?: number | null, max?: number | null }>, tableDataset: { __typename?: 'TableDataset', id: string, name: string } } };
 
 export type GetFolderQueryVariables = Exact<{
   id: Scalars['ID']['input'];
@@ -11992,7 +13314,7 @@ export type GetFileQueryVariables = Exact<{
 }>;
 
 
-export type GetFileQuery = { __typename?: 'Query', file: { __typename?: 'File', id: string, name: string, size?: number | null, contentType?: string | null, folder?: { __typename?: 'Folder', id: string, name: string } | null, derivedContainers: Array<{ __typename?: 'FileLink', id: string, seriesIdentifier?: string | null, container: { __typename: 'AnnotationCollection' } | { __typename: 'ArrayDataset', id: string, name: string } | { __typename: 'MeshCollection' } | { __typename: 'TableDataset', id: string, name: string } }> } };
+export type GetFileQuery = { __typename?: 'Query', file: { __typename?: 'File', id: string, name: string, size?: number | null, contentType?: string | null, folder?: { __typename?: 'Folder', id: string, name: string } | null, derivedContainers: Array<{ __typename?: 'FileLink', id: string, seriesIdentifier: string, container: { __typename: 'AnnotationCollection' } | { __typename: 'ArrayDataset', id: string, name: string } | { __typename: 'MeshCollection' } | { __typename: 'TableDataset', id: string, name: string } }> } };
 
 export type GetFileAccessQueryVariables = Exact<{
   id: Scalars['ID']['input'];
@@ -12020,7 +13342,7 @@ export type GetChartQueryVariables = Exact<{
 }>;
 
 
-export type GetChartQuery = { __typename?: 'Query', chart: { __typename?: 'Chart', id: string, name: string, description?: string | null, createdAt: string, worldCoordinateSystem: { __typename?: 'CoordinateSystem', id: string, name: string }, layers: Array<{ __typename: 'AnnotationChartLayer', id: string, name?: string | null } | { __typename: 'SeriesChartLayer', id: string, name?: string | null } | { __typename: 'TraceChartLayer', id: string, name?: string | null }>, axis: { __typename?: 'Axis', id: string, order: number, name: string, type: AxisType, unit?: any | null, longName?: string | null } } };
+export type GetChartQuery = { __typename?: 'Query', chart: { __typename?: 'Chart', id: string, name: string, description?: string | null, createdAt: string, worldCoordinateSystem: { __typename?: 'CoordinateSystem', id: string, name: string }, layers: Array<{ __typename: 'AnnotationChartLayer', id: string, name?: string | null } | { __typename: 'DistributionChartLayer', id: string, name?: string | null } | { __typename: 'PointsChartLayer', id: string, name?: string | null } | { __typename: 'SeriesChartLayer', id: string, name?: string | null } | { __typename: 'TraceChartLayer', id: string, name?: string | null }>, axis?: { __typename?: 'Axis', id: string, order: number, name: string, type: AxisType, unit?: any | null, longName?: string | null } | null } };
 
 export type GetAnnotationQueryVariables = Exact<{
   id: Scalars['ID']['input'];
@@ -12032,7 +13354,7 @@ export type GetAnnotationQuery = { __typename?: 'Query', annotation: { __typenam
 export type MikroHomeQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type MikroHomeQuery = { __typename?: 'Query', lenses: Array<{ __typename: 'AnnotationLens', id: string, name?: string | null, kind: LensKind, createdAt: string, coordinateSystem?: { __typename?: 'CoordinateSystem', id: string, name: string } | null, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null, windows: Array<{ __typename?: 'Window', axis: string, min?: number | null, max?: number | null }>, annotationCollection: { __typename?: 'AnnotationCollection', id: string, name: string } } | { __typename: 'ArrayLens', id: string, name?: string | null, kind: LensKind, createdAt: string, shape: Array<number>, axisNames: Array<string>, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null, coordinateSystem?: { __typename?: 'CoordinateSystem', id: string, name: string } | null, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null, slices: Array<{ __typename?: 'Slice', axis: string, start?: number | null, stop?: number | null, step?: number | null }>, dataset: { __typename?: 'ArrayDataset', id: string, name: string, axisNames: Array<string>, shape: Array<number> } } | { __typename: 'FixtureLens', id: string, name?: string | null, kind: LensKind, createdAt: string, coordinateSystem?: { __typename?: 'CoordinateSystem', id: string, name: string } | null, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null } | { __typename: 'MeshLens', id: string, name?: string | null, kind: LensKind, createdAt: string, coordinateSystem?: { __typename?: 'CoordinateSystem', id: string, name: string } | null, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null, windows: Array<{ __typename?: 'Window', axis: string, min?: number | null, max?: number | null }>, meshCollection: { __typename?: 'MeshCollection', id: string, name?: string | null } } | { __typename: 'NetworkLens', id: string, name?: string | null, kind: LensKind, createdAt: string, coordinateSystem?: { __typename?: 'CoordinateSystem', id: string, name: string } | null, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null, windows: Array<{ __typename?: 'Window', axis: string, min?: number | null, max?: number | null }>, networkCollection: { __typename?: 'NetworkCollection', id: string, name?: string | null } } | { __typename: 'SparseLens', id: string, name?: string | null, kind: LensKind, createdAt: string, coordinateSystem?: { __typename?: 'CoordinateSystem', id: string, name: string } | null, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null, windows: Array<{ __typename?: 'Window', axis: string, min?: number | null, max?: number | null }>, sparseDataset: { __typename?: 'SparseDataset', id: string, name: string } } | { __typename: 'TableLens', id: string, name?: string | null, kind: LensKind, createdAt: string, coordinateSystem?: { __typename?: 'CoordinateSystem', id: string, name: string } | null, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null, windows: Array<{ __typename?: 'Window', axis: string, min?: number | null, max?: number | null }>, tableDataset: { __typename?: 'TableDataset', id: string, name: string } }>, arrayDatasets: Array<{ __typename?: 'ArrayDataset', id: string, name: string, description?: string | null, axisNames: Array<string>, shape: Array<number>, multiscale: boolean, spec: Array<ArrayDatasetSpec>, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null, fullLens?: { __typename?: 'ArrayLens', id: string } | null }>, pinned: Array<{ __typename?: 'Folder', id: string, name: string, description?: string | null, isDefault: boolean }>, folders: Array<{ __typename?: 'Folder', id: string, name: string, description?: string | null, isDefault: boolean }>, files: Array<{ __typename?: 'File', id: string, name: string, size?: number | null, contentType?: string | null }> };
+export type MikroHomeQuery = { __typename?: 'Query', lenses: Array<{ __typename: 'AnnotationLens', id: string, name?: string | null, kind: LensKind, createdAt: string, coordinateSystem: { __typename?: 'CoordinateSystem', id: string, name: string }, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null, windows: Array<{ __typename?: 'Window', axis: string, min?: number | null, max?: number | null }>, annotationCollection: { __typename?: 'AnnotationCollection', id: string, name: string } } | { __typename: 'ArrayLens', id: string, name?: string | null, kind: LensKind, createdAt: string, shape: Array<number>, axisNames: Array<string>, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null, coordinateSystem: { __typename?: 'CoordinateSystem', id: string, name: string }, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null, slices: Array<{ __typename?: 'Slice', axis: string, start?: number | null, stop?: number | null, step?: number | null }>, dataset: { __typename?: 'ArrayDataset', id: string, name: string, axisNames: Array<string>, shape: Array<number> } } | { __typename: 'FixtureLens', id: string, name?: string | null, kind: LensKind, createdAt: string, coordinateSystem: { __typename?: 'CoordinateSystem', id: string, name: string }, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null } | { __typename: 'MeshLens', id: string, name?: string | null, kind: LensKind, createdAt: string, coordinateSystem: { __typename?: 'CoordinateSystem', id: string, name: string }, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null, windows: Array<{ __typename?: 'Window', axis: string, min?: number | null, max?: number | null }>, meshCollection: { __typename?: 'MeshCollection', id: string, name?: string | null } } | { __typename: 'NetworkLens', id: string, name?: string | null, kind: LensKind, createdAt: string, coordinateSystem: { __typename?: 'CoordinateSystem', id: string, name: string }, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null, windows: Array<{ __typename?: 'Window', axis: string, min?: number | null, max?: number | null }>, networkCollection: { __typename?: 'NetworkCollection', id: string, name?: string | null } } | { __typename: 'SparseLens', id: string, name?: string | null, kind: LensKind, createdAt: string, coordinateSystem: { __typename?: 'CoordinateSystem', id: string, name: string }, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null, windows: Array<{ __typename?: 'Window', axis: string, min?: number | null, max?: number | null }>, sparseDataset: { __typename?: 'SparseDataset', id: string, name: string } } | { __typename: 'TableLens', id: string, name?: string | null, kind: LensKind, createdAt: string, coordinateSystem: { __typename?: 'CoordinateSystem', id: string, name: string }, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null, windows: Array<{ __typename?: 'Window', axis: string, min?: number | null, max?: number | null }>, tableDataset: { __typename?: 'TableDataset', id: string, name: string } }>, arrayDatasets: Array<{ __typename?: 'ArrayDataset', id: string, name: string, description?: string | null, axisNames: Array<string>, shape: Array<number>, multiscale: boolean, spec: Array<ArrayDatasetSpec>, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null, fullLens?: { __typename?: 'ArrayLens', id: string } | null }>, pinned: Array<{ __typename?: 'Folder', id: string, name: string, description?: string | null, isDefault: boolean }>, folders: Array<{ __typename?: 'Folder', id: string, name: string, description?: string | null, isDefault: boolean }>, files: Array<{ __typename?: 'File', id: string, name: string, size?: number | null, contentType?: string | null }> };
 
 export type MikroSearchQueryVariables = Exact<{
   search: Scalars['String']['input'];
@@ -12040,7 +13362,7 @@ export type MikroSearchQueryVariables = Exact<{
 }>;
 
 
-export type MikroSearchQuery = { __typename?: 'Query', arrayDatasets: Array<{ __typename?: 'ArrayDataset', id: string, name: string, description?: string | null, axisNames: Array<string>, shape: Array<number>, multiscale: boolean, spec: Array<ArrayDatasetSpec>, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null, fullLens?: { __typename?: 'ArrayLens', id: string } | null }>, lenses: Array<{ __typename: 'AnnotationLens', id: string, name?: string | null, kind: LensKind, createdAt: string, coordinateSystem?: { __typename?: 'CoordinateSystem', id: string, name: string } | null, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null, windows: Array<{ __typename?: 'Window', axis: string, min?: number | null, max?: number | null }>, annotationCollection: { __typename?: 'AnnotationCollection', id: string, name: string } } | { __typename: 'ArrayLens', id: string, name?: string | null, kind: LensKind, createdAt: string, shape: Array<number>, axisNames: Array<string>, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null, coordinateSystem?: { __typename?: 'CoordinateSystem', id: string, name: string } | null, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null, slices: Array<{ __typename?: 'Slice', axis: string, start?: number | null, stop?: number | null, step?: number | null }>, dataset: { __typename?: 'ArrayDataset', id: string, name: string, axisNames: Array<string>, shape: Array<number> } } | { __typename: 'FixtureLens', id: string, name?: string | null, kind: LensKind, createdAt: string, coordinateSystem?: { __typename?: 'CoordinateSystem', id: string, name: string } | null, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null } | { __typename: 'MeshLens', id: string, name?: string | null, kind: LensKind, createdAt: string, coordinateSystem?: { __typename?: 'CoordinateSystem', id: string, name: string } | null, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null, windows: Array<{ __typename?: 'Window', axis: string, min?: number | null, max?: number | null }>, meshCollection: { __typename?: 'MeshCollection', id: string, name?: string | null } } | { __typename: 'NetworkLens', id: string, name?: string | null, kind: LensKind, createdAt: string, coordinateSystem?: { __typename?: 'CoordinateSystem', id: string, name: string } | null, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null, windows: Array<{ __typename?: 'Window', axis: string, min?: number | null, max?: number | null }>, networkCollection: { __typename?: 'NetworkCollection', id: string, name?: string | null } } | { __typename: 'SparseLens', id: string, name?: string | null, kind: LensKind, createdAt: string, coordinateSystem?: { __typename?: 'CoordinateSystem', id: string, name: string } | null, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null, windows: Array<{ __typename?: 'Window', axis: string, min?: number | null, max?: number | null }>, sparseDataset: { __typename?: 'SparseDataset', id: string, name: string } } | { __typename: 'TableLens', id: string, name?: string | null, kind: LensKind, createdAt: string, coordinateSystem?: { __typename?: 'CoordinateSystem', id: string, name: string } | null, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null, windows: Array<{ __typename?: 'Window', axis: string, min?: number | null, max?: number | null }>, tableDataset: { __typename?: 'TableDataset', id: string, name: string } }>, folders: Array<{ __typename?: 'Folder', id: string, name: string, description?: string | null, isDefault: boolean }>, files: Array<{ __typename?: 'File', id: string, name: string, size?: number | null, contentType?: string | null }> };
+export type MikroSearchQuery = { __typename?: 'Query', arrayDatasets: Array<{ __typename?: 'ArrayDataset', id: string, name: string, description?: string | null, axisNames: Array<string>, shape: Array<number>, multiscale: boolean, spec: Array<ArrayDatasetSpec>, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null, fullLens?: { __typename?: 'ArrayLens', id: string } | null }>, lenses: Array<{ __typename: 'AnnotationLens', id: string, name?: string | null, kind: LensKind, createdAt: string, coordinateSystem: { __typename?: 'CoordinateSystem', id: string, name: string }, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null, windows: Array<{ __typename?: 'Window', axis: string, min?: number | null, max?: number | null }>, annotationCollection: { __typename?: 'AnnotationCollection', id: string, name: string } } | { __typename: 'ArrayLens', id: string, name?: string | null, kind: LensKind, createdAt: string, shape: Array<number>, axisNames: Array<string>, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null, coordinateSystem: { __typename?: 'CoordinateSystem', id: string, name: string }, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null, slices: Array<{ __typename?: 'Slice', axis: string, start?: number | null, stop?: number | null, step?: number | null }>, dataset: { __typename?: 'ArrayDataset', id: string, name: string, axisNames: Array<string>, shape: Array<number> } } | { __typename: 'FixtureLens', id: string, name?: string | null, kind: LensKind, createdAt: string, coordinateSystem: { __typename?: 'CoordinateSystem', id: string, name: string }, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null } | { __typename: 'MeshLens', id: string, name?: string | null, kind: LensKind, createdAt: string, coordinateSystem: { __typename?: 'CoordinateSystem', id: string, name: string }, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null, windows: Array<{ __typename?: 'Window', axis: string, min?: number | null, max?: number | null }>, meshCollection: { __typename?: 'MeshCollection', id: string, name?: string | null } } | { __typename: 'NetworkLens', id: string, name?: string | null, kind: LensKind, createdAt: string, coordinateSystem: { __typename?: 'CoordinateSystem', id: string, name: string }, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null, windows: Array<{ __typename?: 'Window', axis: string, min?: number | null, max?: number | null }>, networkCollection: { __typename?: 'NetworkCollection', id: string, name?: string | null } } | { __typename: 'SparseLens', id: string, name?: string | null, kind: LensKind, createdAt: string, coordinateSystem: { __typename?: 'CoordinateSystem', id: string, name: string }, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null, windows: Array<{ __typename?: 'Window', axis: string, min?: number | null, max?: number | null }>, sparseDataset: { __typename?: 'SparseDataset', id: string, name: string } } | { __typename: 'TableLens', id: string, name?: string | null, kind: LensKind, createdAt: string, coordinateSystem: { __typename?: 'CoordinateSystem', id: string, name: string }, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null, windows: Array<{ __typename?: 'Window', axis: string, min?: number | null, max?: number | null }>, tableDataset: { __typename?: 'TableDataset', id: string, name: string } }>, folders: Array<{ __typename?: 'Folder', id: string, name: string, description?: string | null, isDefault: boolean }>, files: Array<{ __typename?: 'File', id: string, name: string, size?: number | null, contentType?: string | null }> };
 
 export type GetArrayDatasetsQueryVariables = Exact<{
   filters?: InputMaybe<ArrayDatasetFilter>;
@@ -12058,7 +13380,7 @@ export type GetLensesQueryVariables = Exact<{
 }>;
 
 
-export type GetLensesQuery = { __typename?: 'Query', lenses: Array<{ __typename: 'AnnotationLens', id: string, name?: string | null, kind: LensKind, createdAt: string, coordinateSystem?: { __typename?: 'CoordinateSystem', id: string, name: string } | null, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null, windows: Array<{ __typename?: 'Window', axis: string, min?: number | null, max?: number | null }>, annotationCollection: { __typename?: 'AnnotationCollection', id: string, name: string } } | { __typename: 'ArrayLens', id: string, name?: string | null, kind: LensKind, createdAt: string, shape: Array<number>, axisNames: Array<string>, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null, coordinateSystem?: { __typename?: 'CoordinateSystem', id: string, name: string } | null, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null, slices: Array<{ __typename?: 'Slice', axis: string, start?: number | null, stop?: number | null, step?: number | null }>, dataset: { __typename?: 'ArrayDataset', id: string, name: string, axisNames: Array<string>, shape: Array<number> } } | { __typename: 'FixtureLens', id: string, name?: string | null, kind: LensKind, createdAt: string, coordinateSystem?: { __typename?: 'CoordinateSystem', id: string, name: string } | null, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null } | { __typename: 'MeshLens', id: string, name?: string | null, kind: LensKind, createdAt: string, coordinateSystem?: { __typename?: 'CoordinateSystem', id: string, name: string } | null, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null, windows: Array<{ __typename?: 'Window', axis: string, min?: number | null, max?: number | null }>, meshCollection: { __typename?: 'MeshCollection', id: string, name?: string | null } } | { __typename: 'NetworkLens', id: string, name?: string | null, kind: LensKind, createdAt: string, coordinateSystem?: { __typename?: 'CoordinateSystem', id: string, name: string } | null, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null, windows: Array<{ __typename?: 'Window', axis: string, min?: number | null, max?: number | null }>, networkCollection: { __typename?: 'NetworkCollection', id: string, name?: string | null } } | { __typename: 'SparseLens', id: string, name?: string | null, kind: LensKind, createdAt: string, coordinateSystem?: { __typename?: 'CoordinateSystem', id: string, name: string } | null, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null, windows: Array<{ __typename?: 'Window', axis: string, min?: number | null, max?: number | null }>, sparseDataset: { __typename?: 'SparseDataset', id: string, name: string } } | { __typename: 'TableLens', id: string, name?: string | null, kind: LensKind, createdAt: string, coordinateSystem?: { __typename?: 'CoordinateSystem', id: string, name: string } | null, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null, windows: Array<{ __typename?: 'Window', axis: string, min?: number | null, max?: number | null }>, tableDataset: { __typename?: 'TableDataset', id: string, name: string } }> };
+export type GetLensesQuery = { __typename?: 'Query', lenses: Array<{ __typename: 'AnnotationLens', id: string, name?: string | null, kind: LensKind, createdAt: string, coordinateSystem: { __typename?: 'CoordinateSystem', id: string, name: string }, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null, windows: Array<{ __typename?: 'Window', axis: string, min?: number | null, max?: number | null }>, annotationCollection: { __typename?: 'AnnotationCollection', id: string, name: string } } | { __typename: 'ArrayLens', id: string, name?: string | null, kind: LensKind, createdAt: string, shape: Array<number>, axisNames: Array<string>, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null, coordinateSystem: { __typename?: 'CoordinateSystem', id: string, name: string }, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null, slices: Array<{ __typename?: 'Slice', axis: string, start?: number | null, stop?: number | null, step?: number | null }>, dataset: { __typename?: 'ArrayDataset', id: string, name: string, axisNames: Array<string>, shape: Array<number> } } | { __typename: 'FixtureLens', id: string, name?: string | null, kind: LensKind, createdAt: string, coordinateSystem: { __typename?: 'CoordinateSystem', id: string, name: string }, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null } | { __typename: 'MeshLens', id: string, name?: string | null, kind: LensKind, createdAt: string, coordinateSystem: { __typename?: 'CoordinateSystem', id: string, name: string }, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null, windows: Array<{ __typename?: 'Window', axis: string, min?: number | null, max?: number | null }>, meshCollection: { __typename?: 'MeshCollection', id: string, name?: string | null } } | { __typename: 'NetworkLens', id: string, name?: string | null, kind: LensKind, createdAt: string, coordinateSystem: { __typename?: 'CoordinateSystem', id: string, name: string }, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null, windows: Array<{ __typename?: 'Window', axis: string, min?: number | null, max?: number | null }>, networkCollection: { __typename?: 'NetworkCollection', id: string, name?: string | null } } | { __typename: 'SparseLens', id: string, name?: string | null, kind: LensKind, createdAt: string, coordinateSystem: { __typename?: 'CoordinateSystem', id: string, name: string }, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null, windows: Array<{ __typename?: 'Window', axis: string, min?: number | null, max?: number | null }>, sparseDataset: { __typename?: 'SparseDataset', id: string, name: string } } | { __typename: 'TableLens', id: string, name?: string | null, kind: LensKind, createdAt: string, coordinateSystem: { __typename?: 'CoordinateSystem', id: string, name: string }, defaultScene?: { __typename?: 'Scene', id: string, name: string, latestSnapshot?: { __typename?: 'SceneSnapshot', id: string, name: string, createdAt: string, store: { __typename?: 'MediaStore', id: string, key: string, bucket: string } } | null } | null, windows: Array<{ __typename?: 'Window', axis: string, min?: number | null, max?: number | null }>, tableDataset: { __typename?: 'TableDataset', id: string, name: string } }> };
 
 export type GetFoldersQueryVariables = Exact<{
   filters?: InputMaybe<FolderFilter>;
@@ -12103,7 +13425,7 @@ export type GetChartsQueryVariables = Exact<{
 }>;
 
 
-export type GetChartsQuery = { __typename?: 'Query', charts: Array<{ __typename?: 'Chart', id: string, name: string, description?: string | null, createdAt: string, axis: { __typename?: 'Axis', id: string, order: number, name: string, type: AxisType, unit?: any | null, longName?: string | null } }> };
+export type GetChartsQuery = { __typename?: 'Query', charts: Array<{ __typename?: 'Chart', id: string, name: string, description?: string | null, createdAt: string, axis?: { __typename?: 'Axis', id: string, order: number, name: string, type: AxisType, unit?: any | null, longName?: string | null } | null }> };
 
 export type GetAnnotationsQueryVariables = Exact<{
   filters?: InputMaybe<AnnotationFilter>;
@@ -12286,6 +13608,122 @@ export const DetailArrayDatasetFragmentDoc = gql`
     ${ListArrayDatasetFragmentDoc}
 ${ListSceneFragmentDoc}
 ${ListLensFragmentDoc}`;
+export const BlokSceneLensFragmentDoc = gql`
+    fragment BlokSceneLens on ArrayLens {
+  id
+  label
+  dataset {
+    id
+  }
+}
+    `;
+export const BlokSceneLayerFragmentDoc = gql`
+    fragment BlokSceneLayer on Layer {
+  __typename
+  id
+  kind
+  name
+  visible
+  order
+  ... on ImageLayer {
+    arrayLens: lens {
+      ...BlokSceneLens
+    }
+  }
+  ... on IntensityLayer {
+    arrayLens: lens {
+      ...BlokSceneLens
+    }
+  }
+  ... on RgbLayer {
+    arrayLens: lens {
+      ...BlokSceneLens
+    }
+  }
+  ... on PhasorLayer {
+    arrayLens: lens {
+      ...BlokSceneLens
+    }
+  }
+  ... on LabelLayer {
+    arrayLens: lens {
+      ...BlokSceneLens
+    }
+  }
+  ... on AnnotationLayer {
+    annotationCollection {
+      id
+      name
+    }
+  }
+}
+    ${BlokSceneLensFragmentDoc}`;
+export const BlokSceneFragmentDoc = gql`
+    fragment BlokScene on Scene {
+  ...ListScene
+  worldCoordinateSystem {
+    id
+    name
+  }
+  layers {
+    ...BlokSceneLayer
+  }
+}
+    ${ListSceneFragmentDoc}
+${BlokSceneLayerFragmentDoc}`;
+export const BlokAnnotationFragmentDoc = gql`
+    fragment BlokAnnotation on Annotation {
+  id
+  name
+  kind
+}
+    `;
+export const BlokAnnotationCollectionFragmentDoc = gql`
+    fragment BlokAnnotationCollection on AnnotationCollection {
+  id
+  name
+  annotations(pagination: {limit: $limit}) {
+    ...BlokAnnotation
+  }
+}
+    ${BlokAnnotationFragmentDoc}`;
+export const BlokTableColumnFragmentDoc = gql`
+    fragment BlokTableColumn on Column {
+  id
+  name
+  longName
+  description
+  dtype
+  role
+  unit
+  axisType
+  order
+}
+    `;
+export const BlokTableFragmentDoc = gql`
+    fragment BlokTable on TableDataset {
+  id
+  name
+  columns {
+    ...BlokTableColumn
+  }
+  store {
+    id
+    sizeBytes
+  }
+}
+    ${BlokTableColumnFragmentDoc}`;
+export const ParquetAccessGrantFragmentDoc = gql`
+    fragment ParquetAccessGrant on ParquetAccessGrant {
+  accessKey
+  secretKey
+  sessionToken
+  region
+  bucket
+  key
+  expiresIn
+}
+    `;
 export const ListFileFragmentDoc = gql`
     fragment ListFile on File {
   id
@@ -12628,6 +14066,153 @@ export function useRequestGeneralMediaAccessMutation(baseOptions?: ApolloReactHo
 export type RequestGeneralMediaAccessMutationHookResult = ReturnType<typeof useRequestGeneralMediaAccessMutation>;
 export type RequestGeneralMediaAccessMutationResult = Apollo.MutationResult<RequestGeneralMediaAccessMutation>;
 export type RequestGeneralMediaAccessMutationOptions = Apollo.BaseMutationOptions<RequestGeneralMediaAccessMutation, RequestGeneralMediaAccessMutationVariables>;
+export const GetBlokSceneDocument = gql`
+    query GetBlokScene($id: ID!) {
+  scene(id: $id) {
+    ...BlokScene
+  }
+}
+    ${BlokSceneFragmentDoc}`;
+
+/**
+ * __useGetBlokSceneQuery__
+ *
+ * To run a query within a React component, call `useGetBlokSceneQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetBlokSceneQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetBlokSceneQuery({
+ *   variables: {
+ *      id: // value for 'id'
+ *   },
+ * });
+ */
+export function useGetBlokSceneQuery(baseOptions: ApolloReactHooks.QueryHookOptions<GetBlokSceneQuery, GetBlokSceneQueryVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return ApolloReactHooks.useQuery<GetBlokSceneQuery, GetBlokSceneQueryVariables>(GetBlokSceneDocument, options);
+      }
+export function useGetBlokSceneLazyQuery(baseOptions?: ApolloReactHooks.LazyQueryHookOptions<GetBlokSceneQuery, GetBlokSceneQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return ApolloReactHooks.useLazyQuery<GetBlokSceneQuery, GetBlokSceneQueryVariables>(GetBlokSceneDocument, options);
+        }
+export type GetBlokSceneQueryHookResult = ReturnType<typeof useGetBlokSceneQuery>;
+export type GetBlokSceneLazyQueryHookResult = ReturnType<typeof useGetBlokSceneLazyQuery>;
+export type GetBlokSceneQueryResult = Apollo.QueryResult<GetBlokSceneQuery, GetBlokSceneQueryVariables>;
+export const GetBlokAnnotationCollectionDocument = gql`
+    query GetBlokAnnotationCollection($id: ID!, $limit: Int) {
+  annotationCollection(id: $id) {
+    ...BlokAnnotationCollection
+  }
+}
+    ${BlokAnnotationCollectionFragmentDoc}`;
+
+/**
+ * __useGetBlokAnnotationCollectionQuery__
+ *
+ * To run a query within a React component, call `useGetBlokAnnotationCollectionQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetBlokAnnotationCollectionQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetBlokAnnotationCollectionQuery({
+ *   variables: {
+ *      id: // value for 'id'
+ *      limit: // value for 'limit'
+ *   },
+ * });
+ */
+export function useGetBlokAnnotationCollectionQuery(baseOptions: ApolloReactHooks.QueryHookOptions<GetBlokAnnotationCollectionQuery, GetBlokAnnotationCollectionQueryVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return ApolloReactHooks.useQuery<GetBlokAnnotationCollectionQuery, GetBlokAnnotationCollectionQueryVariables>(GetBlokAnnotationCollectionDocument, options);
+      }
+export function useGetBlokAnnotationCollectionLazyQuery(baseOptions?: ApolloReactHooks.LazyQueryHookOptions<GetBlokAnnotationCollectionQuery, GetBlokAnnotationCollectionQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return ApolloReactHooks.useLazyQuery<GetBlokAnnotationCollectionQuery, GetBlokAnnotationCollectionQueryVariables>(GetBlokAnnotationCollectionDocument, options);
+        }
+export type GetBlokAnnotationCollectionQueryHookResult = ReturnType<typeof useGetBlokAnnotationCollectionQuery>;
+export type GetBlokAnnotationCollectionLazyQueryHookResult = ReturnType<typeof useGetBlokAnnotationCollectionLazyQuery>;
+export type GetBlokAnnotationCollectionQueryResult = Apollo.QueryResult<GetBlokAnnotationCollectionQuery, GetBlokAnnotationCollectionQueryVariables>;
+export const GetBlokTableDocument = gql`
+    query GetBlokTable($id: ID!) {
+  tableDataset(id: $id) {
+    ...BlokTable
+  }
+}
+    ${BlokTableFragmentDoc}`;
+
+/**
+ * __useGetBlokTableQuery__
+ *
+ * To run a query within a React component, call `useGetBlokTableQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetBlokTableQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetBlokTableQuery({
+ *   variables: {
+ *      id: // value for 'id'
+ *   },
+ * });
+ */
+export function useGetBlokTableQuery(baseOptions: ApolloReactHooks.QueryHookOptions<GetBlokTableQuery, GetBlokTableQueryVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return ApolloReactHooks.useQuery<GetBlokTableQuery, GetBlokTableQueryVariables>(GetBlokTableDocument, options);
+      }
+export function useGetBlokTableLazyQuery(baseOptions?: ApolloReactHooks.LazyQueryHookOptions<GetBlokTableQuery, GetBlokTableQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return ApolloReactHooks.useLazyQuery<GetBlokTableQuery, GetBlokTableQueryVariables>(GetBlokTableDocument, options);
+        }
+export type GetBlokTableQueryHookResult = ReturnType<typeof useGetBlokTableQuery>;
+export type GetBlokTableLazyQueryHookResult = ReturnType<typeof useGetBlokTableLazyQuery>;
+export type GetBlokTableQueryResult = Apollo.QueryResult<GetBlokTableQuery, GetBlokTableQueryVariables>;
+export const GetTableAccessDocument = gql`
+    query GetTableAccess($id: ID!) {
+  tableDataset(id: $id) {
+    id
+    store {
+      id
+      accessGrant {
+        ...ParquetAccessGrant
+      }
+    }
+  }
+}
+    ${ParquetAccessGrantFragmentDoc}`;
+
+/**
+ * __useGetTableAccessQuery__
+ *
+ * To run a query within a React component, call `useGetTableAccessQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetTableAccessQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetTableAccessQuery({
+ *   variables: {
+ *      id: // value for 'id'
+ *   },
+ * });
+ */
+export function useGetTableAccessQuery(baseOptions: ApolloReactHooks.QueryHookOptions<GetTableAccessQuery, GetTableAccessQueryVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return ApolloReactHooks.useQuery<GetTableAccessQuery, GetTableAccessQueryVariables>(GetTableAccessDocument, options);
+      }
+export function useGetTableAccessLazyQuery(baseOptions?: ApolloReactHooks.LazyQueryHookOptions<GetTableAccessQuery, GetTableAccessQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return ApolloReactHooks.useLazyQuery<GetTableAccessQuery, GetTableAccessQueryVariables>(GetTableAccessDocument, options);
+        }
+export type GetTableAccessQueryHookResult = ReturnType<typeof useGetTableAccessQuery>;
+export type GetTableAccessLazyQueryHookResult = ReturnType<typeof useGetTableAccessLazyQuery>;
+export type GetTableAccessQueryResult = Apollo.QueryResult<GetTableAccessQuery, GetTableAccessQueryVariables>;
 export const GetArrayDatasetDocument = gql`
     query GetArrayDataset($id: ID!) {
   arrayDataset(id: $id) {

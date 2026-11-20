@@ -4,6 +4,7 @@ import {isActionSchema} from '@arkitektio/bsx/runtime';
 import {baseCatalog, defaultBlokView} from '@arkitektio/bsx/spec/catalogs';
 import {pokketBlokUi} from '../catalog';
 import {pokketBlokCatalog} from '../catalog';
+import {ORKESTRATOR_BLOKS} from '../catalog/orkestrator';
 
 jest.mock('sonner-native', () => ({toast: {info: jest.fn(), error: jest.fn(), success: jest.fn()}}));
 jest.mock('@rn-primitives/slot', () => {
@@ -22,8 +23,8 @@ const components = [...pokketBlokCatalog.components.values()];
 /** The families of the base catalog pokket draws in full; of `shadcn` only what a phone has an answer for. */
 const COMPLETE = ['language', 'run', 'html', 'ui', 'logo', 'scene', 'structure'] as const;
 
-/** Pokket's own components, beyond the spec: lovekit streams. */
-const POKKET_OWN = new Set(['StreamRender']);
+/** Beyond the base catalog: pokket's own (lovekit streams) and the Orkestrator's, held to its snapshot by `orkestrator.test.ts`. */
+const POKKET_OWN = new Set(['StreamRender', ...ORKESTRATOR_BLOKS.map(definition => definition.name)]);
 
 describe('the blok catalog', () => {
   it.each(COMPLETE)('draws every component of the %s family of the base catalog', name => {
@@ -34,7 +35,7 @@ describe('the blok catalog', () => {
   it('draws the base catalog whole where a phone can: scenes and logos, not yet every html component', () => {
     // The shadcn family is drawn in part (sheets, menus and charts have no answer here yet), so html is not whole.
     expect(pokketBlokUi.contexts).toEqual(['SCENE', 'LOGO']);
-    expect(pokketBlokUi.claims).toEqual(['base@4']);
+    expect(pokketBlokUi.claims).toEqual(['base@4', 'orkestrator@1']);
   });
 
   it('draws nothing the spec does not hold, with every prop the spec gives it', () => {

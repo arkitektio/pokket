@@ -84,7 +84,9 @@ export const describeChart = (chart: ListChartFragment) => ({
   href: mikroRoute.chart(chart.id),
   icon: MIKRO_ICONS.chart,
   title: chart.name,
-  detail: chart.description || [chart.axis.longName || chart.axis.name, chart.axis.unit].filter(Boolean).join(' · '),
+  detail:
+    chart.description ||
+    (chart.axis ? [chart.axis.longName || chart.axis.name, chart.axis.unit].filter(Boolean).join(' · ') : 'Values'),
 });
 
 export const describeAnnotation = (annotation: ListAnnotationFragment) => ({
