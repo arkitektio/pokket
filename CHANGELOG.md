@@ -1,3 +1,27 @@
+# [2.0.0](https://github.com/arkitektio/pokket/compare/v1.28.1...v2.0.0) (2026-11-20)
+
+
+* feat!: bsx 6.7, bloks are self-contained <Blok kind context> trees ([29cee4b](https://github.com/arkitektio/pokket/commit/29cee4b81ac690858209ed4273693ecc15e61877))
+
+
+### Bug Fixes
+
+* **blok:** a scene's annotation lists poll only while it is followed ([d11f484](https://github.com/arkitektio/pokket/commit/d11f4843a93921362c229c82be672d91bda380f6))
+
+
+### Features
+
+* **blok:** pokket draws the Orkestrator's catalog ([a87d123](https://github.com/arkitektio/pokket/commit/a87d123a46a7cf9e52769a30d6dd1372b201bb33))
+* **state:** a state update is applied whole ([f643863](https://github.com/arkitektio/pokket/commit/f643863c42900f13464456e5eb36a3496b7225f4))
+
+
+### BREAKING CHANGES
+
+* needs rekuest-server with the self-contained blok schema and
+pose-only spaces; locals kept on a device before are dropped once.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
 ## [1.28.1](https://github.com/arkitektio/pokket/compare/v1.28.0...v1.28.1) (2026-11-15)
 
 # [1.28.0](https://github.com/arkitektio/pokket/compare/v1.27.1...v1.28.0) (2026-11-15)
