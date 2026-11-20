@@ -45,8 +45,19 @@ const settle = async () => {
   }
 };
 
-const content = (componentTree: unknown[]) => ({
-  componentTree,
+/** A scene blok as the server sends one: `<Blok kind context="scene">` holding its one Scene or Space. */
+const content = (drawn: unknown[], kind: 'agent' | 'action' = 'agent') => ({
+  componentTree: [
+    {
+      id: 'blok',
+      component: 'Blok',
+      props: [
+        {key: 'kind', static_value: kind},
+        {key: 'context', static_value: 'scene'},
+      ],
+      children: drawn,
+    },
+  ],
   vocab: 2,
   resolvedLocals: [],
   demo: null,
@@ -90,7 +101,7 @@ describe('bloks drawn into a room', () => {
             props: [{key: 'room', static_value: 'room:lab'}],
             children: [{id: 'at', component: 'Placed', props: [{key: 'dep', static_value: 'robot'}], children: []}],
           },
-        ]),
+        ], 'action'),
       },
     };
     const task: RunTaskFragment = {
