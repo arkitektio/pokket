@@ -170,8 +170,8 @@ importers:
         specifier: ^3.13.9
         version: 3.14.1(@types/react@19.3.0)(graphql-ws@6.2.1(graphql@16.14.2)(ws@8.21.3))(graphql@16.14.2)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       '@arkitektio/bsx':
-        specifier: ^5.0.0
-        version: 5.0.0(0df51f1230cae0341647b76b3d97ffa8)
+        specifier: ^6.7.0
+        version: 6.7.0(0df51f1230cae0341647b76b3d97ffa8)
       '@config-plugins/react-native-webrtc':
         specifier: ^15.0.0
         version: 15.0.2(expo@58.0.21)
@@ -524,8 +524,8 @@ packages:
     peerDependencies:
       graphql: '*'
 
-  '@arkitektio/bsx@5.0.0':
-    resolution: {integrity: sha512-3uomOLJQMRm2/RjuqdkHhPg9GmyzecpWIPixan1SmgEL9KlzLCBdZMa2fZwqOUYq6aecgq8H2juzPHLqDXZA5w==}
+  '@arkitektio/bsx@6.7.0':
+    resolution: {integrity: sha512-K8DVv5yXAV+XR8yR1TDHyjN0LDwKDBJROWAz8JNdTXvUKdEON4bozMDwbcX5cW8uOp+2NkKaGm8M7QD+JOu2Dg==}
     peerDependencies:
       '@hookform/resolvers': ^5.2.2
       '@monaco-editor/react': ^4.7.0
@@ -8903,7 +8903,7 @@ snapshots:
       immutable: 5.1.9
       invariant: 2.2.4
 
-  '@arkitektio/bsx@5.0.0(0df51f1230cae0341647b76b3d97ffa8)':
+  '@arkitektio/bsx@6.7.0(0df51f1230cae0341647b76b3d97ffa8)':
     dependencies:
       graphql: 16.14.2
       react: 19.3.0

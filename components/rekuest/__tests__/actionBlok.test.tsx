@@ -35,16 +35,15 @@ const text = (id: string, path: string) => ({id, component: 'Text', props: [{key
 
 const panel: ActionBlokFragment = {
   id: 'ab1',
-  context: ComponentContext.Html,
+  context: ComponentContext.Panel,
   blok: {
     id: 'b1',
-    context: ComponentContext.Html,
+    context: ComponentContext.Panel,
     heldByAction: true,
     componentTree: [text('status', 'task.status'), text('slide', 'args.slide'), {id: 'ask', component: 'ask', props: []}],
     vocab: 2,
     catalogs: [],
     module: {id: 'mod', name: 'tasks'},
-    locals: [],
     resolvedLocals: [],
     demo: null,
     queries: [],

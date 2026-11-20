@@ -71,7 +71,7 @@ export const TaskRun = ({taskId, follow}: {taskId: string; follow?: boolean}) =>
  * then, and nothing is answered.
  */
 const TaskRunBloks = ({taskId, task, travel}: {taskId: string; task: RunTaskFragment | null; travel: BlokTravel}) => {
-  const panel = useTaskActionBlok(task, ComponentContext.Html);
+  const panel = useTaskActionBlok(task, ComponentContext.Panel);
   const live = useBlokTravelMoment() === null;
   // An ask through a blok is answered on its hold card, not again in the list of bloks.
   const onCards = React.useMemo(

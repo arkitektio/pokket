@@ -1,10 +1,12 @@
 fragment ListSpace on Space {
   id
   name
+  reference
 }
 
-# A placement as a space shows it: the 3D view (a materialized scene blok) that
-# stands in the room, the agent it belongs to, and where it stands.
+# A placement as a space keeps it: where people left an agent, the same for
+# everyone (one per space and agent, `role` the dependency key it was placed
+# under). What stands there is drawn by the action's `Space` blok, not stored.
 fragment SpacePlacement on Placement {
   id
   name
@@ -14,42 +16,15 @@ fragment SpacePlacement on Placement {
     name
     connected
   }
-  blok {
-    id
-    name
-    blok {
-      id
-      name
-      context
-    }
-  }
   affineMatrix
 }
 
-# A 3D blok standing in a space on its own, with no agent. Where it sits is a
-# 4x4 affine, as for an agent's placement.
-fragment SpaceBlokPlacement on SpacePlacement {
-  id
-  name
-  affineMatrix
-  blok {
-    id
-    name
-    blok {
-      id
-      name
-      context
-    }
-  }
-}
-
+# A room: where people left each agent (`reference` is an action Space blok's `room`).
 fragment Space on Space {
   id
   name
+  reference
   placements {
     ...SpacePlacement
-  }
-  blokPlacements {
-    ...SpaceBlokPlacement
   }
 }

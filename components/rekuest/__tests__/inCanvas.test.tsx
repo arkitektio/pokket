@@ -83,7 +83,6 @@ describe('bloks drawn into a room', () => {
         heldByAction: true,
         module: {id: 'mod', name: 'tasks'},
         catalogs: [],
-        locals: [],
         ...content([
           {
             id: 'space',

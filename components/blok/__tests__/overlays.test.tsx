@@ -35,7 +35,8 @@ const opened = (event: string) => ({
 const overlay = (kind: 'Popover' | 'Tooltip', props: Record<string, unknown>[] = []) => [
   {
     id: 'root',
-    component: 'Html',
+    component: 'Blok',
+    props: [{key: 'kind', static_value: 'custom'}, {key: 'context', static_value: 'panel'}],
     children: [
       {
         id: 'overlay',

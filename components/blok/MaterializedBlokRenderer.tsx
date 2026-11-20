@@ -3,9 +3,9 @@ import * as Crypto from 'expo-crypto';
 import {toast} from 'sonner-native';
 import {
   liveModel,
+  treeQueries,
+  treeSubscriptions,
   declaredLocals,
-  declaredQueries,
-  declaredSubscriptions,
   type BlokDeclarations,
 } from '@arkitektio/bsx/renderer/declarations';
 import type {BlokPersistence} from '@arkitektio/bsx/renderer/persist';
@@ -371,8 +371,6 @@ export const shownContent = (materializedBlok: Pick<MaterializedBlokData, 'blok'
     vocab: shown.vocab,
     resolvedLocals: shown.resolvedLocals,
     demo: shown.demo,
-    queries: shown.queries,
-    subscriptions: shown.subscriptions,
   };
 };
 
@@ -438,8 +436,9 @@ const MaterializedBlokView = ({
     () => new Map(materializedBlok.agentMappings.map(mapping => [mapping.key, mapping.agent.id] as const)),
     [materializedBlok.agentMappings],
   );
-  const queries = React.useMemo(() => declaredQueries(shown), [shown]);
-  const subscriptions = React.useMemo(() => declaredSubscriptions(shown), [shown]);
+  // The reads are the tree's `<query>`/`<subscription>` children.
+  const queries = React.useMemo(() => treeQueries(roots), [roots]);
+  const subscriptions = React.useMemo(() => treeSubscriptions(roots), [roots]);
   const readVariables = React.useMemo(
     () => [...queries, ...subscriptions].flatMap(read => read.variables ?? []),
     [queries, subscriptions],
@@ -456,7 +455,7 @@ const MaterializedBlokView = ({
 
   // Seeded once: the syncs follow later changes.
   const {initialState, statuses} = React.useMemo(() => {
-    const live = liveModel(roots, shown);
+    const live = liveModel(roots);
     const deps = Object.fromEntries(
       materializedBlok.agentMappings.map(mapping => [mapping.key, {id: mapping.agent.id, name: mapping.agent.name, tasks: {}}]),
     );
@@ -471,12 +470,12 @@ const MaterializedBlokView = ({
     <RekuestAssetHost agents={agents}>
       <BlokRenderer
         // Opened again when what it keeps changes: the kept values seed a new runtime.
-        key={persistence ? [...persistence.keys].join('\u0000') : undefined}
+        key={persistence ? [...persistence.locals].join('\u0000') : undefined}
         uiComponents={roots}
         initialState={initialState}
         statuses={statuses}
         keptValues={persistence?.initial}
-        keptRoots={persistence?.keys}
+        keptLocals={persistence?.locals}
         dispatchAction={dispatchAction}
         refuseAction={travelling ? refuseWhileTravelling : undefined}
         unavailableDependencies={unavailableDependencies}

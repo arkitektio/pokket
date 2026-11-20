@@ -15,13 +15,13 @@ export const BLOK_VIEWS = [
   {
     key: 'interfaces',
     label: 'Interfaces',
-    contexts: ['HTML', 'SCENE'],
+    contexts: ['PANEL', 'SCENE'],
     empty: 'No interfaces yet: bloks show up here once one is materialized for your agents, e.g. in orkestrator.',
   },
   {
     key: 'logos',
     label: 'Logos',
-    contexts: ['LOGO', 'ACTION_LOGO'],
+    contexts: ['LOGO'],
     empty: 'No logos: agents and actions that declare one show up here.',
   },
   { key: 'all', label: 'All', contexts: null, empty: 'No bloks yet.' },

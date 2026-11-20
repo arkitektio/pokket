@@ -10,8 +10,9 @@ import {MaterializedBlokRenderer} from '@/components/blok/MaterializedBlokRender
 import {Text} from '@/components/ui/text';
 import {
   ComponentContext,
+  useListMaterializedBloksQuery,
   useMaterializedBlokQuery,
-  type SpaceBlokPlacementFragment,
+  type ListMaterializedBlokFragment,
   type SpaceFragment,
   type SpacePlacementFragment,
 } from '@/lib/rekuest/api/graphql';
@@ -24,8 +25,8 @@ import {ActionBlokRenderer, RunHost} from '../run/ActionBlokRenderer';
  * A space as one 3D room, to look at (orkestrator's `SpaceScene` without its
  * editor: arranging stays on the desktop).
  *
- * What stands in it are 3D views: materialized bloks of the scene context.
- * Every one of them is rendered into the room's single scene, where its
+ * What stands in it are the agents someone placed here, each drawn by its own
+ * 3D view (a scene blok it declares) into the room's single scene, where its
  * `Scene` root only contributes what it holds, moved to where its placement
  * stands. A run of an action hosted here draws its action's `Space` blok into
  * this room, over the agents it got, where they stand here.
@@ -34,56 +35,41 @@ import {ActionBlokRenderer, RunHost} from '../run/ActionBlokRenderer';
 /** The edge of the box that stands in for a placement with nothing to show, in meters. */
 const MARKER_SIZE = 0.15;
 
-type SceneView = {id: string; name?: string | null; blok: {name: string; context: ComponentContext}};
-
-const viewName = (view: SceneView): string => view.name || view.blok.name;
-
-/** The view, when it is one this room can show: a blok of the scene context. */
-const sceneView = (view: SceneView | null | undefined): SceneView | null =>
-  view?.blok.context === ComponentContext.Scene ? view : null;
+/** How many 3D views are asked for: past the server's default page. */
+const VIEW_LIMIT = 500;
 
 /**
- * Something standing in the room: an app's placement (its agent, shown by one
- * of its 3D views), or a 3D blok placed on its own, with no agent. Both sit
- * where a 4x4 affine puts them.
+ * Someone placed an agent here: where it stands is a 4x4 affine, the same for
+ * everyone. The space keeps only that; the agent is drawn by its own 3D view.
  */
 export type Standing = {
   key: string;
   name: string;
   affineMatrix: unknown;
-  /** The 3D view it shows, when it has one this room can show. */
-  view: SceneView | null;
-  /** Whether it has a view at all, if not one this room can show. */
-  hasView: boolean;
-  /** The agent its models stand for; null for a blok placed on its own. */
-  agentId: string | null;
+  /** The agent its models stand for. */
+  agentId: string;
 };
 
-export const standingsOf = (space: {
-  placements: readonly SpacePlacementFragment[];
-  blokPlacements: readonly SpaceBlokPlacementFragment[];
-}): Standing[] => [
-  ...space.placements.map(
-    (placement): Standing => ({
-      key: `agent:${placement.id}`,
-      name: placement.name,
-      affineMatrix: placement.affineMatrix,
-      view: sceneView(placement.blok),
-      hasView: Boolean(placement.blok),
-      agentId: placement.agent.id,
-    }),
-  ),
-  ...space.blokPlacements.map(
-    (placement): Standing => ({
-      key: `blok:${placement.id}`,
-      name: placement.name || viewName(placement.blok),
-      affineMatrix: placement.affineMatrix,
-      view: sceneView(placement.blok),
-      hasView: true,
-      agentId: null,
-    }),
-  ),
-];
+export const standingsOf = (space: {placements: readonly SpacePlacementFragment[]}): Standing[] =>
+  space.placements.map(placement => ({
+    key: `agent:${placement.id}`,
+    name: placement.name || placement.agent.name,
+    affineMatrix: placement.affineMatrix,
+    agentId: placement.agent.id,
+  }));
+
+/** Whether `view` is one of the agent's own: declared by it, or mapped to it as `self`. */
+const isOwnView = (view: ListMaterializedBlokFragment, agentId: string): boolean =>
+  view.declaredBy?.id === agentId || view.agentMappings.some(mapping => mapping.key === 'self' && mapping.agent.id === agentId);
+
+/** The 3D view an agent is drawn by (orkestrator's `agentSceneView`): its own default scene blok, else any of its own. */
+export const agentSceneView = (
+  agentId: string,
+  views: readonly ListMaterializedBlokFragment[],
+): ListMaterializedBlokFragment | null => {
+  const own = views.filter(view => view.blok.context === ComponentContext.Scene && isOwnView(view, agentId));
+  return own.find(view => view.isDefault) ?? own[0] ?? null;
+};
 
 const isPose = (value: unknown): value is BlokPose =>
   Array.isArray(value) &&
@@ -123,25 +109,26 @@ const PlacedView = ({id, name}: {id: string; name: string}) => {
   return <MaterializedBlokRenderer materializedBlok={data.materializedBlok} chrome="none" />;
 };
 
-const Placed = ({item}: {item: Standing}) => {
+const Placed = ({item, views}: {item: Standing; views: readonly ListMaterializedBlokFragment[] | null}) => {
   const [group, setGroup] = React.useState<THREE.Group | null>(null);
   const affine = item.affineMatrix;
   React.useLayoutEffect(() => {
     if (group) toMatrix4(affine).decompose(group.position, group.quaternion, group.scale);
   }, [affine, group]);
+  const view = views ? agentSceneView(item.agentId, views) : null;
   return (
     <group ref={setGroup} name={item.key}>
-      {item.view ? (
+      {view ? (
         // Its models stand for its agent: a run's `Placed` for that agent binds to them.
         <SceneOwnerProvider value={item.agentId}>
           {/* Two identical devices name their models alike: each view keeps its own. */}
           <SceneModelScopeProvider value={`${item.key}/`}>
-            <PlacedView id={item.view.id} name={viewName(item.view)} />
+            <PlacedView id={view.id} name={view.name || view.blok.name} />
           </SceneModelScopeProvider>
         </SceneOwnerProvider>
-      ) : (
-        <Marker title={item.name} detail={item.hasView ? 'Its view is a panel, not a 3D view' : 'No 3D view'} />
-      )}
+      ) : views ? (
+        <Marker title={item.name} detail="No 3D view" />
+      ) : null}
     </group>
   );
 };
@@ -176,6 +163,11 @@ export const SpaceScene = ({
   className?: string;
 }) => {
   const items = React.useMemo(() => standingsOf(space), [space]);
+  const {data: viewData} = useListMaterializedBloksQuery({
+    variables: {filters: {contexts: [ComponentContext.Scene]}, pagination: {limit: VIEW_LIMIT}},
+    skip: items.length === 0,
+  });
+  const views = viewData?.materializedBloks ?? null;
   const host = React.useMemo(() => spaceHostOf(space.placements), [space.placements]);
   // The run is provided around the whole surface, so a card it opens (the run's ask) has it too.
   const surface = (
@@ -199,7 +191,7 @@ export const SpaceScene = ({
       >
         <BlokSceneInertProvider value={readOnly}>
           {items.map(item => (
-            <Placed key={item.key} item={item} />
+            <Placed key={item.key} item={item} views={views} />
           ))}
         </BlokSceneInertProvider>
         {run ? <RunLayer run={run} /> : null}

@@ -3,7 +3,7 @@ import type { BlokTaskRecord } from '@arkitektio/bsx/runtime';
 import type { BlokLogoFragment } from '@/lib/rekuest/api/graphql';
 
 /**
- * An action's logo (a blok whose root is `ActionLogo`), after orkestrator's
+ * An action's logo (a `<Blok kind="action" context="logo">`), after orkestrator's
  * `rekuest/components/logo/ActionLogo.tsx`. With a `record`, `task` is that
  * task and the logo plays while it runs; see `BlokLogo`.
  */

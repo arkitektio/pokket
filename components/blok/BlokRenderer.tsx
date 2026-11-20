@@ -52,8 +52,8 @@ type BlokRendererProps = {
    * first render on (`lib/ports/blok/persist.ts`). Read once, when the renderer mounts.
    */
   keptValues?: Record<string, unknown>;
-  /** The top-level keys kept between openings: swapping the payload leaves their values alone. */
-  keptRoots?: ReadonlySet<string>;
+  /** The runtime ids of the locals kept between openings: swapping the payload leaves their values alone. */
+  keptLocals?: ReadonlySet<string>;
   /** Source statuses known before the first render, by data-model path (`deps.robot.arm`: pending). */
   statuses?: Readonly<Record<string, BlokSourceStatus>>;
   /** The moment the blok shows while travelling (ISO 8601): commands and toasts are off, inputs read-only. */
@@ -98,7 +98,7 @@ export default function BlokRenderer({
   unavailableDependencies,
   unboundDependencies,
   keptValues,
-  keptRoots,
+  keptLocals,
   statuses,
   travelAt = null,
   viewer = null,
@@ -154,7 +154,7 @@ export default function BlokRenderer({
       refuseAction,
       unavailableDependencies,
       keptValues,
-      keptRoots,
+      keptLocals,
       statuses: unboundDependencies?.length ? {...statuses, ...unboundDependencyStatuses(unboundDependencies)} : statuses,
       travelAt,
       answerTask,
@@ -181,8 +181,8 @@ export default function BlokRenderer({
   }, [answerTask, runtimeStore]);
 
   React.useEffect(() => {
-    if (keptRoots) runtimeStore.getState().setKeptRoots(keptRoots);
-  }, [keptRoots, runtimeStore]);
+    if (keptLocals) runtimeStore.getState().setKeptLocals(keptLocals);
+  }, [keptLocals, runtimeStore]);
 
   React.useEffect(() => {
     runtimeStore.getState().setInitialDataModel(initialState);

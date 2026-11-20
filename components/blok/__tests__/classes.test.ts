@@ -70,10 +70,11 @@ describe('the classes a blok brings that the build could not compile', () => {
   it('finds the classes of a tree, written out or computed, and never a node id', () => {
     const tree = [
       {
-        id: 'Html[0]',
-        component: 'Html',
+        id: 'Blok[0]',
+        component: 'Blok',
+        props: [{key: 'kind', static_value: 'custom'}, {key: 'context', static_value: 'panel'}],
         children: [
-          {id: 'Html[0]/Card[0]', component: 'Card', props: [{key: 'className', static_value: 'w-[12rem] p-4'}, {key: 'title', static_value: 'plain'}]},
+          {id: 'Blok[0]/Card[0]', component: 'Card', props: [{key: 'className', static_value: 'w-[12rem] p-4'}, {key: 'title', static_value: 'plain'}]},
           {
             id: 'x',
             component: 'div',

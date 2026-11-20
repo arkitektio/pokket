@@ -221,8 +221,7 @@ export const pokketBlokUi = declareBlokUi({
       span: TextRender,
     }),
     implementBlokCatalog(logoCatalog, {
-      ActionLogo: LogoRootRender,
-      AgentLogo: LogoRootRender,
+      Logo: LogoRootRender,
       Circle: CircleRender,
       ClipPath: ClipPathRender,
       Defs: DefsRender,

@@ -17,7 +17,7 @@ jest.mock('@rn-primitives/slot', () => {
 });
 
 /**
- * orkestrator's `bloks/logo/logo.fixture.json`: a v2 logo blok as it is
+ * bsx's `bloks/logo/logo.fixture.json`: a v2 logo blok as it is
  * stored — a gradient and a clip path referenced by id, every shape, text, and
  * a keyed `foreach` over state drawing one lamp per item, all painted with the
  * viewer's pens.
@@ -38,6 +38,19 @@ const draw = async (uiComponents: unknown, initialState: unknown = {}, active = 
   });
   return renderer;
 };
+
+/** A logo as every blok is one: `<Blok kind="agent|action" context="logo">` holding its one `Logo`. */
+const logoBlok = (kind: 'agent' | 'action', logo: Record<string, unknown>) => [
+  {
+    id: 'blok',
+    component: 'Blok',
+    props: [
+      {key: 'kind', static_value: kind},
+      {key: 'context', static_value: 'logo'},
+    ],
+    children: [{...logo, component: 'Logo'}],
+  },
+];
 
 const circle = (id: string, props: Record<string, string>) => ({
   id,
@@ -95,16 +108,15 @@ describe('a v2 logo blok', () => {
   });
 
   it('draws a node that fails inside the svg as nothing, not as a card', async () => {
-    const {root} = await draw([
-      {
+    const {root} = await draw(
+      logoBlok('agent', {
         id: 'logo',
-        component: 'AgentLogo',
         children: [
           {id: 'ok', component: 'Circle', props: [{key: 'r', static_value: '2'}]},
           {id: 'broken', component: 'Circle', props: [{key: 'r', util_call: {operation: 'no_such_function'}}]},
         ],
-      },
-    ]);
+      }),
+    );
 
     const svg = root.findByType(Svg);
     expect(svg.findAllByType(Circle)).toHaveLength(1);
@@ -121,8 +133,8 @@ describe('paint', () => {
       circle('colour', {fill: '#fbbf24'}),
       circle('empty', {fill: 'none'}),
     ];
-    for (const root of ['AgentLogo', 'ActionLogo']) {
-      const drawn = await draw([{id: 'logo', component: root, children: shapes}]);
+    for (const kind of ['agent', 'action'] as const) {
+      const drawn = await draw(logoBlok(kind, {id: 'logo', children: shapes}));
       const circles = drawn.root.findAllByType(Circle);
       expect(circles.map(shape => shape.props.fill)).toEqual([palette['brand-soft'], palette.success, palette.ink, 'none']);
       expect(circles[1].props.stroke).toBe(palette.info);
@@ -131,16 +143,15 @@ describe('paint', () => {
 
   it('draws the spectral pens, not their soft roles', async () => {
     const palette = buildLogoPalette();
-    const drawn = await draw([
-      {
+    const drawn = await draw(
+      logoBlok('agent', {
         id: 'logo',
-        component: 'AgentLogo',
         children: [
           circle('green', {fill: 'spectrum-green', stroke: 'spectrum-violet'}),
           circle('soft', {fill: 'spectrum-green-soft'}),
         ],
-      },
-    ]);
+      }),
+    );
     const [green, soft] = drawn.root.findAllByType(Circle);
     expect(green.props.fill).toBe(palette['spectrum-green']);
     expect(green.props.stroke).toBe(palette['spectrum-violet']);
@@ -149,7 +160,7 @@ describe('paint', () => {
 
   it('keeps an action logo a tree this catalog knows, its shapes placed under it', () => {
     const preflight = preflightBlokDocument(
-      normalizeBlokComponentTree([{id: 'action', component: 'ActionLogo', children: [circle('c', {fill: 'brand'})]}]).roots,
+      normalizeBlokComponentTree(logoBlok('action', {id: 'action', children: [circle('c', {fill: 'brand'})]})).roots,
       pokketBlokCatalog,
     );
     expect(preflight.errors).toEqual([]);
@@ -183,11 +194,11 @@ describe('animate', () => {
       const motion = (renderer: ReactTestRenderer) =>
         renderer.root.findAllByType(G).filter(group => typeof group.props.transform === 'string');
 
-      const still = await draw([{id: 'action', component: 'ActionLogo', props: [{key: 'viewBox', static_value: '0 0 24 24'}], children: shapes}]);
+      const still = await draw(logoBlok('action', {id: 'action', props: [{key: 'viewBox', static_value: '0 0 24 24'}], children: shapes}));
       expect(motion(still)).toHaveLength(0);
 
       const playing = await draw(
-        [{id: 'action', component: 'ActionLogo', props: [{key: 'viewBox', static_value: '0 0 24 24'}], children: shapes}],
+        logoBlok('action', {id: 'action', props: [{key: 'viewBox', static_value: '0 0 24 24'}], children: shapes}),
         {},
         true,
       );

@@ -47,26 +47,9 @@ fragment BlokLocalChild on ArgPort {
   }
 }
 
-# A local as the blok wrote it, its kind null when it was left out: kept
-# beside the resolved ones so a client reads the blok as written too.
-fragment BlokLocal on BlokLocal {
-  key
-  label
-  kind
-  description
-  identifier
-  nullable
-  default
-  persist
-  choices {
-    ...BlokLocalChoice
-  }
-  children {
-    ...BlokLocalChild
-  }
-}
-
 fragment ResolvedBlokLocal on ResolvedBlokLocal {
+  # The id of the `<local>` node that declares it: kept values are typed by it.
+  node
   key
   label
   kind
@@ -140,9 +123,6 @@ fragment BlokContent on Blok {
     id
     name
   }
-  locals {
-    ...BlokLocal
-  }
   resolvedLocals {
     ...ResolvedBlokLocal
   }
@@ -163,9 +143,6 @@ fragment BlokRevisionContent on BlokRevision {
   componentTree
   vocab
   catalogs
-  locals {
-    ...BlokLocal
-  }
   resolvedLocals {
     ...ResolvedBlokLocal
   }
@@ -230,6 +207,12 @@ fragment ListMaterializedBlok on MaterializedBlok {
   description
   isDefault
   updatedAt
+  # The agent this materialization belongs to, for a blok its app provides.
+  declaredBy {
+    id
+    name
+    connected
+  }
   blok {
     id
     name

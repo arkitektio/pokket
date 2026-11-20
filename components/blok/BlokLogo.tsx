@@ -38,7 +38,7 @@ const REFUSE_EVERY_ACTION = () => true;
 const NoNodeError = () => null;
 
 /**
- * A logo blok (an `AgentLogo` or `ActionLogo` root), drawn in a box sized by
+ * A logo blok (`<Blok kind="agent|action" context="logo">`), drawn in a box sized by
  * `className`: an agent's, an action's. After orkestrator's `BlokLogo` and
  * `ActionLogo`. No blok draws nothing, so callers keep their own fallback.
  *

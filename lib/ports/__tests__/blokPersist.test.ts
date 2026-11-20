@@ -10,7 +10,7 @@ import {
   type KeptComponentState,
   type KeptLocals,
 } from "@arkitektio/bsx/renderer/persist";
-import { createBlokRuntimeStore } from "@arkitektio/bsx/runtime";
+import { createBlokRuntimeStore, getValueAtPath, localValuePath, runtimeIdOf } from "@arkitektio/bsx/runtime";
 
 // AsyncStorage is the jest mock: each store gets a prefix of its own.
 const freshStore = () =>
@@ -30,13 +30,18 @@ const freshComponentStore = () =>
   });
 
 const SCOPE = { hub: "h1", user: "u1", materializedBlok: "7" };
-/** The blok's locals: ports plus persist (`Local(default, persist=True)`). */
+/** The blok's locals as the tree resolves them: ports plus persist, each by its `<local>` node. */
+const ITERATIONS = "Blok[0]/local[0]";
+const POSE = "Blok[0]/local[1]";
+const LABEL = "Blok[0]/local[2]";
+/** The local inside a foreach: one value per item. */
+const OPEN = "Blok[0]/foreach[0]/local[0]";
 const LOCALS: BlokLocal[] = [
-  { key: "iterations", kind: "INT", default: 15, persist: true },
-  { key: "pose", kind: "LIST", default: [1, 0, 0, 0], persist: true },
-  { key: "label", kind: "STRING", default: "x" },
+  { node: ITERATIONS, key: "iterations", kind: "INT", default: 15, persist: true },
+  { node: POSE, key: "pose", kind: "LIST", default: [1, 0, 0, 0], persist: true },
+  { node: LABEL, key: "label", kind: "STRING", default: "x" },
+  { node: OPEN, key: "open", kind: "BOOL", default: false, persist: true },
 ];
-const DEFAULTS = { iterations: 15, pose: [1, 0, 0, 0], label: "x" };
 
 beforeEach(() => {
   jest.useFakeTimers();
@@ -51,105 +56,121 @@ afterEach(() => {
 const open = (store: ReturnType<typeof freshStore>, locals = LOCALS) =>
   openBlokPersistence({ scope: SCOPE, locals, store, componentStore: freshComponentStore(), delay: 100 });
 
-/** A runtime as a materialized blok seeds it: the locals at their defaults, the kept values over them. */
-const runtimeFor = (initial: KeptLocals, keys: ReadonlySet<string>) =>
-  createBlokRuntimeStore({ initialDataModel: DEFAULTS, keptValues: initial, keptRoots: keys });
+/** A runtime as a materialized blok seeds it: the kept values at their locals' paths. */
+const runtimeFor = (initial: KeptLocals, locals: ReadonlySet<string>) => createBlokRuntimeStore({ keptValues: initial, keptLocals: locals });
 
-describe("kept blok locals: Local(persist=True)", () => {
+/** What the runtime holds for the local of `runtimeId` (undefined: nothing written, it reads its default). */
+const valueOf = (runtime: ReturnType<typeof runtimeFor>, runtimeId: string) => getValueAtPath(runtime.getState().dataModel, localValuePath(runtimeId));
+const write = (runtime: ReturnType<typeof runtimeFor>, runtimeId: string, value: unknown, below = "") =>
+  runtime.getState().setRuntimeValue(`${localValuePath(runtimeId)}${below}`, value);
+
+describe("kept blok locals: <local persist>", () => {
   it("keeps only the locals declared with persist", async () => {
     const persistence = await open(freshStore());
-    expect([...persistence.keys].sort()).toEqual(["iterations", "pose"]);
+    expect([...persistence.locals].sort()).toEqual([OPEN, ITERATIONS, POSE].sort());
   });
 
-  it("seeds what was kept before the first render, and nothing for a first opening", async () => {
+  it("seeds what was kept before the first render, by runtime id, and nothing for a first opening", async () => {
     const store = freshStore();
     const first = await open(store);
     expect(first.initial).toEqual({});
 
-    await store.save(keptLocalsId(SCOPE), "locals", { iterations: 30 });
+    await store.save(keptLocalsId(SCOPE), "locals", { [ITERATIONS]: 30, [runtimeIdOf(OPEN, ["7"])]: true });
     const again = await open(store);
-    expect(again.initial).toEqual({ iterations: 30 });
-    const runtime = runtimeFor(again.initial, again.keys);
-    expect((runtime.getState().dataModel as Record<string, unknown>).iterations).toBe(30);
+    expect(again.initial).toEqual({ [ITERATIONS]: 30, [`${OPEN}@7`]: true });
+    const runtime = runtimeFor(again.initial, again.locals);
+    expect(valueOf(runtime, ITERATIONS)).toBe(30);
+    expect(valueOf(runtime, `${OPEN}@7`)).toBe(true);
+    expect(valueOf(runtime, `${OPEN}@8`)).toBeUndefined();
   });
 
-  it("writes a change of a kept local once, after the last change settles", async () => {
+  it("writes a change of a kept local once, after the last change settles, one value per foreach item", async () => {
     const store = freshStore();
     const save = jest.spyOn(store, "save");
     const persistence = await open(store);
-    const runtime = runtimeFor(persistence.initial, persistence.keys);
+    const runtime = runtimeFor(persistence.initial, persistence.locals);
     const detach = persistence.attach(runtime);
 
-    runtime.getState().setRuntimeValue("pose", [2, 0, 0, 0]);
-    runtime.getState().setRuntimeValue("pose.0", 3);
-    runtime.getState().setRuntimeValue("label", "not kept");
+    write(runtime, POSE, [2, 0, 0, 0]);
+    write(runtime, POSE, 3, "/0");
+    write(runtime, LABEL, "not kept");
+    write(runtime, `${OPEN}@a`, true);
     expect(save).not.toHaveBeenCalled();
     await jest.advanceTimersByTimeAsync(100);
     expect(save).toHaveBeenCalledTimes(1);
-    expect(await store.load(keptLocalsId(SCOPE), "locals")).toEqual({ pose: [3, 0, 0, 0] });
+    expect(await store.load(keptLocalsId(SCOPE), "locals")).toEqual({ [POSE]: [3, 0, 0, 0], [`${OPEN}@a`]: true });
     detach();
   });
 
   it("writes what is pending when the blok closes, and nothing back at the default", async () => {
     const store = freshStore();
     const persistence = await open(store);
-    const runtime = runtimeFor(persistence.initial, persistence.keys);
+    const runtime = runtimeFor(persistence.initial, persistence.locals);
     const detach = persistence.attach(runtime);
-    runtime.getState().setRuntimeValue("iterations", 4);
+    write(runtime, ITERATIONS, 4);
+    write(runtime, `${OPEN}@a`, false);
     detach();
     await jest.runAllTimersAsync();
-    expect(await store.load(keptLocalsId(SCOPE), "locals")).toEqual({ iterations: 4 });
+    expect(await store.load(keptLocalsId(SCOPE), "locals")).toEqual({ [ITERATIONS]: 4 });
   });
 
   it("keeps the kept locals across a reset of the runtime values", async () => {
     const persistence = await open(freshStore());
-    const runtime = runtimeFor(persistence.initial, persistence.keys);
-    runtime.getState().setRuntimeValue("pose", [5, 0, 0, 0]);
-    runtime.getState().setRuntimeValue("label", "edited");
+    const runtime = runtimeFor(persistence.initial, persistence.locals);
+    write(runtime, POSE, [5, 0, 0, 0]);
+    write(runtime, `${OPEN}@a`, true);
+    write(runtime, LABEL, "edited");
     runtime.getState().resetRuntimeValues();
-    const model = runtime.getState().dataModel as Record<string, unknown>;
-    expect(model.pose).toEqual([5, 0, 0, 0]);
-    expect(model.label).toBe("x");
+    expect(valueOf(runtime, POSE)).toEqual([5, 0, 0, 0]);
+    expect(valueOf(runtime, `${OPEN}@a`)).toBe(true);
+    expect(valueOf(runtime, LABEL)).toBeUndefined();
   });
 
   it("forgets every kept local and shows the defaults again", async () => {
     const store = freshStore();
-    await store.save(keptLocalsId(SCOPE), "locals", { pose: [0, 1, 0, 0], iterations: 3 });
+    await store.save(keptLocalsId(SCOPE), "locals", { [POSE]: [0, 1, 0, 0], [ITERATIONS]: 3 });
     const persistence = await open(store);
-    const runtime = runtimeFor(persistence.initial, persistence.keys);
+    const runtime = runtimeFor(persistence.initial, persistence.locals);
     persistence.attach(runtime);
     await persistence.resetLocals();
-    expect((runtime.getState().dataModel as Record<string, unknown>).pose).toEqual(DEFAULTS.pose);
+    expect(valueOf(runtime, POSE)).toBeUndefined();
     expect(await store.load(keptLocalsId(SCOPE), "locals")).toBeNull();
   });
 
   it("drops what no longer persists or no longer fits its port", async () => {
     const store = freshStore();
-    await store.save(keptLocalsId(SCOPE), "locals", { pose: { x: 1 }, iterations: 2.5, label: "kept?", gone: true });
+    await store.save(keptLocalsId(SCOPE), "locals", { [POSE]: { x: 1 }, [ITERATIONS]: 2.5, [LABEL]: "kept?", "Blok[0]/local[9]": true, [`${OPEN}@a`]: 3 });
     expect((await open(store)).initial).toEqual({});
-    await store.save(keptLocalsId(SCOPE), "locals", { iterations: 2 });
-    expect((await open(store)).initial).toEqual({ iterations: 2 });
+    await store.save(keptLocalsId(SCOPE), "locals", { [ITERATIONS]: 2 });
+    expect((await open(store)).initial).toEqual({ [ITERATIONS]: 2 });
+  });
+
+  it("drops what a blok kept by top-level key, before locals were kept by runtime id", async () => {
+    const store = freshStore();
+    await store.save(keptLocalsId(SCOPE), "locals", { iterations: 30 });
+    expect((await open(store)).initial).toEqual({});
   });
 
   it("keeps nothing for another user or hub", async () => {
     const store = freshStore();
-    await store.save(keptLocalsId(SCOPE), "locals", { iterations: 2 });
+    await store.save(keptLocalsId(SCOPE), "locals", { [ITERATIONS]: 2 });
     const other = await openBlokPersistence({ scope: { ...SCOPE, user: "u2" }, locals: LOCALS, store, componentStore: freshComponentStore() });
     expect(other.initial).toEqual({});
   });
 
   it("checks a kept value against the local's port", () => {
-    expect(fitsLocal(3, { key: "n", kind: "INT" })).toBe(true);
-    expect(fitsLocal(3.5, { key: "n", kind: "INT" })).toBe(false);
-    expect(fitsLocal(3.5, { key: "n", kind: "FLOAT" })).toBe(true);
-    expect(fitsLocal(true, { key: "n", kind: "FLOAT" })).toBe(false);
-    expect(fitsLocal("a", { key: "s", kind: "STRING" })).toBe(true);
-    expect(fitsLocal({ object: "4", __identifier: "@mikro/image" }, { key: "img", kind: "STRUCTURE", identifier: "@mikro/image" })).toBe(true);
-    expect(fitsLocal([1], { key: "l", kind: "LIST" })).toBe(true);
-    expect(fitsLocal("x", { key: "l", kind: "LIST" })).toBe(false);
-    expect(fitsLocal("fast", { key: "m", kind: "ENUM", choices: [{ value: "fast" }] })).toBe(true);
-    expect(fitsLocal("slow", { key: "m", kind: "ENUM", choices: [{ value: "fast" }] })).toBe(false);
-    expect(fitsLocal(null, { key: "n", kind: "INT" })).toBe(true);
+    const local = (port: Omit<BlokLocal, "node">): BlokLocal => ({ node: "n", ...port });
+    expect(fitsLocal(3, local({ key: "n", kind: "INT" }))).toBe(true);
+    expect(fitsLocal(3.5, local({ key: "n", kind: "INT" }))).toBe(false);
+    expect(fitsLocal(3.5, local({ key: "n", kind: "FLOAT" }))).toBe(true);
+    expect(fitsLocal(true, local({ key: "n", kind: "FLOAT" }))).toBe(false);
+    expect(fitsLocal("a", local({ key: "s", kind: "STRING" }))).toBe(true);
+    expect(fitsLocal({ object: "4", __identifier: "@mikro/image" }, local({ key: "img", kind: "STRUCTURE", identifier: "@mikro/image" }))).toBe(true);
+    expect(fitsLocal([1], local({ key: "l", kind: "LIST" }))).toBe(true);
+    expect(fitsLocal("x", local({ key: "l", kind: "LIST" }))).toBe(false);
+    expect(fitsLocal("fast", local({ key: "m", kind: "ENUM", choices: [{ value: "fast" }] }))).toBe(true);
+    expect(fitsLocal("slow", local({ key: "m", kind: "ENUM", choices: [{ value: "fast" }] }))).toBe(false);
+    expect(fitsLocal(null, local({ key: "n", kind: "INT" }))).toBe(true);
   });
 });
 

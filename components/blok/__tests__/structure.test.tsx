@@ -73,7 +73,8 @@ const QUERY = `query Lenses($dataset: ID, $search: String, $values: [ID!]) {
 const picker = (props: Record<string, unknown>[], identifier = '@mikro/arraylens') => [
   {
     id: 'root',
-    component: 'Html',
+    component: 'Blok',
+    props: [{key: 'kind', static_value: 'custom'}, {key: 'context', static_value: 'panel'}],
     children: [
       {
         id: 'picker',
@@ -186,7 +187,7 @@ describe('StructurePicker', () => {
 });
 
 const single = (component: string, props: Record<string, unknown>[]) => [
-  {id: 'root', component: 'Html', children: [{id: 'it', component, props}]},
+  {id: 'root', component: 'Blok', props: [{key: 'kind', static_value: 'custom'}, {key: 'context', static_value: 'panel'}], children: [{id: 'it', component, props}]},
 ];
 
 describe('StructureDisplay', () => {

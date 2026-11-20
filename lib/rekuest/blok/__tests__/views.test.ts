@@ -5,11 +5,11 @@ describe('blok views', () => {
   it('keeps logos out of the default view', () => {
     const view = blokView(undefined);
     expect(view.key).toBe('interfaces');
-    expect(blokViewContexts(view)).toEqual(['HTML', 'SCENE']);
+    expect(blokViewContexts(view)).toEqual(['PANEL', 'SCENE']);
   });
 
   it('asks for logos alone under logos, and for every context under all', () => {
-    expect(blokViewContexts(blokView('logos'))).toEqual(['LOGO', 'ACTION_LOGO']);
+    expect(blokViewContexts(blokView('logos'))).toEqual(['LOGO']);
     expect(blokViewContexts(blokView('all'))).toBeUndefined();
   });
 

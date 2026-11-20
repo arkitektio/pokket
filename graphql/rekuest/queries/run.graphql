@@ -22,10 +22,3 @@ query PastTasks($filter: TaskFilter, $ordering: [TaskOrder!], $pagination: Offse
     ...PastTask
   }
 }
-
-# Where to show a run over these agents: the spaces placing the most of them first.
-query SpacesForAgents($agents: [ID!]!) {
-  spacesForAgents(agents: $agents) {
-    ...SpaceForAgents
-  }
-}

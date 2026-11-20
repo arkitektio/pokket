@@ -106,11 +106,3 @@ fragment PastTask on Task {
     createdAt
   }
 }
-
-# A space that places some of the agents asked about, and how many.
-fragment SpaceForAgents on SpaceForAgents {
-  placed
-  space {
-    ...ListSpace
-  }
-}

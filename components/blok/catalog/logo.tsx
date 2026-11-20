@@ -35,17 +35,17 @@ import type {logoCatalog} from '@arkitektio/bsx/catalogs';
 type Logo = typeof logoCatalog.components;
 
 /**
- * The `logo@1` catalog, after orkestrator's `bloks/logo/index.tsx`: the
- * `AgentLogo` and `ActionLogo` roots and the classic SVG elements as
- * components, drawn with react-native-svg.
+ * The base catalog's logo family, after orkestrator's `bloks/logo/index.tsx`:
+ * the `Logo` drawing and the classic SVG elements as components, drawn with
+ * react-native-svg.
  *
  * The same names and prop schemas, so a payload validates on both. What the
  * phone cannot do is still accepted and dropped: an SVG `<title>` (the root's
  * becomes its accessibility label), and the hover that plays animations.
  *
- * The root names the blok's context: an `AgentLogo` root is an agent's logo,
- * an `ActionLogo` root an action's (it reads `task`, the viewer's last task of
- * the action). A logo paints with the viewer's pens only (vocabulary
+ * A logo is a `<Blok context="logo">` holding one `Logo`: `kind="agent"` is an
+ * agent's logo, `kind="action"` an action's (it reads `task`, the viewer's
+ * last task of the action). A logo paints with the viewer's pens only (vocabulary
  * `theme.logo_pens`: `ink`, `brand`, ..., the status and spectral roles),
  * resolved from the brand in JS (`buildLogoPalette`), since react-native-svg
  * cannot read orkestrator's `var(--logo-*)`; or with `url(#id)` into the
@@ -391,7 +391,7 @@ export const parseViewBox = (viewBox: string | undefined): Box | null => {
 };
 
 /** A drawing's root: an `Svg` whose shapes paint with the pens. */
-export const LogoRootRender: BlokRender<Logo['AgentLogo']> = args => {
+export const LogoRootRender: BlokRender<Logo['Logo']> = args => {
   const blok = useBlok(args.component, args.schema);
   const viewBox = useValue(blok.viewBox);
   const width = useValue(blok.width);

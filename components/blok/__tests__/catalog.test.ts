@@ -34,7 +34,7 @@ describe('the blok catalog', () => {
   it('draws the base catalog whole where a phone can: scenes and logos, not yet every html component', () => {
     // The shadcn family is drawn in part (sheets, menus and charts have no answer here yet), so html is not whole.
     expect(pokketBlokUi.contexts).toEqual(['SCENE', 'LOGO']);
-    expect(pokketBlokUi.claims).toEqual(['base@3']);
+    expect(pokketBlokUi.claims).toEqual(['base@4']);
   });
 
   it('draws nothing the spec does not hold, with every prop the spec gives it', () => {

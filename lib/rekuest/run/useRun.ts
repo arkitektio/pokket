@@ -5,10 +5,8 @@ import {
   type RunTaskFragment,
   type TaskEventChangeFragment,
   useRunTaskQuery,
-  useSpacesForAgentsQuery,
 } from '../api/graphql';
 import {useTaskStreamListener} from '../useTaskStream';
-import {runAgentIds} from './binding';
 import {actionBlokFor, foldRunEvents, runOfTask, type ActionBlokRun} from './runTask';
 
 /**
@@ -80,22 +78,5 @@ export const useTaskActionBlok = (task: RunTaskFragment | null, context: Compone
   return React.useMemo(() => (run && actionBlok ? {actionBlok, run} : null), [actionBlok, run]);
 };
 
-/** The spaces placing the most of `agents`, best first; empty while there are no agents or it is read. */
-export const useSpacesForAgents = (agents: readonly string[]) => {
-  const key = [...agents].sort().join(',');
-  const sorted = React.useMemo(() => (key ? key.split(',') : []), [key]);
-  const {data, loading, error} = useSpacesForAgentsQuery({variables: {agents: sorted}, skip: sorted.length === 0});
-  return {spaces: data?.spacesForAgents ?? [], loading, error};
-};
-
-/**
- * Where to open a run in 3D: the space it was started in, else the space
- * placing the most of its agents. Null while there is none.
- */
-export const useRunSpace = (task: RunTaskFragment | null): string | null => {
-  const run = useRunOfTask(task);
-  const agents = React.useMemo(() => (run ? runAgentIds(run.binding, run.self) : []), [run]);
-  // Asked only when the run names no space of its own.
-  const {spaces} = useSpacesForAgents(task?.space ? [] : agents);
-  return task?.space?.id ?? spaces[0]?.space.id ?? null;
-};
+/** Where to open a run in 3D: the space it was started in. Null while there is none. */
+export const useRunSpace = (task: RunTaskFragment | null): string | null => task?.space?.id ?? null;

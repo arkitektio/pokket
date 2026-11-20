@@ -28,11 +28,12 @@ const pressable = (renderer: ReactTestRenderer, label: string): ReactTestInstanc
   return found;
 };
 
-/** `<Html><Heading>{self.stage.name}</Heading><foreach .../><Button onClick={self.home(speed: 2) into home}>…</Button><Chart/></Html>`. */
+/** `<Blok kind="custom" context="panel"><Heading>{self.stage.name}</Heading><foreach .../><Button onClick={self.home(speed: 2) into home}>…</Button><Chart/></Blok>`. */
 const tree = [
   {
     id: 'root',
-    component: 'Html',
+    component: 'Blok',
+    props: [{key: 'kind', static_value: 'custom'}, {key: 'context', static_value: 'panel'}],
     children: [
       {id: 'title', component: 'Heading', props: [{key: 'text', ...path('self.stage.name')}]},
       {
