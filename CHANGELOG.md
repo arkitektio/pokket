@@ -1,3 +1,10 @@
+# [2.4.0](https://github.com/arkitektio/pokket/compare/v2.3.0...v2.4.0) (2026-11-21)
+
+
+### Features
+
+* **blok:** custom bloks that read agents.<key> and declare an action's dependencies (bsx 6.8) ([25144af](https://github.com/arkitektio/pokket/commit/25144af03946b71600fd6098ee054d082701a676))
+
 # [2.3.0](https://github.com/arkitektio/pokket/compare/v2.2.0...v2.3.0) (2026-11-21)
 
 
