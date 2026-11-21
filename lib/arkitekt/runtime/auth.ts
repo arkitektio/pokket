@@ -31,6 +31,15 @@ export const isAbortLikeError = (error: unknown): boolean => {
   );
 };
 
+/** Told, once per deployment, that lok wants a person to approve this version (the provider's prompt). */
+let approvalRequired: ((tokenEndpoint: string) => void) | null = null;
+const approvalAsked = new Set<string>();
+
+export const onApprovalRequired = (listener: ((tokenEndpoint: string) => void) | null): void => {
+  approvalRequired = listener;
+  approvalAsked.clear();
+};
+
 /**
  * Refresh as a public client: `client_id` only, no secret.
  *
@@ -74,6 +83,12 @@ export const refreshAccessToken = async (
     throw new Error(
       `Failed to refresh token: ${response.status} ${response.statusText}\n${JSON.stringify(json)}`,
     );
+  }
+
+  // The offered manifest asks for more than was approved: lok changed nothing.
+  if (json?.manifest_status === "approval_required" && !approvalAsked.has(tokenEndpoint)) {
+    approvalAsked.add(tokenEndpoint);
+    approvalRequired?.(tokenEndpoint);
   }
 
   return splitRefreshResponse(json);

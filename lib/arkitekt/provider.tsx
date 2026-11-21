@@ -1,3 +1,4 @@
+import { toast } from "sonner-native";
 import React, { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { checkAliasHealth, resolveWorkingAlias } from "./alias/resolve";
@@ -49,6 +50,7 @@ import {
   isAbortLikeError,
   normalizeToken,
   refreshAccessToken,
+  onApprovalRequired,
   shouldRefreshToken,
 } from "./runtime/auth";
 import { instantiateConnection, type ServiceMap } from "./runtime/connection";
@@ -975,6 +977,23 @@ export const ArkitektProvider = <T extends ServiceBuilderMap, S extends ServiceB
       replaceProfileId: store.getState().profileBook.activeProfileId ?? undefined,
     });
   }, [store, connect]);
+
+  // An update that asks for more than was approved keeps working with what was approved;
+  // approving the rest is a fresh login, offered once.
+  useEffect(() => {
+    onApprovalRequired((tokenEndpoint) => {
+      const live = store.getState().storedSession?.endpoint.token_endpoint === tokenEndpoint;
+      toast.info("This version of Pokket needs your approval", {
+        id: `manifest-approval:${tokenEndpoint}`,
+        description: live
+          ? "It asks for more than you approved before, and keeps working with what was approved until you approve the rest."
+          : "It asks for more than you approved before on one of your accounts. Sign in to that account again to approve the rest.",
+        duration: Infinity,
+        action: live ? { label: "Approve", onClick: () => void reconnect() } : undefined,
+      });
+    });
+    return () => onApprovalRequired(null);
+  }, [store, reconnect]);
 
   const cancelConnection = useCallback<AppFunctions["cancelConnection"]>(() => {
     dlog("[ArkitektProvider] cancelConnection called");

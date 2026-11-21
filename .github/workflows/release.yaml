@@ -52,6 +52,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           persist-credentials: false # Required for semantic-release
+          fetch-depth: 0 # the last release's tag, to compare the documents with
 
       # Must precede setup-node: `cache: "pnpm"` resolves the store path by
       # invoking pnpm, so pnpm has to be on PATH before that step runs.
@@ -68,9 +69,22 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       # The release's test: every service's documents against the schema a released build of
-      # it serves. Writes lib/tested.json, which the release commit carries.
+      # it serves. Writes lib/tested.json, which the release commit carries. Skipped while
+      # the documents are those of the last release: its stamp still holds.
+      - name: Have the documents changed since the last release?
+        id: documents
+        run: |
+          last="$(git describe --tags --abbrev=0 2>/dev/null || true)"
+          if [ -n "$last" ] && grep -q '"' lib/tested.json \
+            && git diff --quiet "$last" HEAD -- graphql scripts/tested.mjs scripts/tested_hub.py; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
       - uses: astral-sh/setup-uv@v6
+        if: steps.documents.outputs.changed == 'true'
       - name: Validate the documents against released services
+        if: steps.documents.outputs.changed == 'true'
         env:
           SERVICE_TAG: ${{ vars.SERVICE_TAG || 'latest' }}
         run: uv run --with konstruktor scripts/tested_hub.py
