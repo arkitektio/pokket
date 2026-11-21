@@ -268,6 +268,7 @@ export const ArkitektProvider = <T extends ServiceBuilderMap, S extends ServiceB
           session.endpoint.token_endpoint,
           currentToken,
           controllerRef.current || undefined,
+          store.getState().manifest.node_id ? store.getState().manifest : undefined,
         );
         // No envelope on the response means the server could not re-render it,
         // not that our config went away.
@@ -802,6 +803,8 @@ export const ArkitektProvider = <T extends ServiceBuilderMap, S extends ServiceB
         const { token: nextToken, fakts: refreshedFakts } = await refreshAccessToken(
           profile.session.endpoint.token_endpoint,
           normalizeToken(profile.session.token),
+          undefined,
+          manifest.node_id ? manifest : undefined,
         );
         const nextSession: StoredArkitektSession = {
           ...profile.session,

@@ -1,6 +1,7 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { Text } from '@/components/ui/text';
 import { App } from '@/lib/app/App';
+import { TESTED, wanted } from '@/lib/arkitekt/tested';
 import { profileTitle } from '@/lib/arkitekt/fakts/profileStorageSchema';
 import { useAvailableModules } from '@/lib/modules/useAvailableModules';
 import { showPage } from '@/lib/navigation';
@@ -116,6 +117,35 @@ function Fact({ label, value }: { label: string; value: string | null }) {
   );
 }
 
+/** The release each service runs, next to the one this Pokket was tested against. */
+function Services() {
+  const instances = App.useFakts()?.instances ?? {};
+  const reported = Object.entries(instances).filter(([key, instance]) => instance.version || TESTED[key]);
+  if (!reported.length) return null;
+  return (
+    <View className="gap-2">
+      <Text className="px-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Services</Text>
+      <Card className="border-border bg-card">
+        <CardContent className="py-3">
+          {reported.map(([key, instance]) => (
+            <View key={key}>
+              <Fact
+                label={key}
+                value={[instance.version ?? 'not reported', TESTED[key] ? `tested against ${TESTED[key]}` : null]
+                  .filter(Boolean)
+                  .join(' · ')}
+              />
+              {instance.satisfies === false ? (
+                <Text className="pb-2 text-xs text-destructive">This Pokket wants {wanted(TESTED[key])}.</Text>
+              ) : null}
+            </View>
+          ))}
+        </CardContent>
+      </Card>
+    </View>
+  );
+}
+
 /** Which Pokket this is, and whether a newer one is out. */
 function About() {
   const colors = useThemeColors();
@@ -204,6 +234,7 @@ export default function SettingsScreen() {
           <TimelineSettings />
           <LokateLink />
         </View>
+        <Services />
         <View className="gap-2">
           <Text className="px-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">About</Text>
           <About />

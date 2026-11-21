@@ -23,6 +23,9 @@ export const InstanceSchema = z.object({
   service: z.string(),
   aliases: z.array(AliasSchema),
   challenge_key: ChallengeKeySchema.optional().nullable(),
+  /** The release the hub reported for it, and whether it is one this app wants. */
+  version: z.string().nullish(),
+  satisfies: z.boolean().nullish(),
 });
 
 // SelfFakt type

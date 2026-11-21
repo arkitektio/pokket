@@ -238,6 +238,8 @@ export type ChromaCollectionFilter = {
   NOT?: InputMaybe<ChromaCollectionFilter>;
   OR?: InputMaybe<ChromaCollectionFilter>;
   ids?: InputMaybe<Array<Scalars['ID']['input']>>;
+  /** Filter to the objects satisfying every one of these descriptor constraints: the `requires` of a port, handed on unchanged, so a picker offers what the port accepts. Answered from the stored descriptors, in one indexed query */
+  requires?: InputMaybe<Array<DescriptorConstraintInput>>;
   /** Search by name: a case-insensitive substring, or semantic similarity of the query to the collection's name and description. Substring matches rank first, then by similarity; an explicit `ordering` replaces that ranking. */
   search?: InputMaybe<Scalars['String']['input']>;
 };
@@ -269,6 +271,39 @@ export type Client = {
   release?: Maybe<Release>;
 };
 
+/** What a guest granted it sees of the organization: the objects put in it, and what is part of them. */
+export type Collaboration = {
+  __typename?: 'Collaboration';
+  createdAt: Scalars['DateTime']['output'];
+  description?: Maybe<Scalars['String']['output']>;
+  id: Scalars['ID']['output'];
+  /** What is in the collaboration; what is part of these is in it too */
+  items: Array<CollaborationItem>;
+  name: Scalars['String']['output'];
+};
+
+/** One object in a collaboration: put there, or brought along with one that needs it to be seen. */
+export type CollaborationItem = {
+  __typename?: 'CollaborationItem';
+  addedAt: Scalars['DateTime']['output'];
+  /** Whether it is in the collaboration only as what another object in it needs to be seen */
+  brought: Scalars['Boolean']['output'];
+  id: Scalars['ID']['output'];
+  /** The structure the object is known by across the hub: @mikro/scene */
+  identifier?: Maybe<Scalars['String']['output']>;
+  /** The object's id, in its structure */
+  objectId: Scalars['String']['output'];
+};
+
+/** An object to put in, or take out of, a collaboration */
+export type CollaborationObjectInput = {
+  collaboration: Scalars['ID']['input'];
+  /** The structure the object is known by: @mikro/scene */
+  identifier: Scalars['String']['input'];
+  /** The object's id */
+  object: Scalars['ID']['input'];
+};
+
 /** A budget to create */
 export type CreateBudgetInput = {
   hard?: Scalars['Boolean']['input'];
@@ -277,6 +312,12 @@ export type CreateBudgetInput = {
   model?: InputMaybe<Scalars['ID']['input']>;
   period?: BudgetPeriod;
   user?: InputMaybe<Scalars['ID']['input']>;
+};
+
+/** A new collaboration */
+export type CreateCollaborationInput = {
+  description?: InputMaybe<Scalars['String']['input']>;
+  name: Scalars['String']['input'];
 };
 
 /** The room to create */
@@ -358,6 +399,29 @@ export type DeleteRoomInput = {
   id: Scalars['ID']['input'];
 };
 
+/** One constraint on an object's descriptors, in the shape a rekuest port states its `requires` in -- so a picker hands a port's constraints on unchanged. `key` is one of the keys the structure declares (e.g. `@alpaka/provider_kind`); a key it does not declare is refused. */
+export type DescriptorConstraintInput = {
+  /** The descriptor key, e.g. `@alpaka/provider_kind` */
+  key: Scalars['String']['input'];
+  /** How the object's value is compared with `value`. MATCHES is equality, as EQUALS is */
+  operator: DescriptorOperator;
+  /** The value compared against: a number for GTE and LTE, a list for IN and NOT_IN, true or false for EXISTS, the member looked for with CONTAINS */
+  value?: InputMaybe<Scalars['JSON']['input']>;
+};
+
+/** How a descriptor constraint compares the object's value with the stated one. The operators a rekuest port's `requires` and `provides` are written in, with the same meaning. */
+export enum DescriptorOperator {
+  Contains = 'CONTAINS',
+  Equals = 'EQUALS',
+  Exists = 'EXISTS',
+  Gte = 'GTE',
+  In = 'IN',
+  Lte = 'LTE',
+  Matches = 'MATCHES',
+  NotEquals = 'NOT_EQUALS',
+  NotIn = 'NOT_IN'
+}
+
 /** A document stored in a collection */
 export type Document = {
   __typename?: 'Document';
@@ -391,6 +455,11 @@ export type FinishMessageInput = {
   attachStructures?: InputMaybe<Array<StructureInput>>;
   message: Scalars['ID']['input'];
   text?: InputMaybe<Scalars['String']['input']>;
+};
+
+/** A memory to forget */
+export type ForgetInput = {
+  name: Scalars['String']['input'];
 };
 
 /** The type of the tool */
@@ -474,12 +543,67 @@ export type LlmModelFilter = {
   inputModalities?: InputMaybe<Array<Modality>>;
   outputModalities?: InputMaybe<Array<Modality>>;
   provider?: InputMaybe<Scalars['ID']['input']>;
+  /** Filter to the objects satisfying every one of these descriptor constraints: the `requires` of a port, handed on unchanged, so a picker offers what the port accepts. Answered from the stored descriptors, in one indexed query */
+  requires?: InputMaybe<Array<DescriptorConstraintInput>>;
   search?: InputMaybe<Scalars['String']['input']>;
 };
 
 export type LlmModelOrder =
   { label: Ordering; modelId?: never; }
   |  { label?: never; modelId: Ordering; };
+
+/** Something an assistant remembers about the person who assigned its task */
+export type Memory = {
+  __typename?: 'Memory';
+  /** The memory itself */
+  content: Scalars['String']['output'];
+  createdAt: Scalars['DateTime']['output'];
+  /** One line saying what the memory holds: what an assistant reads in the index */
+  description: Scalars['String']['output'];
+  id: Scalars['ID']['output'];
+  /** What the memory is about */
+  kind: MemoryKind;
+  /** A short slug the memory is found and replaced by, unique per person */
+  name: Scalars['String']['output'];
+  updatedAt: Scalars['DateTime']['output'];
+};
+
+/** Filter for memories */
+export type MemoryFilter = {
+  AND?: InputMaybe<MemoryFilter>;
+  DISTINCT?: InputMaybe<Scalars['Boolean']['input']>;
+  NOT?: InputMaybe<MemoryFilter>;
+  OR?: InputMaybe<MemoryFilter>;
+  ids?: InputMaybe<Array<Scalars['ID']['input']>>;
+  kind?: InputMaybe<MemoryKind>;
+  names?: InputMaybe<Array<Scalars['String']['input']>>;
+  /** Search what a memory says: a case-insensitive substring of its name, description or content, or semantic similarity to all three. Substring matches rank first, then by similarity; an explicit `ordering` replaces that ranking. */
+  search?: InputMaybe<Scalars['String']['input']>;
+};
+
+/** Something to remember about the person who assigned the task */
+export type MemoryInput = {
+  /** The memory itself */
+  content: Scalars['String']['input'];
+  /** One line saying what the memory holds, read in the index every turn */
+  description: Scalars['String']['input'];
+  /** What the memory is about */
+  kind?: MemoryKind;
+  /** A short slug to find and replace the memory by: `prefers-tiff-exports` */
+  name: Scalars['String']['input'];
+};
+
+/** What a memory is about */
+export enum MemoryKind {
+  Feedback = 'FEEDBACK',
+  Project = 'PROJECT',
+  Reference = 'REFERENCE',
+  User = 'USER'
+}
+
+export type MemoryOrder =
+  { name: Ordering; updatedAt?: never; }
+  |  { name?: never; updatedAt: Ordering; };
 
 /** Message represent the message of an agent on a room */
 export type Message = {
@@ -540,6 +664,8 @@ export type MessageFilter = {
   NOT?: InputMaybe<MessageFilter>;
   OR?: InputMaybe<MessageFilter>;
   ids?: InputMaybe<Array<Scalars['ID']['input']>>;
+  /** Filter to the objects satisfying every one of these descriptor constraints: the `requires` of a port, handed on unchanged, so a picker offers what the port accepts. Answered from the stored descriptors, in one indexed query */
+  requires?: InputMaybe<Array<DescriptorConstraintInput>>;
   search?: InputMaybe<Scalars['String']['input']>;
 };
 
@@ -559,12 +685,16 @@ export type Mutation = {
   __typename?: 'Mutation';
   /** Embed documents and add them to a collection */
   addDocumentsToCollection: Array<Document>;
+  /** Put a room or a message in a collaboration, with what it needs to be seen: a room comes with its agents and messages */
+  addToCollaboration: Collaboration;
   /** Append a delta to a streaming message. Batch deltas (every ~100-250 ms or ~30 characters) and await each call before sending the next, so they arrive in order. */
   appendMessage: Message;
   /** Send a chat completion request */
   chat: ChatResponse;
   /** Cap this organization's LLM consumption, optionally for one user and/or model */
   createBudget: Budget;
+  /** Create an empty collaboration, to put rooms in and grant a guest */
+  createCollaboration: Collaboration;
   /** Create a searchable collection of documents */
   createCollection: ChromaCollection;
   /** Configure a new LLM provider and list the models it offers */
@@ -575,6 +705,8 @@ export type Mutation = {
   decide: Decision;
   /** Remove a budget */
   deleteBudget: Scalars['ID']['output'];
+  /** Delete a collaboration: whoever was granted it sees nothing of it any more */
+  deleteCollaboration: Scalars['ID']['output'];
   /** Delete a collection and its documents */
   deleteCollection: Scalars['ID']['output'];
   /** Delete a provider and the models it offers */
@@ -585,12 +717,18 @@ export type Mutation = {
   ensureCollection: ChromaCollection;
   /** Close a streaming message. Pass the full final text so any delta lost on the way is repaired; call it in a finally block so a crashed stream never stays open. */
   finishMessage: Message;
+  /** Forget one of the assigner's memories by name; whether there was one */
+  forget: Scalars['Boolean']['output'];
   /** Generate an image from a text description */
   generateImage: ImageResponse;
   /** Pull a model into an Ollama provider, or a decision model into an Ollaya provider */
   pull: OllamaPullResult;
   /** Re-list the models a provider offers */
   refreshProvider: Provider;
+  /** Remember something about the person who assigned the task, replacing the memory of that name. Needs the task's provenance token */
+  remember: Memory;
+  /** Take a room or a message out of a collaboration, with what it brought that nothing else there needs */
+  removeFromCollaboration: Collaboration;
   /** Post a complete message into a room */
   send: Message;
   /** Open a message to stream text into. Only the starting agent (same user and client) can append to or finish it. */
@@ -611,6 +749,12 @@ export type MutationAddDocumentsToCollectionArgs = {
 
 
 /** The root mutation type */
+export type MutationAddToCollaborationArgs = {
+  input: CollaborationObjectInput;
+};
+
+
+/** The root mutation type */
 export type MutationAppendMessageArgs = {
   input: AppendMessageInput;
 };
@@ -625,6 +769,12 @@ export type MutationChatArgs = {
 /** The root mutation type */
 export type MutationCreateBudgetArgs = {
   input: CreateBudgetInput;
+};
+
+
+/** The root mutation type */
+export type MutationCreateCollaborationArgs = {
+  input: CreateCollaborationInput;
 };
 
 
@@ -659,6 +809,12 @@ export type MutationDeleteBudgetArgs = {
 
 
 /** The root mutation type */
+export type MutationDeleteCollaborationArgs = {
+  id: Scalars['ID']['input'];
+};
+
+
+/** The root mutation type */
 export type MutationDeleteCollectionArgs = {
   input: DeleteCollectionInput;
 };
@@ -689,6 +845,12 @@ export type MutationFinishMessageArgs = {
 
 
 /** The root mutation type */
+export type MutationForgetArgs = {
+  input: ForgetInput;
+};
+
+
+/** The root mutation type */
 export type MutationGenerateImageArgs = {
   input: ImageInput;
 };
@@ -703,6 +865,18 @@ export type MutationPullArgs = {
 /** The root mutation type */
 export type MutationRefreshProviderArgs = {
   input: RefreshProviderInput;
+};
+
+
+/** The root mutation type */
+export type MutationRememberArgs = {
+  input: MemoryInput;
+};
+
+
+/** The root mutation type */
+export type MutationRemoveFromCollaborationArgs = {
+  input: CollaborationObjectInput;
 };
 
 
@@ -787,7 +961,8 @@ export enum Ordering {
 export type Organization = {
   __typename?: 'Organization';
   id: Scalars['ID']['output'];
-  slug: Scalars['String']['output'];
+  /** The organization across issuers and services: `<issuer>#<org>` */
+  identifier: Scalars['String']['output'];
 };
 
 /** A provider of LLMs */
@@ -822,6 +997,8 @@ export type ProviderFilter = {
   NOT?: InputMaybe<ProviderFilter>;
   OR?: InputMaybe<ProviderFilter>;
   ids?: InputMaybe<Array<Scalars['ID']['input']>>;
+  /** Filter to the objects satisfying every one of these descriptor constraints: the `requires` of a port, handed on unchanged, so a picker offers what the port accepts. Answered from the stored descriptors, in one indexed query */
+  requires?: InputMaybe<Array<DescriptorConstraintInput>>;
   search?: InputMaybe<Scalars['String']['input']>;
 };
 
@@ -876,6 +1053,8 @@ export type Query = {
   __typename?: 'Query';
   _entities: Array<Maybe<_Entity>>;
   _service: _Service;
+  /** Who assigned the task this request is made for: whose memories it reaches */
+  assigner: User;
   /** Get a single budget by ID */
   budget: Budget;
   /** How much of a budget is used in the current period */
@@ -886,6 +1065,10 @@ export type Query = {
   chromaCollection: ChromaCollection;
   /** List this organization's Chroma collections */
   chromaCollections: Array<ChromaCollection>;
+  /** Get a single collaboration by ID */
+  collaboration: Collaboration;
+  /** List the organization's collaborations: what a guest granted one sees of it (a guest: the collaborations granted to them) */
+  collaborations: Array<Collaboration>;
   /** The model the caller uses by default for one kind of task, if any */
   defaultModelFor?: Maybe<LlmModel>;
   /** The models the caller has registered as defaults */
@@ -896,6 +1079,10 @@ export type Query = {
   llmModel: LlmModel;
   /** List the LLM models reachable through this organization's providers */
   llmModels: Array<LlmModel>;
+  /** What is remembered about the person who assigned the task this request is made for. Needs the task's provenance token */
+  memories: Array<Memory>;
+  /** Get one of the assigner's memories by ID */
+  memory: Memory;
   /** Get a single message by ID */
   message: Message;
   /** List the messages in this organization's rooms */
@@ -951,6 +1138,11 @@ export type QueryChromaCollectionsArgs = {
 };
 
 
+export type QueryCollaborationArgs = {
+  id: Scalars['ID']['input'];
+};
+
+
 export type QueryDefaultModelForArgs = {
   kind: DefaultKind;
 };
@@ -977,6 +1169,18 @@ export type QueryLlmModelsArgs = {
   filters?: InputMaybe<LlmModelFilter>;
   ordering?: Array<LlmModelOrder>;
   pagination?: InputMaybe<OffsetPaginationInput>;
+};
+
+
+export type QueryMemoriesArgs = {
+  filters?: InputMaybe<MemoryFilter>;
+  ordering?: Array<MemoryOrder>;
+  pagination?: InputMaybe<OffsetPaginationInput>;
+};
+
+
+export type QueryMemoryArgs = {
+  id: Scalars['ID']['input'];
 };
 
 
@@ -1139,6 +1343,8 @@ export type RoomFilter = {
   NOT?: InputMaybe<RoomFilter>;
   OR?: InputMaybe<RoomFilter>;
   ids?: InputMaybe<Array<Scalars['ID']['input']>>;
+  /** Filter to the objects satisfying every one of these descriptor constraints: the `requires` of a port, handed on unchanged, so a picker offers what the port accepts. Answered from the stored descriptors, in one indexed query */
+  requires?: InputMaybe<Array<DescriptorConstraintInput>>;
   /** Search by title: a case-insensitive substring, or semantic similarity of the query to the room's title and description. Substring matches rank first, then by similarity; an explicit `ordering` replaces that ranking. */
   search?: InputMaybe<Scalars['String']['input']>;
   talkingAbout?: InputMaybe<StructureInput>;
@@ -1496,9 +1702,23 @@ export type UseModelForInput = {
 export type User = {
   __typename?: 'User';
   activeOrganization?: Maybe<Organization>;
+  /** The family name, if the issuer sends one. */
+  familyName?: Maybe<Scalars['String']['output']>;
+  /** The given name, if the issuer sends one. */
+  givenName?: Maybe<Scalars['String']['output']>;
   id: Scalars['ID']['output'];
+  /** The user's locale (BCP47), if the issuer sends one. */
+  locale?: Maybe<Scalars['String']['output']>;
+  /** The full name, if the issuer sends one. */
+  name?: Maybe<Scalars['String']['output']>;
+  /** A casual name, if the issuer sends one. */
+  nickname?: Maybe<Scalars['String']['output']>;
+  /** URL of the profile picture, if the issuer sends one. */
+  picture?: Maybe<Scalars['String']['output']>;
   preferredUsername: Scalars['String']['output'];
   sub: Scalars['String']['output'];
+  /** The user's IANA time zone, if the issuer sends one. */
+  zoneinfo?: Maybe<Scalars['String']['output']>;
 };
 
 export type _Entity = Agent | App | Client | Message | Organization | Release | Room | User;
@@ -1512,7 +1732,7 @@ export type MessageAgentFragment = { __typename?: 'Agent', id: string, name?: st
 
 export type ListMessageFragment = { __typename?: 'Message', id: string, text: string, isStreaming: boolean, createdAt: string, agent: { __typename?: 'Agent', id: string, name?: string | null, user: { __typename?: 'User', id: string, preferredUsername: string } }, attachedStructures: Array<{ __typename?: 'Structure', identifier: string, object: number }> };
 
-export type RoomFragment = { __typename?: 'Room', id: string, title: string, description?: string | null, createdAt: string, creator?: { __typename?: 'User', id: string, preferredUsername: string } | null, organization: { __typename?: 'Organization', id: string, slug: string }, agents: Array<{ __typename?: 'Agent', id: string, name?: string | null, user: { __typename?: 'User', id: string, preferredUsername: string } }>, messages: Array<{ __typename?: 'Message', id: string, text: string, isStreaming: boolean, createdAt: string, agent: { __typename?: 'Agent', id: string, name?: string | null, user: { __typename?: 'User', id: string, preferredUsername: string } }, attachedStructures: Array<{ __typename?: 'Structure', identifier: string, object: number }> }> };
+export type RoomFragment = { __typename?: 'Room', id: string, title: string, description?: string | null, createdAt: string, creator?: { __typename?: 'User', id: string, preferredUsername: string } | null, organization: { __typename?: 'Organization', id: string, identifier: string }, agents: Array<{ __typename?: 'Agent', id: string, name?: string | null, user: { __typename?: 'User', id: string, preferredUsername: string } }>, messages: Array<{ __typename?: 'Message', id: string, text: string, isStreaming: boolean, createdAt: string, agent: { __typename?: 'Agent', id: string, name?: string | null, user: { __typename?: 'User', id: string, preferredUsername: string } }, attachedStructures: Array<{ __typename?: 'Structure', identifier: string, object: number }> }> };
 
 export type RecentRoomFragment = { __typename?: 'Room', id: string, title: string, description?: string | null, createdAt: string, latest: Array<{ __typename?: 'Message', id: string, text: string, createdAt: string, attachedStructures: Array<{ __typename?: 'Structure', identifier: string, object: number }> }> };
 
@@ -1521,7 +1741,7 @@ export type CreateRoomMutationVariables = Exact<{
 }>;
 
 
-export type CreateRoomMutation = { __typename?: 'Mutation', createRoom: { __typename?: 'Room', id: string, title: string, description?: string | null, createdAt: string, creator?: { __typename?: 'User', id: string, preferredUsername: string } | null, organization: { __typename?: 'Organization', id: string, slug: string }, agents: Array<{ __typename?: 'Agent', id: string, name?: string | null, user: { __typename?: 'User', id: string, preferredUsername: string } }>, messages: Array<{ __typename?: 'Message', id: string, text: string, isStreaming: boolean, createdAt: string, agent: { __typename?: 'Agent', id: string, name?: string | null, user: { __typename?: 'User', id: string, preferredUsername: string } }, attachedStructures: Array<{ __typename?: 'Structure', identifier: string, object: number }> }> } };
+export type CreateRoomMutation = { __typename?: 'Mutation', createRoom: { __typename?: 'Room', id: string, title: string, description?: string | null, createdAt: string, creator?: { __typename?: 'User', id: string, preferredUsername: string } | null, organization: { __typename?: 'Organization', id: string, identifier: string }, agents: Array<{ __typename?: 'Agent', id: string, name?: string | null, user: { __typename?: 'User', id: string, preferredUsername: string } }>, messages: Array<{ __typename?: 'Message', id: string, text: string, isStreaming: boolean, createdAt: string, agent: { __typename?: 'Agent', id: string, name?: string | null, user: { __typename?: 'User', id: string, preferredUsername: string } }, attachedStructures: Array<{ __typename?: 'Structure', identifier: string, object: number }> }> } };
 
 export type DeleteRoomMutationVariables = Exact<{
   id: Scalars['ID']['input'];
@@ -1542,7 +1762,7 @@ export type GetRoomQueryVariables = Exact<{
 }>;
 
 
-export type GetRoomQuery = { __typename?: 'Query', room: { __typename?: 'Room', id: string, title: string, description?: string | null, createdAt: string, creator?: { __typename?: 'User', id: string, preferredUsername: string } | null, organization: { __typename?: 'Organization', id: string, slug: string }, agents: Array<{ __typename?: 'Agent', id: string, name?: string | null, user: { __typename?: 'User', id: string, preferredUsername: string } }>, messages: Array<{ __typename?: 'Message', id: string, text: string, isStreaming: boolean, createdAt: string, agent: { __typename?: 'Agent', id: string, name?: string | null, user: { __typename?: 'User', id: string, preferredUsername: string } }, attachedStructures: Array<{ __typename?: 'Structure', identifier: string, object: number }> }> } };
+export type GetRoomQuery = { __typename?: 'Query', room: { __typename?: 'Room', id: string, title: string, description?: string | null, createdAt: string, creator?: { __typename?: 'User', id: string, preferredUsername: string } | null, organization: { __typename?: 'Organization', id: string, identifier: string }, agents: Array<{ __typename?: 'Agent', id: string, name?: string | null, user: { __typename?: 'User', id: string, preferredUsername: string } }>, messages: Array<{ __typename?: 'Message', id: string, text: string, isStreaming: boolean, createdAt: string, agent: { __typename?: 'Agent', id: string, name?: string | null, user: { __typename?: 'User', id: string, preferredUsername: string } }, attachedStructures: Array<{ __typename?: 'Structure', identifier: string, object: number }> }> } };
 
 export type RecentRoomsQueryVariables = Exact<{
   filter?: InputMaybe<RoomFilter>;
@@ -1597,7 +1817,7 @@ export const RoomFragmentDoc = gql`
   }
   organization {
     id
-    slug
+    identifier
   }
   agents {
     ...MessageAgent

@@ -75,7 +75,7 @@ export function RoomInfoSheet({
         {room.description ? <Text className="pb-3 text-sm text-muted-foreground">{room.description}</Text> : null}
         <Fact label="Started" value={when(room.createdAt)} />
         <Fact label="By" value={room.creator?.preferredUsername} />
-        <Fact label="Organization" value={room.organization?.slug} />
+        <Fact label="Organization" value={room.organization?.identifier} />
         <Fact label="Messages" value={String(room.messages.length)} />
         <Fact label="Last message" value={when(last)} />
         <Fact label="In the room" value={participants.join(', ')} />

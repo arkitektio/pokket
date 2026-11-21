@@ -1,3 +1,4 @@
+import { version as packageVersion } from "../package.json";
 import { Theme } from "expo-router/react-navigation";
 import { Manifest } from "./arkitekt/fakts/manifestSchema";
 import { buildBrandTokens } from "./theme/brandTokens";
@@ -52,7 +53,7 @@ export const ALL_SCOPES = [
 ];
 
 export const manifest: Manifest = {
-    version: "0.0.1",
+    version: packageVersion,
     identifier: "live.arkitekt.docs",
     scopes: ALL_SCOPES,
     requirements: [

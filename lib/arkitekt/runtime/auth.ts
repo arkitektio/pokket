@@ -45,6 +45,11 @@ export const refreshAccessToken = async (
   tokenEndpoint: string,
   currentToken: TokenResponse,
   controller?: AbortController,
+  /**
+   * What this app is now (with its node id: without it lok reads another device). lok moves
+   * the installation to it when it asks for nothing more than was approved.
+   */
+  manifest?: unknown,
 ): Promise<RefreshResult> => {
   if (!currentToken.refresh_token) {
     throw new Error("No refresh token available – cannot refresh");
@@ -59,6 +64,7 @@ export const refreshAccessToken = async (
       grant_type: "refresh_token",
       refresh_token: currentToken.refresh_token,
       client_id: currentToken.client_id,
+      ...(manifest ? { manifest: JSON.stringify(manifest) } : {}),
     }),
     signal: controller?.signal,
   });
