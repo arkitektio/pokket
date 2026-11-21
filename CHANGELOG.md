@@ -1,3 +1,10 @@
+# [2.1.0](https://github.com/arkitektio/pokket/compare/v2.0.0...v2.1.0) (2026-11-21)
+
+
+### Features
+
+* **lovekit:** streams instead of broadcasts, and connections instead of tokens ([455b78f](https://github.com/arkitektio/pokket/commit/455b78fe2b8e1adbe6171827314489ce72f170a1))
+
 # [2.0.0](https://github.com/arkitektio/pokket/compare/v1.28.1...v2.0.0) (2026-11-20)
 
 
