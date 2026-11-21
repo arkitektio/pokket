@@ -1,3 +1,10 @@
+# [2.3.0](https://github.com/arkitektio/pokket/compare/v2.2.0...v2.3.0) (2026-11-21)
+
+
+### Features
+
+* an update that needs approving again says so ([99a2506](https://github.com/arkitektio/pokket/commit/99a250614d931aeeca9aace4eddec40f152da0c0))
+
 # [2.2.0](https://github.com/arkitektio/pokket/compare/v2.1.0...v2.2.0) (2026-11-21)
 
 
