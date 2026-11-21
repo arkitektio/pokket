@@ -1,3 +1,10 @@
+# [2.2.0](https://github.com/arkitektio/pokket/compare/v2.1.0...v2.2.0) (2026-11-21)
+
+
+### Features
+
+* a release wants the service versions its documents were validated against ([7aab88b](https://github.com/arkitektio/pokket/commit/7aab88b6effe05ce9ea249e4fb1eec11f33fd5c0))
+
 # [2.1.0](https://github.com/arkitektio/pokket/compare/v2.0.0...v2.1.0) (2026-11-21)
 
 
