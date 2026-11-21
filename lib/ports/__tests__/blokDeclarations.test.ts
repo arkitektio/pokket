@@ -15,7 +15,7 @@ const roots = [
       <query name="stats" service="mikro" document="query Stats($image: ID!) { stats(image: $image) }">
         <var key="image" value={args.image} />
       </query>
-      <Button label="Go" onClick={deps.robot.move() into move} />
+      <Button label="Go" onClick={agents.robot.move() into move} />
     </Blok>`,
   ).tree,
 ];
