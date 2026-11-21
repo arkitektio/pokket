@@ -5,7 +5,9 @@ mutation EnsureCall($input: EnsureCallInput!) {
 }
 
 mutation JoinCall($input: JoinCallInput!) {
-  joinCall(input: $input)
+  joinCall(input: $input) {
+    ...Connection
+  }
 }
 
 mutation InviteToCall($input: InviteToCallInput!) {

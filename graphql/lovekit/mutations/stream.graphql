@@ -1,7 +1,17 @@
-mutation JoinBroadcast($input: JoinBroadcastInput!) {
-  joinBroadcast(input: $input)
+mutation DeclareStreams($input: DeclareStreamsInput!) {
+  declareStreams(input: $input) {
+    ...Stream
+  }
 }
 
-mutation EnsureStream($input: EnsureStreamInput!) {
-  ensureStream(input: $input)
+mutation PublisherConnection {
+  publisherConnection {
+    ...Connection
+  }
+}
+
+mutation WatchAgent($input: WatchAgentInput!) {
+  watchAgent(input: $input) {
+    ...Connection
+  }
 }

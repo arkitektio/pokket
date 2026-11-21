@@ -3,8 +3,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { Text } from '@/components/ui/text';
 import { Guard } from '@/lib/app/App';
-import { SoloBroadcastPlayer } from '@/components/broadcasts/SoloBroadcastPlayer';
-import { useGetSoloBroadcastQuery } from '@/lib/lovekit/api/graphql';
+import { StreamPlayer } from '@/components/streams/StreamPlayer';
+import { useGetStreamQuery } from '@/lib/lovekit/api/graphql';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import * as React from 'react';
 import { ActivityIndicator, View } from 'react-native';
@@ -45,22 +45,22 @@ function LoadingState({ message }: { message: string }) {
   );
 }
 
-function SoloBroadcastContent({ broadcastId }: { broadcastId: string }) {
-  const { data, loading, error, refetch } = useGetSoloBroadcastQuery({
-    variables: { id: broadcastId },
-    skip: !broadcastId,
+function StreamContent({ streamId }: { streamId: string }) {
+  const { data, loading, error, refetch } = useGetStreamQuery({
+    variables: { id: streamId },
+    skip: !streamId,
     fetchPolicy: 'cache-and-network',
   });
 
-  const broadcast = data?.soloBroadcast;
+  const stream = data?.stream;
 
   return (
     <View className="flex-1 gap-4 bg-background px-4 py-6">
-      <Stack.Screen options={{ title: broadcast?.title ?? 'Solo Broadcast' }} />
+      <Stack.Screen options={{ title: stream?.title ?? 'Stream' }} />
 
-      {loading && !broadcast ? <LoadingState message="Loading broadcast details..." /> : null}
+      {loading && !stream ? <LoadingState message="Loading stream..." /> : null}
 
-      {error && !broadcast ? (
+      {error && !stream ? (
         <Card className="border-border bg-card">
           <CardContent className="gap-4 py-6">
             <Text className="text-sm text-destructive">{error.message}</Text>
@@ -77,32 +77,31 @@ function SoloBroadcastContent({ broadcastId }: { broadcastId: string }) {
         </Card>
       ) : null}
 
-      {broadcast ? (
+      {stream ? (
         <>
           <Card className="border-border bg-card">
             <CardHeader>
-              <CardTitle>{broadcast.title}</CardTitle>
-              <CardDescription>Live solo broadcast</CardDescription>
+              <CardTitle>{stream.title}</CardTitle>
+              <CardDescription>{stream.description ?? (stream.live ? 'Live' : 'Offline')}</CardDescription>
             </CardHeader>
             <CardContent className="gap-1">
               <Text className="text-sm text-muted-foreground">
-                Streamer: {broadcast.streamer.user.sub}
+                From: {stream.agent.user.preferredUsername ?? stream.agent.user.sub}
               </Text>
-              <Text className="text-xs text-muted-foreground">
-                Client: {broadcast.streamer.client.clientId}
-              </Text>
+              <Text className="text-xs text-muted-foreground">App: {stream.agent.name}</Text>
             </CardContent>
           </Card>
-          <SoloBroadcastPlayer key={broadcast.id} broadcastId={broadcast.id} />
+
+          <StreamPlayer key={stream.id} stream={stream} />
         </>
       ) : null}
     </View>
   );
 }
 
-export default function SoloBroadcastDetailScreen() {
+export default function StreamDetailScreen() {
   const params = useLocalSearchParams<{ id?: string | string[] }>();
-  const broadcastId = Array.isArray(params.id) ? params.id[0] : params.id;
+  const streamId = Array.isArray(params.id) ? params.id[0] : params.id;
 
   return (
     <Guard.Lok
@@ -111,7 +110,7 @@ export default function SoloBroadcastDetailScreen() {
         <View className="flex-1 bg-background px-4 py-6">
           <EmptyState
             title="Lok connection required"
-            description="Connect your account before opening a solo broadcast."
+            description="Connect your account before opening a stream."
           />
         </View>
       }
@@ -136,13 +135,13 @@ export default function SoloBroadcastDetailScreen() {
             </View>
           }
         >
-          {broadcastId ? (
-            <SoloBroadcastContent broadcastId={broadcastId} />
+          {streamId ? (
+            <StreamContent streamId={streamId} />
           ) : (
             <View className="flex-1 bg-background px-4 py-6">
               <EmptyState
-                title="Broadcast not found"
-                description="The selected broadcast id is missing from the route."
+                title="Stream not found"
+                description="The selected stream id is missing from the route."
               />
             </View>
           )}

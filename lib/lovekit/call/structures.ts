@@ -24,7 +24,7 @@ const KINDS: readonly StructureKind[] = [
   { identifier: "@rekuest/implementation", name: "Implementation", prefix: "/implementations/", callable: false, desktop: "/rekuest/implementations/" },
   { identifier: "@bank/transaction", name: "Transaction", prefix: "/bank/transaction/", callable: true, desktop: "/bank/transactions/" },
   { identifier: "@kuvert/thread", name: "Thread", prefix: "/mail/thread/", callable: true, desktop: "/kuvert/threads/" },
-  { identifier: "@lovekit/solo_broadcast", name: "Broadcast", prefix: "/solo-broadcast/", callable: true, desktop: "/lovekit/solobroadcasts/" },
+  { identifier: "@lovekit/stream", name: "Stream", prefix: "/stream/", callable: true, desktop: "/lovekit/streams/" },
   { identifier: "@lovekit/call", name: "Call", prefix: "/calls/", callable: false, desktop: "/lovekit/calls/" },
   { identifier: "@mikro/arraydataset", name: "Dataset", prefix: "/mikro/arraydatasets/", callable: true },
   { identifier: "@mikro/lens", name: "Lens", prefix: "/mikro/lenses/", callable: true },

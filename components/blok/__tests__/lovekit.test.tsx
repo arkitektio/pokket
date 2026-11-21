@@ -18,11 +18,11 @@ jest.mock('@/lib/app/App', () => {
   return {...actual, Guard: {...actual.Guard, Lovekit: missing, Livekit: missing}};
 });
 
-const stream = (broadcast?: unknown) => [
+const stream = (value?: unknown) => [
   {
     id: 'stream',
     component: 'StreamRender',
-    props: broadcast === undefined ? [] : [{key: 'broadcast', static_value: broadcast}],
+    props: value === undefined ? [] : [{key: 'stream', static_value: value}],
   },
 ];
 
@@ -40,20 +40,20 @@ const draw = async (uiComponents: unknown) => {
 };
 
 describe('StreamRender', () => {
-  it("is a component this catalog knows, with orkestrator's broadcast prop", () => {
+  it('is a component this catalog knows, with a stream prop', () => {
     const preflight = preflightBlokDocument(
-      normalizeBlokComponentTree(stream({object: '4', __identifier: '@lovekit/solo_broadcast'})).roots,
+      normalizeBlokComponentTree(stream({object: '4', __identifier: '@lovekit/stream'})).roots,
       pokketBlokCatalog,
     );
     expect(preflight.errors).toEqual([]);
     expect(preflight.invalidNodes.size).toBe(0);
   });
 
-  it('says so when no broadcast is selected', async () => {
-    expect(texts(await draw(stream()))).toContain('No broadcast selected.');
+  it('says so when no stream is selected', async () => {
+    expect(texts(await draw(stream()))).toContain('No stream selected.');
   });
 
   it('degrades to a notice where lovekit is not connected, without loading the player', async () => {
-    expect(texts(await draw(stream({object: '4', __identifier: '@lovekit/solo_broadcast'})))).toContain('Lovekit is not available.');
+    expect(texts(await draw(stream({object: '4', __identifier: '@lovekit/stream'})))).toContain('Lovekit is not available.');
   });
 });

@@ -8,26 +8,25 @@ import {useThemeColors} from '@/lib/theme/BrandProvider';
 import {asStructure} from './shared';
 
 /**
- * Lovekit's bloks, after orkestrator's `bloks/lovekit/Lovekit.tsx`: the same
- * names and prop schemas, so a payload validates on both.
+ * Lovekit's bloks: a stream an agent offers, live.
  */
 
-const SOLO_BROADCAST = '@lovekit/solo_broadcast';
+const STREAM = '@lovekit/stream';
 
 const classNameSchema = z.string().optional().describe('Extra Tailwind classes appended to the widget.');
 const streamSchema = z
   .object({
     object: z.string(),
-    __identifier: z.literal(SOLO_BROADCAST),
+    __identifier: z.literal(STREAM),
   })
   .optional()
-  .describe('The lovekit broadcast to render.');
+  .describe('The lovekit stream to render.');
 
 /**
  * Loaded when a stream is first shown, not with the catalog: LiveKit's native
  * modules have no business in every blok, and none in the tests that load it.
  */
-const SoloBroadcastPlayer = React.lazy(() => import('@/components/broadcasts/SoloBroadcastPlayer'));
+const StreamPlayerById = React.lazy(() => import('@/components/streams/StreamPlayer'));
 
 const UnavailableNotice = ({children}: {children: string}) => (
   <View className="min-h-40 items-center justify-center rounded-xl border border-dashed border-border bg-muted/20 px-4">
@@ -49,28 +48,28 @@ export const StreamRenderBlok = createBlokComponent(
     name: 'StreamRender',
     schema: z
       .object({
-        broadcast: streamSchema,
+        stream: streamSchema,
         className: classNameSchema,
       })
-      .describe('Renders a live lovekit broadcast.'),
+      .describe('Renders a live lovekit stream.'),
   },
   ({component, schema}) => {
     const blok = useBlok(component, schema);
-    const broadcast = asStructure(useValue(blok.broadcast));
+    const stream = asStructure(useValue(blok.stream));
     const className = useValue(blok.className);
 
-    if (!broadcast || broadcast.__identifier !== SOLO_BROADCAST) {
-      return <UnavailableNotice>No broadcast selected.</UnavailableNotice>;
+    if (!stream || stream.__identifier !== STREAM) {
+      return <UnavailableNotice>No stream selected.</UnavailableNotice>;
     }
 
-    // The broadcast is lovekit's to show, over livekit. A deployment without
+    // The stream is lovekit's to show, over livekit. A deployment without
     // either (or with it not ready) degrades to a notice.
     const unavailable = <UnavailableNotice>Lovekit is not available.</UnavailableNotice>;
     return (
       <Guard.Lovekit fallback={unavailable}>
         <Guard.Livekit fallback={unavailable}>
           <React.Suspense fallback={<Loading />}>
-            <SoloBroadcastPlayer key={broadcast.object} broadcastId={broadcast.object} className={className ?? 'h-auto aspect-video'} />
+            <StreamPlayerById key={stream.object} streamId={stream.object} className={className ?? 'h-auto aspect-video'} />
           </React.Suspense>
         </Guard.Livekit>
       </Guard.Lovekit>

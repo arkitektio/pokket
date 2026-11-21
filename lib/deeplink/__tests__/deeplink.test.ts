@@ -92,7 +92,7 @@ describe("links from the desktop app", () => {
     expect(fromDesktopPath("/rekuest/implementations/8")).toBe("/implementations/8");
     expect(fromDesktopPath("/kuvert/threads/9")).toBe("/mail/thread/9");
     expect(fromDesktopPath("/bank/transactions/3")).toBe("/bank/transaction/3");
-    expect(fromDesktopPath("/lovekit/solobroadcasts/2")).toBe("/solo-broadcast/2");
+    expect(fromDesktopPath("/lovekit/streams/2")).toBe("/stream/2");
     expect(fromDesktopPath("/lovekit/calls/2?join=1")).toBe("/calls/2?join=1");
   });
   it("keep the paths both apps share", () => {

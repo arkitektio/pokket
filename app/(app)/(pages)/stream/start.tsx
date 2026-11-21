@@ -5,18 +5,21 @@ import { Text } from '@/components/ui/text';
 import { App, Guard } from '@/lib/app/App';
 import {
     StreamKind,
-    useEnsureSoloBroadcastMutation,
-    useEnsureStreamMutation,
-    type SoloBroadcastFragment,
+    Transport,
+    useDeclareStreamsMutation,
+    usePublisherConnectionMutation,
+    type StreamFragment,
 } from '@/lib/lovekit/api/graphql';
 import {
     AudioSession,
     LiveKitRoom,
+    useConnectionState,
     useLocalParticipant,
+    useRoomContext,
     VideoTrack,
 } from '@livekit/react-native';
 import { Link, Stack } from 'expo-router';
-import { Track } from 'livekit-client';
+import { ConnectionState, Track } from 'livekit-client';
 import type { LivekitClient } from '@/lib/livekit/client';
 import * as React from 'react';
 import { ActivityIndicator, ScrollView, TextInput, View } from 'react-native';
@@ -93,15 +96,36 @@ function LocalCameraPreview() {
   );
 }
 
+/** The key this phone's camera is declared under: the name of the track it publishes. */
+const CAMERA = 'camera';
+
+/**
+ * Turns the camera on once the room is joined, published under the stream's key: lovekit
+ * finds a stream by the track of that name, so the default name would leave it offline.
+ */
+function PublishCamera({ onError }: { onError: (message: string) => void }) {
+  const room = useRoomContext();
+  const state = useConnectionState();
+
+  React.useEffect(() => {
+    if (state !== ConnectionState.Connected) return;
+    room.localParticipant
+      .setCameraEnabled(true, undefined, { name: CAMERA })
+      .catch((error: unknown) => onError(error instanceof Error ? error.message : 'Could not start the camera'));
+  }, [room, state, onError]);
+
+  return null;
+}
+
 function BroadcasterRoom({
-  broadcast,
+  stream,
   token,
   startedAt,
   roomError,
   onRoomError,
   onStop,
 }: {
-  broadcast: SoloBroadcastFragment;
+  stream: StreamFragment;
   token: string;
   startedAt: number | null;
   roomError: string | null;
@@ -153,11 +177,12 @@ function BroadcasterRoom({
         token={token}
         serverUrl={(livekit.client as LivekitClient).url}
         connect
-        video
+        video={false}
         onError={(error) => {
           onRoomError(error.message);
         }}
       >
+        <PublishCamera onError={onRoomError} />
         <LocalCameraPreview />
       </LiveKitRoom>
 
@@ -167,11 +192,11 @@ function BroadcasterRoom({
             <Text className="text-xs font-semibold text-white">LIVE {liveDuration}</Text>
           </View>
           <View className="self-start rounded-2xl bg-black/60 px-3 py-2">
-            <Text className="text-sm font-medium text-white">{broadcast.title}</Text>
+            <Text className="text-sm font-medium text-white">{stream.title}</Text>
           </View>
         </View>
 
-        <Link href={`/solo-broadcast/${broadcast.id}`} asChild>
+        <Link href={`/stream/${stream.id}`} asChild>
           <Button variant="outline" className="rounded-full border-white/30 bg-black/50 px-4">
             <Text className="text-sm font-medium text-white">Viewer</Text>
           </Button>
@@ -195,12 +220,12 @@ function BroadcasterRoom({
   );
 }
 
-function StartSoloBroadcastContent() {
+function StartStreamContent() {
   const colors = useThemeColors();
-  const [ensureSoloBroadcast] = useEnsureSoloBroadcastMutation();
-  const [ensureStream] = useEnsureStreamMutation();
-  const [title, setTitle] = React.useState('My solo broadcast');
-  const [broadcast, setBroadcast] = React.useState<SoloBroadcastFragment | null>(null);
+  const [declareStreams] = useDeclareStreamsMutation();
+  const [publisherConnection] = usePublisherConnectionMutation();
+  const [title, setTitle] = React.useState("This phone's camera");
+  const [stream, setStream] = React.useState<StreamFragment | null>(null);
   const [token, setToken] = React.useState<string | null>(null);
   const [startedAt, setStartedAt] = React.useState<number | null>(null);
   const [submitting, setSubmitting] = React.useState(false);
@@ -215,60 +240,48 @@ function StartSoloBroadcastContent() {
     setStartedAt(null);
 
     try {
-      const ensured = await ensureSoloBroadcast({
+      // The declaration is this app's whole set: its camera, and nothing else.
+      const declared = await declareStreams({
         variables: {
-          input: {
-            title: title.trim() || undefined,
-          },
+          input: { streams: [{ key: CAMERA, title: title.trim() || undefined, kind: StreamKind.Video }] },
         },
       });
+      const nextStream = declared.data?.declareStreams[0];
+      if (!nextStream) {
+        throw new Error('Unable to declare the stream');
+      }
+      setStream(nextStream);
 
-      const nextBroadcast = ensured.data?.ensureSoloBroadcast;
-
-      if (!nextBroadcast) {
-        throw new Error('Unable to create solo broadcast');
+      const connection = (await publisherConnection()).data?.publisherConnection;
+      if (!connection) {
+        throw new Error('Lovekit handed out no connection');
+      }
+      if (connection.transport !== Transport.Livekit) {
+        throw new Error(`This app does not speak the ${connection.transport} transport`);
       }
 
-      setBroadcast(nextBroadcast);
-
-      const ensuredStream = await ensureStream({
-        variables: {
-          input: {
-            broadcast: nextBroadcast.id,
-            kind: StreamKind.Video,
-            title: title.trim() || undefined,
-          },
-        },
-      });
-
-      const nextToken = ensuredStream.data?.ensureStream;
-
-      if (!nextToken) {
-        throw new Error('Unable to create broadcast stream');
-      }
-
-      setToken(nextToken);
+      setToken(connection.credential);
       setStartedAt(Date.now());
     } catch (error) {
-      setSubmitError(error instanceof Error ? error.message : 'Unable to start solo broadcast');
+      setSubmitError(error instanceof Error ? error.message : 'Unable to start the stream');
     } finally {
       setSubmitting(false);
     }
-  }, [ensureSoloBroadcast, ensureStream, title]);
+  }, [declareStreams, publisherConnection, title]);
 
   const handleStop = React.useCallback(() => {
     setToken(null);
-    setBroadcast(null);
+    setStream(null);
     setStartedAt(null);
     setRoomError(null);
   }, []);
 
-  if (broadcast && token) {
+  if (stream && token) {
     return (
       <View className="flex-1 bg-black">
-        <Stack.Screen options={{ title: broadcast.title, headerShown: false }} />
+        <Stack.Screen options={{ title: stream.title, headerShown: false }} />
         <BroadcasterRoom
-          broadcast={broadcast}
+          stream={stream}
           token={token}
           startedAt={startedAt}
           roomError={roomError}
@@ -281,22 +294,22 @@ function StartSoloBroadcastContent() {
 
   return (
     <ScrollView className="flex-1 bg-background" contentContainerClassName="px-4 py-6 gap-4">
-      <Stack.Screen options={{ title: 'Start Solo Broadcast', headerShown: true }} />
+      <Stack.Screen options={{ title: 'Stream This Camera', headerShown: true }} />
 
       <Card className="border-border bg-card">
         <CardHeader>
-          <CardTitle>Start solo broadcast</CardTitle>
+          <CardTitle>Stream this camera</CardTitle>
           <CardDescription>
-            Create a solo broadcast and publish your camera live.
+            Offer this phone&apos;s camera as a live stream of your organization.
           </CardDescription>
         </CardHeader>
         <CardContent className="gap-4">
           <View>
-            <Text className="mb-2 text-sm font-medium text-foreground">Broadcast title</Text>
+            <Text className="mb-2 text-sm font-medium text-foreground">Stream title</Text>
             <TextInput
               value={title}
               onChangeText={setTitle}
-              placeholder="Name your broadcast"
+              placeholder="Name your stream"
               placeholderTextColor={colors.mutedForeground}
               autoCapitalize="sentences"
               autoCorrect={false}
@@ -312,7 +325,7 @@ function StartSoloBroadcastContent() {
             disabled={submitting}
           >
             <Text className="text-sm font-medium text-primary-foreground">
-              {submitting ? 'Starting broadcast...' : token ? 'Restart broadcast session' : 'Start broadcast'}
+              {submitting ? 'Starting stream...' : token ? 'Restart stream' : 'Start stream'}
             </Text>
           </Button>
 
@@ -320,19 +333,19 @@ function StartSoloBroadcastContent() {
         </CardContent>
       </Card>
 
-      {submitting && !token ? <LoadingState message="Creating and joining broadcast..." /> : null}
+      {submitting && !token ? <LoadingState message="Declaring and joining the stream..." /> : null}
 
-      {!broadcast && !submitting ? (
+      {!stream && !submitting ? (
         <EmptyState
           title="Not streaming yet"
-          description="Choose a title and start a solo broadcast to publish your camera."
+          description="Choose a title and start to publish your camera."
         />
       ) : null}
     </ScrollView>
   );
 }
 
-export default function StartSoloBroadcastScreen() {
+export default function StartStreamScreen() {
   return (
     <Guard.Lok
       connectingFallback={<LoadingState message="Connecting to Lok..." />}
@@ -340,7 +353,7 @@ export default function StartSoloBroadcastScreen() {
         <View className="flex-1 bg-background px-4 py-6">
           <EmptyState
             title="Lok connection required"
-            description="Connect your account before starting a solo broadcast."
+            description="Connect your account before streaming this camera."
           />
         </View>
       }
@@ -365,7 +378,7 @@ export default function StartSoloBroadcastScreen() {
             </View>
           }
         >
-          <StartSoloBroadcastContent />
+          <StartStreamContent />
         </Guard.Livekit>
       </Guard.Lovekit>
     </Guard.Lok>

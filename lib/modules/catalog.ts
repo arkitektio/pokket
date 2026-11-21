@@ -125,17 +125,17 @@ export const MODULE_CATALOG: ModuleDecl[] = [
     ],
   },
   {
-    key: "broadcasts",
-    label: "Broadcasts",
+    key: "streams",
+    label: "Streams",
     icon: "radio",
     description: "Live video: what your organization streams, and this phone's camera.",
     serviceKey: "lovekit",
-    route: "/broadcasts",
+    route: "/streams",
     navLinks: [
-      { label: "Broadcasts", route: "/broadcasts", home: true, keywords: ["live", "stream", "video"] },
+      { label: "Streams", route: "/streams", home: true, keywords: ["live", "broadcast", "video"] },
       {
-        label: "Start solo broadcast",
-        route: "/solo-broadcast/start",
+        label: "Stream this camera",
+        route: "/stream/start",
         group: "Live",
         icon: "radio-tower",
         description: "Stream this phone's camera",

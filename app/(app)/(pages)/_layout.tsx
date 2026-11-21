@@ -42,7 +42,7 @@ const PAGES: Record<string, string> = {
   'agents/index': 'Agents',
   'bloks/index': 'Bloks',
   'spaces/index': 'Spaces',
-  broadcasts: 'Broadcasts',
+  streams: 'Streams',
   'calls/index': 'Calls',
   'alpaka/index': 'Chat',
   'mikro/index': 'Mikro',
@@ -152,8 +152,8 @@ export default function PagesLayout() {
         <Stack.Screen name="mikro/tabledatasets/[id]" options={{ title: 'Table' }} />
         <Stack.Screen name="mikro/charts/[id]" options={{ title: 'Chart' }} />
         <Stack.Screen name="mikro/annotations/[id]" options={{ title: 'Annotation' }} />
-        <Stack.Screen name="solo-broadcast/start" options={{ title: 'Start Solo Broadcast' }} />
-        <Stack.Screen name="solo-broadcast/[id]" options={{ title: 'Solo Broadcast' }} />
+        <Stack.Screen name="stream/start" options={{ title: 'Stream This Camera' }} />
+        <Stack.Screen name="stream/[id]" options={{ title: 'Stream' }} />
         <Stack.Screen name="wifi/eduroam" options={{ title: 'Eduroam' }} />
         <Stack.Screen name="wifi/standard" options={{ title: 'Standard Wi-Fi' }} />
         <Stack.Screen name="timeline/place/[id]" options={{ title: 'Place' }} />

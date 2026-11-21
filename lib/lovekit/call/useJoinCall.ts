@@ -1,4 +1,4 @@
-import { useJoinCallMutation } from "@/lib/lovekit/api/graphql";
+import { Transport, useJoinCallMutation } from "@/lib/lovekit/api/graphql";
 import { useCallback, useState } from "react";
 
 import { hasMicrophone, requestMicrophone } from "./permissions";
@@ -27,9 +27,10 @@ export const useJoinCall = () => {
         const audio = prompt ? await requestMicrophone() : await hasMicrophone();
         if (!prompt && !audio) return;
         const result = await joinCall({ variables: { input: { call: call.id } } });
-        const token = result.data?.joinCall;
-        if (!token) throw new Error("The call handed out no token");
-        callStore.getState().start(call, token, { audio });
+        const connection = result.data?.joinCall;
+        if (!connection) throw new Error("The call handed out no connection");
+        if (connection.transport !== Transport.Livekit) throw new Error(`This app does not speak the ${connection.transport} transport`);
+        callStore.getState().start(call, connection.credential, { audio });
       } catch (nextError) {
         setError(nextError instanceof Error ? nextError.message : "Could not join the call");
       } finally {

@@ -43,7 +43,7 @@ describe("call structures", () => {
 
   it("offers no call about a list, a page without a whole-number id, or a call", () => {
     expect(structureForRoute("/tasks")).toBeNull();
-    expect(structureForRoute("/solo-broadcast/start")).toBeNull();
+    expect(structureForRoute("/stream/start")).toBeNull();
     expect(structureForRoute("/tasks/abc-1")).toBeNull();
     expect(structureForRoute("/tasks/4/logs")).toBeNull();
     expect(structureForRoute("/calls/4")).toBeNull();

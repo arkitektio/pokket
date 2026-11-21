@@ -1,8 +1,55 @@
-fragment Stream on Stream {
+fragment StreamAgent on Agent {
   id
+  name
+  user {
+    id
+    sub
+    preferredUsername
+  }
+  client {
+    id
+    clientId
+  }
 }
 
+fragment DataFormat on DataFormat {
+  dtype
+  shape
+  unit
+  axes {
+    name
+    type
+  }
+  calibration {
+    axis
+    unit
+    scale
+    offset
+  }
+}
+
+fragment Stream on Stream {
+  id
+  key
+  title
+  kind
+  description
+  live
+  format {
+    ...DataFormat
+  }
+  agent {
+    ...StreamAgent
+  }
+}
 
 fragment ListStream on Stream {
   id
+  key
+  title
+  kind
+  live
+  agent {
+    ...StreamAgent
+  }
 }
