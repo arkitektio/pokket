@@ -100,6 +100,35 @@ func TestE2EMediaBridgeRelaysOverTheMesh(t *testing.T) {
 		t.Fatalf("the reply never came back through the bridge: %q %v", buf[:n], err)
 	}
 
+	// Its socket taken away (iOS, while suspended): the next ask gets a new bridge that works.
+	meshNode := lookup(id)
+	meshNode.bridgeMu.Lock()
+	gone := meshNode.bridge
+	meshNode.bridgeMu.Unlock()
+	_ = gone.listener.Close()
+	for deadline := time.Now().Add(3 * time.Second); !gone.dead.Load(); time.Sleep(10 * time.Millisecond) {
+		if time.Now().After(deadline) {
+			t.Fatal("the bridge never noticed its socket was gone")
+		}
+	}
+	rebuilt, err := MediaBridge(id, testSvcName)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var fresh mediaBridgeInfo
+	if err := json.Unmarshal([]byte(rebuilt), &fresh); err != nil {
+		t.Fatal(err)
+	}
+	if fresh.URLs[0] == info.URLs[0] && fresh.Credential == info.Credential {
+		t.Fatal("a dead bridge must be replaced, not handed out again")
+	}
+	again2 := dialBridge(t, fresh.URLs, fresh.Username, fresh.Credential)
+	relayed2, err := again2.Allocate()
+	if err != nil {
+		t.Fatalf("allocate on the new bridge: %v", err)
+	}
+	_ = relayed2.Close()
+
 	// The node takes its bridge with it.
 	Stop(id)
 	if _, err := MediaBridge(id, testSvcName); err == nil {

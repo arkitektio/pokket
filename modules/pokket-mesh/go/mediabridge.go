@@ -31,6 +31,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/pion/turn/v4"
@@ -52,11 +53,32 @@ type mediaBridgeInfo struct {
 
 type mediaBridge struct {
 	server     *turn.Server
+	listener   net.PacketConn
 	urls       []string
 	username   string
 	credential string
 	mu         sync.Mutex
 	allowed    map[netip.Addr]bool
+	// Set once its listener stops reading: iOS reclaims the sockets of a suspended app, and a
+	// bridge on a reclaimed socket would hand WebRTC a port nobody answers on.
+	dead atomic.Bool
+}
+
+// watchedConn is the bridge's listener, telling the bridge when it stops reading.
+type watchedConn struct {
+	net.PacketConn
+	dead *atomic.Bool
+}
+
+func (c watchedConn) ReadFrom(p []byte) (int, net.Addr, error) {
+	n, addr, err := c.PacketConn.ReadFrom(p)
+	if err != nil {
+		var timeout interface{ Timeout() bool }
+		if !errors.As(err, &timeout) || !timeout.Timeout() {
+			c.dead.Store(true)
+		}
+	}
+	return n, addr, err
 }
 
 func (b *mediaBridge) permits(ip netip.Addr) bool {
@@ -175,6 +197,7 @@ func newMediaBridge(relay turn.RelayAddressGenerator) (*mediaBridge, error) {
 		return nil, err
 	}
 	b := &mediaBridge{
+		listener:   listener,
 		urls:       []string{fmt.Sprintf("turn:127.0.0.1:%d?transport=udp", listener.LocalAddr().(*net.UDPAddr).Port)},
 		username:   randomHex(8),
 		credential: randomHex(16),
@@ -187,7 +210,7 @@ func newMediaBridge(relay turn.RelayAddressGenerator) (*mediaBridge, error) {
 			return key, username == b.username
 		},
 		PacketConnConfigs: []turn.PacketConnConfig{{
-			PacketConn:            listener,
+			PacketConn:            watchedConn{PacketConn: listener, dead: &b.dead},
 			RelayAddressGenerator: relay,
 			PermissionHandler: func(_ net.Addr, peer net.IP) bool {
 				ip, ok := netip.AddrFromSlice(peer)
@@ -207,7 +230,8 @@ func newMediaBridge(relay turn.RelayAddressGenerator) (*mediaBridge, error) {
 // `hostsCSV` too (comma-separated `host` or `host:port`: the media server's). It answers with
 // the bridge as JSON (mediaBridgeInfo): one ICE server for WebRTC. Every ask gets the same
 // bridge while the node runs; a node that stopped takes its bridge with it, and the next ask
-// after a restart gets a new one.
+// after a restart gets a new one. So does the next ask after the bridge's socket was taken
+// away (iOS, while the app was suspended).
 func MediaBridge(id, hostsCSV string) (string, error) {
 	n := lookup(id)
 	if n == nil {
@@ -240,6 +264,10 @@ func MediaBridge(id, hostsCSV string) (string, error) {
 
 	n.bridgeMu.Lock()
 	defer n.bridgeMu.Unlock()
+	if n.bridge != nil && n.bridge.dead.Load() {
+		_ = n.bridge.server.Close()
+		n.bridge = nil
+	}
 	if n.bridge == nil {
 		b, err := newMediaBridge(meshRelay{n: n})
 		if err != nil {

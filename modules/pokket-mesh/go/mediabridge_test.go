@@ -142,3 +142,25 @@ func TestMediaBridgeRefusesAWrongPassword(t *testing.T) {
 		t.Fatal("an allocation with a wrong password must be refused")
 	}
 }
+
+// iOS reclaims a suspended app's sockets: a bridge whose listener stopped reading says so, and
+// the next ask gets a new one that works (see MediaBridge).
+func TestMediaBridgeKnowsWhenItsSocketIsGone(t *testing.T) {
+	b, err := newMediaBridge(localRelay{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = b.server.Close() })
+	if b.dead.Load() {
+		t.Fatal("a fresh bridge is not dead")
+	}
+	// Taken away from under the server, as a reclaimed socket is.
+	_ = b.listener.Close()
+	deadline := time.Now().Add(3 * time.Second)
+	for !b.dead.Load() {
+		if time.Now().After(deadline) {
+			t.Fatal("a bridge whose socket is gone must know it")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+}

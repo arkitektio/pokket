@@ -186,7 +186,13 @@ export function StreamPlayer({ stream, className }: { stream: ShownStream; class
         </LiveKitRoom>
       </View>
       {roomError ? (
-        <Text className="text-sm text-destructive">{roomError}</Text>
+        <View className="flex-row items-center gap-3">
+          <Text className="flex-1 text-sm text-destructive">{roomError}</Text>
+          {/* A retry asks for the media path again: after the app was suspended, the bridge is a new one. */}
+          <Button variant="outline" className="rounded-xl border-border" onPress={retry}>
+            <Text className="text-sm font-medium text-foreground">Retry</Text>
+          </Button>
+        </View>
       ) : media.path.kind === 'media-bridge' ? (
         <Text className="text-xs text-muted-foreground">{describeMediaPath(media.path)}</Text>
       ) : null}
