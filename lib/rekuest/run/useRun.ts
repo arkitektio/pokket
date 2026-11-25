@@ -6,25 +6,24 @@ import {
   type TaskEventChangeFragment,
   useRunTaskQuery,
 } from '../api/graphql';
-import {useTaskStreamListener} from '../useTaskStream';
+import {toTaskEventChange, type TaskSnapshot, type WireTaskEvent} from '../session/frames';
+import {useRekuestSession} from '../session/hooks';
 import {actionBlokFor, foldRunEvents, runOfTask, type ActionBlokRun} from './runTask';
 
 /**
- * How often a run is read again while it goes on, when it may get no events
- * on the task stream (which carries the organization's root tasks only).
- */
-export const RUN_POLL_MS = 5_000;
-
-/**
  * A run as its action's bloks draw it; null until it is read. Read once, then
- * moved by the task stream (`foldRunEvent`). `follow` also polls while the run
- * goes on, for a run the stream does not carry (a child task).
+ * moved by its own topic on the app's caller session (`task:<id>`: the task's
+ * events, gap-free across a resume), folded in by `foldRunEvent`. A child task
+ * is followed as well as a root one, which the old stream could not. Back after the session was gone too long, it is read again.
+ *
+ * `follow` is kept for its callers: every run is followed now, not polled.
  */
 export const useRunTask = (
   id: string | null | undefined,
-  {follow = false}: {follow?: boolean} = {},
+  _options: {follow?: boolean} = {},
 ): {task: RunTaskFragment | null; error?: Error; refetch: () => void} => {
-  const {data, error, refetch, startPolling, stopPolling} = useRunTaskQuery({
+  const session = useRekuestSession();
+  const {data, error, refetch} = useRunTaskQuery({
     variables: {id: id ?? ''},
     skip: !id,
     // Its events are folded in here, never written to the shared cache.
@@ -32,23 +31,23 @@ export const useRunTask = (
   });
   const fetched = data?.task ?? null;
 
-  // What the stream said since the run was read; a read that already has an event skips it.
+  // What the topic said since the run was read; a read that already has an event skips it.
   const [heard, setHeard] = React.useState<readonly TaskEventChangeFragment[]>([]);
-  useTaskStreamListener(change => {
-    const event = change.event;
-    if (event && id && event.task === id) setHeard(previous => [...previous, event]);
-  });
-  const task = React.useMemo(() => (fetched ? foldRunEvents(fetched, heard) : null), [fetched, heard]);
-
-  const ended = task?.isDone ?? false;
   React.useEffect(() => {
-    if (!follow || !id || ended || error) {
-      stopPolling();
-      return undefined;
-    }
-    startPolling(RUN_POLL_MS);
-    return () => stopPolling();
-  }, [ended, error, follow, id, startPolling, stopPolling]);
+    setHeard([]);
+    if (!id) return undefined;
+    return session.watch(`task:${id}`, {
+      onData: item => setHeard(previous => [...previous, toTaskEventChange(item as WireTaskEvent)]),
+      onResync: (snapshot, reason) => {
+        // Its newest events, oldest first: what the read already has is skipped.
+        const events = ((snapshot as TaskSnapshot).events ?? []).map(toTaskEventChange);
+        setHeard(previous => [...previous, ...events]);
+        // Gone longer than the session's grace: what fell out of the snapshot is read again.
+        if (reason !== 'new' && reason !== 'resumed') void refetch().catch(() => undefined);
+      },
+    });
+  }, [session, id, refetch]);
+  const task = React.useMemo(() => (fetched ? foldRunEvents(fetched, heard) : null), [fetched, heard]);
 
   const reread = React.useCallback(() => void refetch(), [refetch]);
   return {task, error, refetch: reread};

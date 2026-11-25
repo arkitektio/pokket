@@ -14,11 +14,9 @@ import {createTravelSource, type TravelSource} from '@/lib/rekuest/travel/travel
 import {ActionBlokRenderer} from '../run/ActionBlokRenderer';
 import {renderInSession} from '../testing';
 
-const mockDecide = jest.fn((_options: unknown) => Promise.resolve({}));
-jest.mock('@/lib/rekuest/api/graphql', () => ({
-  ...jest.requireActual<typeof import('@/lib/rekuest/api/graphql')>('@/lib/rekuest/api/graphql'),
-  useDecideMutation: () => [mockDecide, {loading: false}],
-}));
+const mockDecide = jest.fn((_input: unknown) => Promise.resolve());
+// The answer goes over the app's caller session.
+jest.mock('../run/useDecide', () => ({useDecide: () => mockDecide}));
 jest.mock('sonner-native', () => ({toast: {info: jest.fn(), error: jest.fn(), success: jest.fn()}}));
 // Ships untranspiled JSX; `asChild` is never used by bloks.
 jest.mock('@rn-primitives/slot', () => {
@@ -161,7 +159,7 @@ describe('task.answer in an action\'s html blok', () => {
 
   it('answers the ask task.ask shows', async () => {
     await press(asking);
-    expect(mockDecide).toHaveBeenCalledWith({variables: {input: {task: 't1', approved: true, values: {ok: true}}}});
+    expect(mockDecide).toHaveBeenCalledWith({task: 't1', approved: true, values: {ok: true}});
   });
 
   it('answers nothing once the run ended', async () => {

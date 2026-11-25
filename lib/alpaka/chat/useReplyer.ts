@@ -5,10 +5,10 @@ import {
   DetailTaskDocument,
   DetailTaskQuery,
   DetailTaskQueryVariables,
-  useAssignMutation,
-  useCancelTaskMutation,
   useReplyerActionsQuery,
 } from "@/lib/rekuest/api/graphql";
+import { useTaskCalls } from "@/lib/rekuest/session/calls";
+import { toTaskChange } from "@/lib/rekuest/session/frames";
 import { useRekuestClient, useTaskStreamListener } from "@/lib/rekuest/useTaskStream";
 import {
   ActiveTask,
@@ -120,9 +120,11 @@ export const useReplyer = (roomId: string): ReplyerController => {
   });
 
   useTaskStreamListener((change) => {
-    const { create, event } = change;
+    const { create, event, update } = change;
     if (create?.reference) setTasks((prev) => bindTask(prev, create.reference!, create));
     if (event) setTasks((prev) => applyTaskEvent(prev, event));
+    // Back after a gap: the task as it is now, its end included.
+    if (update) setTasks((prev) => settleFromTasks(prev, [update]));
   });
 
   // The stream can drop the one event that settles a pill; the task itself cannot be wrong.
@@ -176,8 +178,8 @@ export const useReplyer = (roomId: string): ReplyerController => {
     };
   }, []);
 
-  const [assign] = useAssignMutation();
-  const [cancelTask] = useCancelTaskMutation();
+  // Over the app's caller session: a refusal rejects with the server's sentence.
+  const calls = useTaskCalls();
 
   const run = React.useCallback(
     async (messageId: string, about?: StructureInput | null) => {
@@ -185,35 +187,31 @@ export const useReplyer = (roomId: string): ReplyerController => {
       const reference = Crypto.randomUUID();
       setTasks((prev) => startTask(prev, reference, chosen.name));
       try {
-        const result = await assign({
-          variables: {
-            input: {
-              action: chosen.id,
-              args: replyerArgs(chosen, messageId, settingsOf(chosen), about ?? subject),
-              reference,
-              capture: false,
-            },
-          },
+        const answer = await calls.assign({
+          action: chosen.id,
+          args: replyerArgs(chosen, messageId, settingsOf(chosen), about ?? subject),
+          reference,
+          capture: false,
+          hooks: [],
         });
-        const task = result.data?.assign;
-        if (task) setTasks((prev) => bindTask(prev, reference, task));
-        else setTasks((prev) => failTask(prev, reference, "The replyer was not assigned"));
+        const record = answer.record ? toTaskChange(answer.record) : null;
+        setTasks((prev) => bindTask(prev, reference, record ?? { id: answer.task, latestEventKind: "QUEUED" }));
       } catch (e) {
         setTasks((prev) => failTask(prev, reference, e instanceof Error ? e.message : String(e)));
       }
     },
-    [chosen, assign, blockerOf, settingsOf, subject],
+    [chosen, calls, blockerOf, settingsOf, subject],
   );
 
   const cancel = React.useCallback(
     (task: ActiveTask) => {
       if (!task.id) return;
-      cancelTask({ variables: { task: task.id } }).then(
+      calls.control("CANCEL", task.id).then(
         () => toast.success("Cancellation requested"),
-        () => undefined,
+        (e) => toast.error(e instanceof Error ? e.message : "The task could not be cancelled"),
       );
     },
-    [cancelTask],
+    [calls],
   );
 
   const dismiss = React.useCallback(

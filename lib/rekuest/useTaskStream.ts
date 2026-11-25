@@ -1,16 +1,26 @@
 import type { ApolloClient } from "@apollo/client";
 import * as React from "react";
 import { useService } from "../arkitekt/hooks";
-import {
-  DetailTaskDocument,
-  ListTasksDocument,
-  WatchChildTasksDocument,
-  WatchChildTasksSubscription,
-  WatchTasksDocument,
-  WatchTasksSubscription,
-} from "./api/graphql";
+import { DetailTaskDocument, ListTasksDocument, type TaskChangeFragment, type TaskEventChangeFragment } from "./api/graphql";
+import { toTaskChange, toTaskEventChange, type ListSnapshot, type WireTaskChange, type WireTaskEvent } from "./session/frames";
+import { useRekuestSession } from "./session/hooks";
 import { applyTaskChange, writeTaskEventToCache } from "./taskCache";
 import { isTerminalKind } from "./taskStatus";
+
+/**
+ * The organization's tasks, live, over the app's caller session on takt
+ * (`lib/rekuest/session`, orkestrator's `OrgTasksUpdater` and `TaskUpdater`):
+ *
+ * - `useTaskStream`: `tasks:org`, kept in the cache while a list shows it;
+ * - `useTaskStreamListener`: `tasks:mine`, change by change, for following the
+ *   tasks this user started from the moment they are assigned;
+ * - `useChildTaskStream`: `children:<task>`, a task's tree.
+ *
+ * The session watches each topic once however many screens use it, and drops
+ * what arrives twice at a resume's seam before anyone hears it. A list carries
+ * no cursor: back after a gap, the topic is resent whole (`RESYNC`), and the
+ * lists are read again.
+ */
 
 type Client = ApolloClient<any>;
 
@@ -31,103 +41,112 @@ const debounced = (run: () => void) => {
   return schedule;
 };
 
-type Stream = { users: number; stop: () => void };
-const streams = new WeakMap<Client, Stream>();
-
-export type TaskStreamChange = NonNullable<WatchTasksSubscription["tasks"]>;
-type Listener = (change: TaskStreamChange) => void;
-/** Who else wants each change as it arrives, e.g. the chat's replyer pills. */
-const listeners = new WeakMap<Client, Set<Listener>>();
-
-const openStream = (client: Client): (() => void) => {
-  const refetchLists = debounced(() => void client.refetchQueries({ include: [ListTasksDocument] }));
-  const subscription = client.subscribe<WatchTasksSubscription>({ query: WatchTasksDocument }).subscribe({
-    next: ({ data }) => {
-      const change = data?.tasks;
-      if (change) listeners.get(client)?.forEach((listener) => listener(change));
-      if (change?.event) writeTaskEventToCache(client, change.event);
-      // A finished task leaves the "Running" view and joins "Finished".
-      if (change?.create || isTerminalKind(change?.event?.kind)) refetchLists();
-    },
-    error: (e) => console.warn("[rekuest] task stream closed", e),
-  });
-  return () => {
-    refetchLists.cancel();
-    subscription.unsubscribe();
-  };
+/**
+ * One change of a task list: a task started (`create`), one of its events
+ * (`event`), or the task as it is now (`update`, from a snapshot: on every
+ * watch, and back after a gap): what a follower missed, its end included.
+ */
+export type TaskStreamChange = {
+  create?: TaskChangeFragment | null;
+  event?: TaskEventChangeFragment | null;
+  update?: TaskChangeFragment | null;
 };
 
+type ListItem = { create?: WireTaskChange | null; event?: WireTaskEvent | null };
+
+const toChange = (item: ListItem): TaskStreamChange => ({
+  create: item.create ? toTaskChange(item.create) : null,
+  event: item.event ? toTaskEventChange(item.event) : null,
+});
+
 /**
- * The organization's root task stream, kept in the cache: every event is
- * written onto its task, a new task refetches the lists. One subscription per
- * client however many screens use it — the list stays mounted under a pushed
- * task, and both use it.
+ * The organization's root tasks (`tasks:org`), kept in the cache: every event
+ * is written onto its task, a new or finished task reads the lists again.
  */
 export const useTaskStream = () => {
   const client = useRekuestClient();
+  const session = useRekuestSession();
   React.useEffect(() => {
-    let stream = streams.get(client);
-    if (!stream) {
-      stream = { users: 0, stop: openStream(client) };
-      streams.set(client, stream);
-    }
-    stream.users += 1;
+    const refetchLists = debounced(() => void client.refetchQueries({ include: [ListTasksDocument] }));
+    const stop = session.watch("tasks:org", {
+      onData: (item) => {
+        const change = toChange(item as ListItem);
+        if (change.event) writeTaskEventToCache(client, change.event);
+        // A finished task leaves the "Running" view and joins "Finished".
+        if (change.create || isTerminalKind(change.event?.kind)) refetchLists();
+      },
+      onResync: (snapshot, reason) => {
+        if (reason === "new") return;
+        for (const row of (snapshot as ListSnapshot<WireTaskChange>).rows ?? []) applyTaskChange(client, toTaskChange(row));
+        refetchLists();
+      },
+    });
     return () => {
-      const s = streams.get(client);
-      if (!s) return;
-      s.users -= 1;
-      if (s.users === 0) {
-        s.stop();
-        streams.delete(client);
-      }
+      refetchLists.cancel();
+      stop();
     };
-  }, [client]);
+  }, [client, session]);
 };
 
 /**
- * The same stream, change by change: for following one task from the moment
- * it is assigned, before any query knows it. Holds the stream open like
- * `useTaskStream`.
+ * This user's root tasks (`tasks:mine`), change by change: for following one
+ * task from the moment it is assigned, before any query knows it. Events are
+ * also written onto their tasks in the cache.
  */
 export const useTaskStreamListener = (listener: (change: TaskStreamChange) => void) => {
   const client = useRekuestClient();
-  useTaskStream();
+  const session = useRekuestSession();
   const latest = React.useRef(listener);
   React.useEffect(() => {
     latest.current = listener;
   });
-  React.useEffect(() => {
-    const own: Listener = (change) => latest.current(change);
-    const set = listeners.get(client) ?? new Set<Listener>();
-    listeners.set(client, set);
-    set.add(own);
-    return () => {
-      set.delete(own);
-    };
-  }, [client]);
+  React.useEffect(
+    () =>
+      session.watch("tasks:mine", {
+        onData: (item) => {
+          const change = toChange(item as ListItem);
+          if (change.event) writeTaskEventToCache(client, change.event);
+          latest.current(change);
+        },
+        // Every snapshot, a first one too: a rebuilt connection brings a new session, whose
+        // first look is all a follower hears of a task that ended while it was being replaced.
+        // Each row moves a follower forward only, so one it already knew changes nothing.
+        onResync: (snapshot) => {
+          for (const row of (snapshot as ListSnapshot<WireTaskChange>).rows ?? []) {
+            const update = toTaskChange(row);
+            applyTaskChange(client, update);
+            latest.current({ update });
+          }
+        },
+      }),
+    [client, session],
+  );
 };
 
 /**
- * Keep a task's children current: updates move their status, a new child
- * refetches the task (children carry no events on this stream).
+ * Keep a task's tree current (`children:<task>`): updates move their status,
+ * a new task in it reads the task again (the feed carries no events).
  */
 export const useChildTaskStream = (id: string) => {
   const client = useRekuestClient();
+  const session = useRekuestSession();
   React.useEffect(() => {
     const refetchDetail = debounced(() => void client.refetchQueries({ include: [DetailTaskDocument] }));
-    const subscription = client
-      .subscribe<WatchChildTasksSubscription>({ query: WatchChildTasksDocument, variables: { id } })
-      .subscribe({
-        next: ({ data }) => {
-          const change = data?.childTasks;
-          if (change?.update) applyTaskChange(client, change.update);
-          if (change?.create) refetchDetail();
-        },
-        error: (e) => console.warn("[rekuest] child task stream closed", e),
-      });
+    const stop = session.watch(`children:${id}`, {
+      onData: (item) => {
+        const change = item as { create?: WireTaskChange | null; update?: WireTaskChange | null };
+        if (change.update) applyTaskChange(client, toTaskChange(change.update));
+        if (change.create) refetchDetail();
+      },
+      onResync: (snapshot, reason) => {
+        if (reason === "new") return;
+        for (const row of (snapshot as ListSnapshot<WireTaskChange>).rows ?? []) applyTaskChange(client, toTaskChange(row));
+        refetchDetail();
+      },
+    });
     return () => {
       refetchDetail.cancel();
-      subscription.unsubscribe();
+      stop();
     };
-  }, [client, id]);
+  }, [client, session, id]);
 };

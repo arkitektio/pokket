@@ -2,7 +2,7 @@ import * as React from 'react';
 import {BlokRunHostProvider, type BlokRunHost} from '@/components/blok/catalog/run/host';
 import {MaterializedBlokRenderer} from '@/components/blok/MaterializedBlokRenderer';
 import {normalizeBlokComponentTree} from '@arkitektio/bsx/runtime';
-import {useDecideMutation, type ActionBlokFragment, type RunTaskFragment} from '@/lib/rekuest/api/graphql';
+import type {ActionBlokFragment, RunTaskFragment} from '@/lib/rekuest/api/graphql';
 import {dependencyKeysRead} from '@/lib/rekuest/blok/blokDemands';
 import {agentMappingsOf, agentsByKey, type RunBinding} from '@/lib/rekuest/run/binding';
 import type {ActionBlokRun} from '@/lib/rekuest/run/runTask';
@@ -10,6 +10,7 @@ import {shownAsk, taskRecordOf} from '@/lib/rekuest/run/taskRoot';
 import {useBlokTravelMoment} from '@/lib/rekuest/travel/context';
 import {parseTimestamp} from '@/lib/rekuest/travel/travelSource';
 import {HoldCard} from './HoldCard';
+import {useDecide} from './useDecide';
 
 /**
  * An action's own blok, drawn for one run of it (orkestrator's
@@ -65,10 +66,10 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 
 /** `task.answer(values)`: the ask `task.ask` shows, approved with what the blok answered. */
 const useAnswerShownAsk = (task: RunTaskFragment): ((values: Record<string, unknown>) => Promise<unknown>) | undefined => {
-  const [decide] = useDecideMutation();
+  const decide = useDecide();
   const held = React.useMemo(() => shownAsk(task)?.task, [task]);
   return React.useMemo(
-    () => (held ? (values: Record<string, unknown>) => decide({variables: {input: {task: held, approved: true, values}}}) : undefined),
+    () => (held ? (values: Record<string, unknown>) => decide({task: held, approved: true, values}) : undefined),
     [decide, held],
   );
 };

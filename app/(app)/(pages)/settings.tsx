@@ -8,6 +8,7 @@ import { showPage } from '@/lib/navigation';
 import { disablePush, enablePush, PushStatus, pushUnavailableReason, reregisterPush, usePush } from '@/lib/push/push';
 import { useThemeColors } from '@/lib/theme/BrandProvider';
 import { TimelineSettings } from '@/components/timeline/TimelineSettings';
+import { LiveUpdates } from '@/components/rekuest/LiveUpdates';
 import { Bell, Bug, ChevronRight, MapPinned, RefreshCw } from 'lucide-react-native';
 import { useUpdateInfo } from '@/lib/updates/useUpdateInfo';
 import * as React from 'react';
@@ -235,6 +236,7 @@ export default function SettingsScreen() {
           <LokateLink />
         </View>
         <Services />
+        <LiveUpdates />
         <View className="gap-2">
           <Text className="px-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">About</Text>
           <About />

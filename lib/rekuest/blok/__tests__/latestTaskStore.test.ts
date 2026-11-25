@@ -3,6 +3,7 @@ import {afterEach, beforeEach, describe, expect, it, jest} from '@jest/globals';
 jest.mock('@/lib/rekuest/funcs', () => ({}));
 import {TaskEventKind} from '../../api/graphql';
 import {createLiveStateStore, type LiveStateEvent} from '../liveStateStore';
+import type {RekuestSession, TopicListener} from '../../session/client';
 import {
   foldLatestTask,
   subscribeLatestTask,
@@ -104,16 +105,38 @@ describe('the latest task of an action, folded from its feed', () => {
 describe('the latest-task store', () => {
   const make = () => {
     const frames: Array<() => void> = [];
+    // The server's side of the session's `latest:` topic: a message as the wire carries it.
+    const row = (task: {id: string; isDone: boolean; latestEventKind: string}) => ({
+      id: task.id,
+      is_done: task.isDone,
+      latest_event_kind: task.latestEventKind,
+    });
     const feeds: Array<{variables: unknown; next: (message: LatestTaskMessage) => void; closed: boolean}> = [];
     const client = {
-      subscribe: jest.fn(({variables}: {variables: unknown}) => ({
-        subscribe: (observer: {next: (result: {data: {latestTask: LatestTaskMessage}}) => void}) => {
-          const feed = {variables, next: (message: LatestTaskMessage) => observer.next({data: {latestTask: message}}), closed: false};
-          feeds.push(feed);
-          return {unsubscribe: () => (feed.closed = true)};
-        },
-      })),
-    };
+      watch: (topic: string, listener: TopicListener) => {
+        const [agent, iface] = topic.slice('latest:'.length).split('/');
+        const feed = {
+          variables: {agent, interface: iface},
+          closed: false,
+          next: (message: LatestTaskMessage) => {
+            if (message.__typename === 'LatestTaskSnapshot') {
+              listener.onResync(
+                {implementation: message.implementation, latest: message.latest ? row(message.latest) : null, events: message.events},
+                'new',
+              );
+            } else if (message.__typename === 'TaskChange') {
+              listener.onData({create: row(message)});
+            } else {
+              listener.onData({event: message});
+            }
+          },
+        };
+        feeds.push(feed);
+        return () => {
+          feed.closed = true;
+        };
+      },
+    } as unknown as RekuestSession;
     const store = createLiveStateStore<typeof client>({
       subscribe: subscribeLatestTask as never,
       schedule: callback => frames.push(callback),

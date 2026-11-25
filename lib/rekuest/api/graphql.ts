@@ -56,6 +56,8 @@ export type Action = {
   assignBloks: Array<ActionBlok>;
   /** Whether an agent that can take this action is connected (or is a webhook agent) right now: `liveImplementations > 0`. */
   assignable: Scalars['Boolean']['output'];
+  /** Whether it can run: RUNNABLE now, RECENT (an implementing agent seen in the last 24 hours), OFFLINE, or NONE (no implementation). The same rank `ActionOrder.availability` orders and `ActionFilter.availability` filters by. */
+  availability: ActionAvailability;
   /** The action's own bloks, at most one per context (PANEL for a task panel, SCENE a 3D view, as a `Space` placing the run's dependencies): declared with the action, the latest registration's. Not part of its hash. */
   bloks: Array<ActionBlok>;
   /** Collections to which this action belongs. */
@@ -250,6 +252,14 @@ export type ActionArgumentInput = {
   valuePath?: InputMaybe<Scalars['String']['input']>;
 };
 
+/** Whether an action can run, as a list groups it: RUNNABLE now (`Action.assignable`), RECENT (an implementing agent was seen in the last 24 hours), OFFLINE (implemented, but no agent seen for longer), NONE (no implementation). In that order, which is `ActionOrder.availability` ascending. */
+export enum ActionAvailability {
+  None = 'NONE',
+  Offline = 'OFFLINE',
+  Recent = 'RECENT',
+  Runnable = 'RUNNABLE'
+}
+
 /** An action's own blok for one context: how a client shows a run of the action there. It names devices only by the action's dependency keys: a run binds them through `Task.dependencyAgents`, a preview through the `dependencyTree` dry run. */
 export type ActionBlok = {
   __typename?: 'ActionBlok';
@@ -409,6 +419,8 @@ export type ActionFilter = {
   asks?: InputMaybe<Scalars['Boolean']['input']>;
   /** Whether an agent that can take the action is connected now (`Action.assignable`). */
   assignable?: InputMaybe<Scalars['Boolean']['input']>;
+  /** Only actions of these availabilities (`Action.availability`). An empty list is ignored. */
+  availability?: InputMaybe<Array<ActionAvailability>>;
   /** Whether any of its implementations may call other actions (a declared dependency, or `dynamicCalls`). False: none ever calls. */
   calls?: InputMaybe<Scalars['Boolean']['input']>;
   demands?: InputMaybe<Array<PortDemandInput>>;
@@ -428,7 +440,7 @@ export type ActionFilter = {
   name?: InputMaybe<StrFilterLookup>;
   objectDemands?: InputMaybe<Array<PortDemandInput>>;
   protocols?: InputMaybe<Array<Scalars['String']['input']>>;
-  /** Search by name: a case-insensitive substring, or semantic similarity of the query to the action's name and description. Substring matches rank first, then by similarity; an explicit `ordering` replaces that ranking. */
+  /** Search by name: a case-insensitive substring, or semantic similarity of the query to the action's name and description. Ranked: an exact match, then a prefix, then other textual matches by trigram similarity, then by meaning; an explicit `ordering` replaces that ranking. */
   search?: InputMaybe<Scalars['String']['input']>;
   stateful?: InputMaybe<Scalars['Boolean']['input']>;
   usedAfter?: InputMaybe<Scalars['DateTime']['input']>;
@@ -442,12 +454,19 @@ export enum ActionKind {
 }
 
 export type ActionOrder =
-  /** Runnable first (DESC) or last (ASC) by `Action.assignable`. The order the filters set (a `search`'s ranking) is kept as the tie-break, so `search` with this ordering lists runnable matches first, each group still ranked by relevance. */
-  { assignable: Ordering; definedAt?: never; estimatedRuntime?: never; usedAt?: never; }
-  |  { assignable?: never; definedAt: Ordering; estimatedRuntime?: never; usedAt?: never; }
+  /** By the identifier of the app the action belongs to, so one app's actions stay together across pages. */
+  { appIdentifier: Ordering; assignable?: never; availability?: never; collection?: never; definedAt?: never; estimatedRuntime?: never; kind?: never; usedAt?: never; }
+  |  /** Runnable first (DESC) or last (ASC) by `Action.assignable`. The order the filters set (a `search`'s ranking) is kept as the tie-break, so `search` with this ordering lists runnable matches first, each group still ranked by relevance. */
+  { appIdentifier?: never; assignable: Ordering; availability?: never; collection?: never; definedAt?: never; estimatedRuntime?: never; kind?: never; usedAt?: never; }
+  |  /** By `Action.availability`: runnable now first (ASC), then recently active, offline, and without an implementation; DESC reverses it. Keeps each availability group together across pages. */
+  { appIdentifier?: never; assignable?: never; availability: Ordering; collection?: never; definedAt?: never; estimatedRuntime?: never; kind?: never; usedAt?: never; }
+  |  /** By the name of the action's first collection (alphabetically): the collection a grouped list files it under. Actions in no collection come last. */
+  { appIdentifier?: never; assignable?: never; availability?: never; collection: Ordering; definedAt?: never; estimatedRuntime?: never; kind?: never; usedAt?: never; }
+  |  { appIdentifier?: never; assignable?: never; availability?: never; collection?: never; definedAt: Ordering; estimatedRuntime?: never; kind?: never; usedAt?: never; }
   |  /** Runnable first, then by the estimate for the object named in the `estimatedRuntime` filter, with no estimate last. Does nothing without that filter. */
-  { assignable?: never; definedAt?: never; estimatedRuntime: Ordering; usedAt?: never; }
-  |  { assignable?: never; definedAt?: never; estimatedRuntime?: never; usedAt: Ordering; };
+  { appIdentifier?: never; assignable?: never; availability?: never; collection?: never; definedAt?: never; estimatedRuntime: Ordering; kind?: never; usedAt?: never; }
+  |  { appIdentifier?: never; assignable?: never; availability?: never; collection?: never; definedAt?: never; estimatedRuntime?: never; kind: Ordering; usedAt?: never; }
+  |  { appIdentifier?: never; assignable?: never; availability?: never; collection?: never; definedAt?: never; estimatedRuntime?: never; kind?: never; usedAt: Ordering; };
 
 export enum ActionScope {
   BridgeGlobalToLocal = 'BRIDGE_GLOBAL_TO_LOCAL',
@@ -510,6 +529,16 @@ export type ActionStatsSumArgs = {
 export enum ActionTimestampField {
   CreatedAt = 'CREATED_AT'
 }
+
+/** Objects to put in a collaboration at once: all of them, or none */
+export type AddManyToCollaborationInput = {
+  /** The collaboration's key (lok's) */
+  collaboration: Scalars['ID']['input'];
+  /** The collaboration's name, kept here when these are the first things put in */
+  name?: InputMaybe<Scalars['String']['input']>;
+  /** What to put in; a whole before its parts */
+  objects: Array<CollaborationObjectRef>;
+};
 
 /** Represents a compute agent that can execute implementations. */
 export type Agent = {
@@ -578,7 +607,7 @@ export type Agent = {
   specVersion?: Maybe<Scalars['String']['output']>;
   /** Current and historical states associated with the agent. */
   states: Array<State>;
-  /** The app this agent says controls its lifecycle (e.g. 'plugin_engine'), as stated on its last registration. Self-declared: a hint for pickers (descriptor @rekuest/supervisor), never authority. */
+  /** The app that provisioned this agent's client (e.g. 'plugin_engine'), as lok signed it into the token of its last registration. Null for an agent whose client nobody provisioned. Pickers match it as the descriptor @rekuest/supervisor. */
   supervisor?: Maybe<Scalars['String']['output']>;
   /** Tasks executed by this agent. */
   tasks: Array<Task>;
@@ -629,6 +658,14 @@ export type AgentSchedulesArgs = {
 export type AgentSessionsArgs = {
   filters?: InputMaybe<SessionFilter>;
   ordering?: Array<SessionOrder>;
+  pagination?: InputMaybe<OffsetPaginationInput>;
+};
+
+
+/** Represents a compute agent that can execute implementations. */
+export type AgentStatesArgs = {
+  filters?: InputMaybe<StateFilter>;
+  ordering?: Array<StateOrder>;
   pagination?: InputMaybe<OffsetPaginationInput>;
 };
 
@@ -730,6 +767,12 @@ export type AgentDependencyInput = {
   version?: InputMaybe<Scalars['String']['input']>;
 };
 
+/** Numeric/aggregatable fields of Agent */
+export enum AgentField {
+  InstalledAt = 'INSTALLED_AT',
+  LastSeen = 'LAST_SEEN'
+}
+
 /** A way to filter agents */
 export type AgentFilter = {
   AND?: InputMaybe<AgentFilter>;
@@ -746,6 +789,8 @@ export type AgentFilter = {
   callerOf?: InputMaybe<Scalars['ID']['input']>;
   /** Filter by client ID of the app the agent is registered to */
   clientId?: InputMaybe<Scalars['String']['input']>;
+  /** Agents with a live connection (true): connected, with a fresh heartbeat. False keeps every other agent, webhook agents included. Unlike `available`, a webhook agent is never connected. */
+  connected?: InputMaybe<Scalars['Boolean']['input']>;
   dependency?: InputMaybe<Scalars['ID']['input']>;
   /** Filter based on device */
   deviceId?: InputMaybe<Scalars['ID']['input']>;
@@ -758,6 +803,8 @@ export type AgentFilter = {
   ids?: InputMaybe<Array<Scalars['ID']['input']>>;
   /** The agents with at least one implementation listed under any of these protocols, declared as a hint (`on_scene_annotation`) or inferred. Each agent once, however many of its actions match. */
   implementsProtocols?: InputMaybe<Array<Scalars['String']['input']>>;
+  /** Filter by the kind of agent (websocket, webhook, ...) */
+  kind?: InputMaybe<AgentKind>;
   /** Filter by pinned agents */
   pinned?: InputMaybe<Scalars['Boolean']['input']>;
   /** Agents meeting a port's descriptor constraints (a picker hands them in as $requires). The only descriptor of @rekuest/agent is @rekuest/supervisor; any other key is refused. */
@@ -765,7 +812,9 @@ export type AgentFilter = {
   /** Filter by name of the agents */
   search?: InputMaybe<Scalars['String']['input']>;
   stateDemands?: InputMaybe<Array<StateDemandInput>>;
-  /** Agents whose self-declared supervisor is this app (e.g. 'plugin_engine'). */
+  /** Agents whose client an app provisioned (true), or nobody (false), as of their last registration. */
+  supervised?: InputMaybe<Scalars['Boolean']['input']>;
+  /** Agents whose client this app provisioned (e.g. 'plugin_engine'), as lok signed it into their token. */
   supervisor?: InputMaybe<Scalars['String']['input']>;
   /** Filter by user ID */
   user?: InputMaybe<Scalars['ID']['input']>;
@@ -822,7 +871,8 @@ export type AgentMapping = {
 };
 
 export type AgentOrder =
-  { lastSeen: Ordering; };
+  { installedAt: Ordering; lastSeen?: never; }
+  |  { installedAt?: never; lastSeen: Ordering; };
 
 /** Defines a callback that routes user interactions directly to an Arkitekt Agent via Rekuest. */
 export type AgentProbeInput = {
@@ -846,11 +896,67 @@ export type AgentSnapshotEvent = {
 
 export type AgentSnapshotEventStatePatchEvent = AgentSnapshotEvent | StatePatchEvent;
 
+export type AgentStats = {
+  __typename?: 'AgentStats';
+  /** Average */
+  avg?: Maybe<Scalars['Float']['output']>;
+  /** Total number of agents in the selection. Ask once with `filters: {connected: true}` (aliased) for how many are online. */
+  count: Scalars['Int']['output'];
+  /** Number of distinct values for the field */
+  distinctCount: Scalars['Int']['output'];
+  /** Maximum */
+  max?: Maybe<Scalars['Float']['output']>;
+  /** Minimum */
+  min?: Maybe<Scalars['Float']['output']>;
+  /** Time-bucketed stats over a datetime field. */
+  series: Array<TimeBucket>;
+  /** Sum */
+  sum?: Maybe<Scalars['Float']['output']>;
+};
+
+
+export type AgentStatsAvgArgs = {
+  field: AgentField;
+};
+
+
+export type AgentStatsDistinctCountArgs = {
+  field: AgentField;
+};
+
+
+export type AgentStatsMaxArgs = {
+  field: AgentField;
+};
+
+
+export type AgentStatsMinArgs = {
+  field: AgentField;
+};
+
+
+export type AgentStatsSeriesArgs = {
+  by: Granularity;
+  field: AgentField;
+  timestampField: AgentTimestampField;
+};
+
+
+export type AgentStatsSumArgs = {
+  field: AgentField;
+};
+
 export type AgentTaskUpdate = {
   __typename?: 'AgentTaskUpdate';
   create?: Maybe<TaskChange>;
   update?: Maybe<TaskChange>;
 };
+
+/** Datetime fields of Agent for bucketing */
+export enum AgentTimestampField {
+  InstalledAt = 'INSTALLED_AT',
+  LastSeen = 'LAST_SEEN'
+}
 
 export type AgentWithValues = {
   __typename?: 'AgentWithValues';
@@ -1000,6 +1106,16 @@ export type Asset = {
   stats?: Maybe<ModelStats>;
   /** An image's width in pixels. Null for other kinds. */
   width?: Maybe<Scalars['Int']['output']>;
+};
+
+/** An asset that was just stored: enough to tell whether it is the one awaited. */
+export type AssetChange = {
+  __typename?: 'AssetChange';
+  id: Scalars['ID']['output'];
+  /** What the file is (AssetKind). */
+  kind: Scalars['String']['output'];
+  /** 'sha256:' and the hex SHA-256 of the file's bytes: what an agent's declared asset names. */
+  ref: Scalars['String']['output'];
 };
 
 /** Where an asset's bytes are: a kulisse store for a 3D model, a media store for an image. */
@@ -1227,6 +1343,8 @@ export type Blok = {
   forModel?: Maybe<Scalars['String']['output']>;
   /** The node of `forModel` this blok attaches to; the model's root when null. */
   forNode?: Maybe<Scalars['String']['output']>;
+  /** Whether the blok declares a logo of its own (`<logo>`, a child of its `<Blok>`): what lists, pins and tabs draw for it instead of its context's icon. Read it before asking for the tree, which a list never needs otherwise. */
+  hasLogo: Scalars['Boolean']['output'];
   /** A SHA-256 of what the blok renders: its component tree (its declarations included), context, language version, catalogs and demo. Two bloks with the same hash draw the same thing, so a client may cache what it rendered under it. */
   hash: Scalars['String']['output'];
   /** The revision this custom blok is at: what an edit names as its `base`. Null for a provided blok, which changes with its agents' registrations instead. */
@@ -1243,6 +1361,8 @@ export type Blok = {
   origin?: Maybe<Scalars['String']['output']>;
   /** The hash its origin gave what it draws when it was installed. When the origin's hash differs now, it has an update. */
   originHash?: Maybe<Scalars['String']['output']>;
+  /** Whether the caller pinned this blok. */
+  pinned: Scalars['Boolean']['output'];
   /** Whether an app's agents provide this blok (see `app`). */
   provided: Scalars['Boolean']['output'];
   /** The agents that currently provide this blok, each through its own materialization. */
@@ -1410,15 +1530,21 @@ export type BlokFilter = {
   OR?: InputMaybe<BlokFilter>;
   /** Only bloks whose args accept at least one of these demand sets (each set as `demands`). One statement, so prefer it to `OR`-ing `demands`. An empty list is ignored; an empty set is an error. */
   anyDemands?: InputMaybe<Array<Array<PortDemandInput>>>;
+  /** Only bloks that render in one of these contexts: PANEL and SCENE are interfaces to open, LOGO draws an agent or an action. */
+  contexts?: InputMaybe<Array<ComponentContext>>;
   /** Only bloks whose args accept these demands: the bloks an item opens in. Same matching as `ActionFilter.demands`, so a match's `descriptors` are checked against each arg's `requires`. Only `ARGS` demands; a blok without args matches none. */
   demands?: InputMaybe<Array<PortDemandInput>>;
   /** Only bloks installed from an origin (true) or only ones made here (false). */
   hasOrigin?: InputMaybe<Scalars['Boolean']['input']>;
+  /** Only bloks whose name starts with this (case-insensitive): the names a new blok would collide with, e.g. `X panel` and `X panel 2` for `X panel`. */
+  nameStartsWith?: InputMaybe<Scalars['String']['input']>;
   /** Only bloks installed from one of these origins. */
   origins?: InputMaybe<Array<Scalars['String']['input']>>;
+  /** Only bloks the caller pinned (true) or did not (false). */
+  pinned?: InputMaybe<Scalars['Boolean']['input']>;
   /** Only bloks an app provides (true) or only custom bloks users made (false). */
   provided?: InputMaybe<Scalars['Boolean']['input']>;
-  /** Search by name */
+  /** Search by name or description (case-insensitive substring). */
   search?: InputMaybe<Scalars['String']['input']>;
 };
 
@@ -1560,7 +1686,7 @@ export type CatalogArgument = {
   __typename?: 'CatalogArgument';
   description?: Maybe<Scalars['String']['output']>;
   key: Scalars['String']['output'];
-  kind: CatalogValueKind;
+  port?: Maybe<CatalogPort>;
   required: Scalars['Boolean']['output'];
 };
 
@@ -1570,10 +1696,72 @@ export type CatalogArgumentInput = {
   description?: InputMaybe<Scalars['String']['input']>;
   /** The argument key a UtilCall argument must use. */
   key: Scalars['String']['input'];
-  /** The value kind of the argument. */
-  kind: CatalogValueKind;
+  /** What it takes; none: open (any value). */
+  port?: InputMaybe<CatalogPortInput>;
   /** Whether every call must pass this argument. */
   required?: Scalars['Boolean']['input'];
+};
+
+/** A catalog port below another: an item ('...'), a field, a variant, a payload field. */
+export type CatalogChildPort = {
+  __typename?: 'CatalogChildPort';
+  children?: Maybe<Array<CatalogChildPort>>;
+  choices?: Maybe<Array<CatalogChoice>>;
+  default?: Maybe<Scalars['AnyDefault']['output']>;
+  description?: Maybe<Scalars['String']['output']>;
+  dimension?: Maybe<Scalars['String']['output']>;
+  identifier?: Maybe<Scalars['String']['output']>;
+  key: Scalars['String']['output'];
+  kind?: Maybe<PortKind>;
+  nullable: Scalars['Boolean']['output'];
+  proposedUnits?: Maybe<Array<Scalars['String']['output']>>;
+  referenceUnit?: Maybe<Scalars['String']['output']>;
+  /** The whole port, children at every depth, as a catalog writes it (camelCase, empty fields left out): what a client compares a catalog by. */
+  tree: Scalars['JSONSerializable']['output'];
+};
+
+/** A catalog port below another: an item ('...'), a field, a variant, a payload field. */
+export type CatalogChildPortInput = {
+  /** LIST/BINDING: its one item, keyed '...'; DICT/MODEL: its fields; UNION: its variants; CALLBACK: its payload. */
+  children?: InputMaybe<Array<CatalogChildPortInput>>;
+  /** The values it takes (required for ENUM). */
+  choices?: InputMaybe<Array<CatalogChoiceInput>>;
+  /** Its default value. */
+  default?: InputMaybe<Scalars['AnyDefault']['input']>;
+  /** What it is. */
+  description?: InputMaybe<Scalars['String']['input']>;
+  /** For a QUANTITY: its dimensionality. */
+  dimension?: InputMaybe<Scalars['String']['input']>;
+  /** STRUCTURE, MEMORY_STRUCTURE, INTERFACE: what it references (`*`: any). */
+  identifier?: InputMaybe<Scalars['String']['input']>;
+  /** Its key (may be `value`). */
+  key: Scalars['String']['input'];
+  /** Its kind; none: open (any value). */
+  kind?: InputMaybe<PortKind>;
+  /** Whether it takes null. */
+  nullable?: Scalars['Boolean']['input'];
+  /** For a QUANTITY: the units offered. */
+  proposedUnits?: InputMaybe<Array<Scalars['String']['input']>>;
+  /** For a QUANTITY: its reference unit. */
+  referenceUnit?: InputMaybe<Scalars['String']['input']>;
+};
+
+/** A value a catalog port takes. */
+export type CatalogChoice = {
+  __typename?: 'CatalogChoice';
+  description?: Maybe<Scalars['String']['output']>;
+  label?: Maybe<Scalars['String']['output']>;
+  value: Scalars['AnyDefault']['output'];
+};
+
+/** A value a catalog port takes. */
+export type CatalogChoiceInput = {
+  /** What it means. */
+  description?: InputMaybe<Scalars['String']['input']>;
+  /** How it is shown. */
+  label?: InputMaybe<Scalars['String']['input']>;
+  /** The value (any JSON value fitting the port's kind). */
+  value: Scalars['AnyDefault']['input'];
 };
 
 /** A component a UI catalog can render. */
@@ -1618,31 +1806,13 @@ export type CatalogComponentInput = {
   textProp?: InputMaybe<Scalars['String']['input']>;
 };
 
-/** A field of the event a CALLBACK prop hands its callback. */
-export type CatalogEventField = {
-  __typename?: 'CatalogEventField';
-  description?: Maybe<Scalars['String']['output']>;
-  key: Scalars['String']['output'];
-  kind: CatalogValueKind;
-};
-
-/** A field of the event a CALLBACK prop hands its callback (`event.<key>`). */
-export type CatalogEventFieldInput = {
-  /** Human-readable description of the field. */
-  description?: InputMaybe<Scalars['String']['input']>;
-  /** The field a callback reads as `event.<key>`. */
-  key: Scalars['String']['input'];
-  /** The value kind of the field. */
-  kind: CatalogValueKind;
-};
-
 /** A pure operation a UI catalog can evaluate for UtilCalls. */
 export type CatalogOperation = {
   __typename?: 'CatalogOperation';
   arguments: Array<CatalogArgument>;
   description?: Maybe<Scalars['String']['output']>;
   name: Scalars['String']['output'];
-  returns: CatalogValueKind;
+  returns?: Maybe<CatalogPort>;
 };
 
 /** A pure operation a UI catalog can evaluate for UtilCalls. */
@@ -1653,46 +1823,71 @@ export type CatalogOperationInput = {
   description?: InputMaybe<Scalars['String']['input']>;
   /** The operation name a UtilCall.operation must match. */
   name: Scalars['String']['input'];
-  /** The kind of value the operation returns (BOOL for effect and validator calls). */
-  returns: CatalogValueKind;
+  /** What it returns (BOOL for effect and validator calls); none: open. */
+  returns?: InputMaybe<CatalogPortInput>;
+};
+
+/** The port a catalog types a prop, an operation argument or a result by: an action's port, plus CALLBACK, ASSET and BINDING and the open identifier `*`. No kind: open (any value). */
+export type CatalogPort = {
+  __typename?: 'CatalogPort';
+  children?: Maybe<Array<CatalogChildPort>>;
+  choices?: Maybe<Array<CatalogChoice>>;
+  default?: Maybe<Scalars['AnyDefault']['output']>;
+  dimension?: Maybe<Scalars['String']['output']>;
+  identifier?: Maybe<Scalars['String']['output']>;
+  kind?: Maybe<PortKind>;
+  nullable: Scalars['Boolean']['output'];
+  proposedUnits?: Maybe<Array<Scalars['String']['output']>>;
+  referenceUnit?: Maybe<Scalars['String']['output']>;
+  /** The whole port, children at every depth, as a catalog writes it (camelCase, empty fields left out): what a client compares a catalog by. */
+  tree: Scalars['JSONSerializable']['output'];
+};
+
+/** The port a catalog types a prop, an operation argument or a result by: an action's port, plus CALLBACK, ASSET and BINDING and the open identifier `*`. No kind: open (any value). */
+export type CatalogPortInput = {
+  /** LIST/BINDING: its one item, keyed '...'; DICT/MODEL: its fields; UNION: its variants; CALLBACK: its payload. */
+  children?: InputMaybe<Array<CatalogChildPortInput>>;
+  /** The values it takes (required for ENUM). */
+  choices?: InputMaybe<Array<CatalogChoiceInput>>;
+  /** Its default value. */
+  default?: InputMaybe<Scalars['AnyDefault']['input']>;
+  /** For a QUANTITY: its dimensionality. */
+  dimension?: InputMaybe<Scalars['String']['input']>;
+  /** STRUCTURE, MEMORY_STRUCTURE, INTERFACE: what it references (`*`: any). */
+  identifier?: InputMaybe<Scalars['String']['input']>;
+  /** Its kind; none: open (any value). */
+  kind?: InputMaybe<PortKind>;
+  /** Whether it takes null. */
+  nullable?: Scalars['Boolean']['input'];
+  /** For a QUANTITY: the units offered. */
+  proposedUnits?: InputMaybe<Array<Scalars['String']['input']>>;
+  /** For a QUANTITY: its reference unit. */
+  referenceUnit?: InputMaybe<Scalars['String']['input']>;
 };
 
 /** A prop a catalog component accepts. */
 export type CatalogProp = {
   __typename?: 'CatalogProp';
   description?: Maybe<Scalars['String']['output']>;
-  event?: Maybe<Array<CatalogEventField>>;
   key: Scalars['String']['output'];
-  kind: CatalogValueKind;
+  port?: Maybe<CatalogPort>;
   required: Scalars['Boolean']['output'];
+  since: Scalars['Int']['output'];
 };
 
 /** A prop a catalog component accepts. */
 export type CatalogPropInput = {
   /** Human-readable description of the prop. */
   description?: InputMaybe<Scalars['String']['input']>;
-  /** For a CALLBACK prop: the fields of the event it hands its callback (`event.<key>`); none when it hands none. */
-  event?: InputMaybe<Array<CatalogEventFieldInput>>;
   /** The prop key a ComponentProp.key must match. */
   key: Scalars['String']['input'];
-  /** The value kind this prop accepts. CALLBACK props hold one task call or one effect. On `bind`, the kind the control writes (`locals.bind_kinds`). */
-  kind: CatalogValueKind;
+  /** What it takes; none: open (the language's own props). CALLBACK props hold one task call or one effect; `bind` is a BINDING. */
+  port?: InputMaybe<CatalogPortInput>;
   /** Whether every component instance must set this prop. */
   required?: Scalars['Boolean']['input'];
+  /** The catalog minor that added it; 0: from the start. */
+  since?: Scalars['Int']['input'];
 };
-
-/** The kind of value a catalog component prop accepts or a catalog operation argument/return carries. */
-export enum CatalogValueKind {
-  Any = 'ANY',
-  Asset = 'ASSET',
-  Bool = 'BOOL',
-  Callback = 'CALLBACK',
-  Dict = 'DICT',
-  Float = 'FLOAT',
-  Int = 'INT',
-  List = 'LIST',
-  String = 'STRING'
-}
 
 export type ChildTaskEvent = {
   __typename?: 'ChildTaskEvent';
@@ -1783,11 +1978,83 @@ export type ClientFilter = {
   ids?: InputMaybe<Array<Scalars['ID']['input']>>;
   interface?: InputMaybe<StrFilterLookup>;
   mine?: InputMaybe<Scalars['Boolean']['input']>;
+  /** Search by OAuth client id, name, app identifier, release version or device id (case-insensitive substring). */
+  search?: InputMaybe<Scalars['String']['input']>;
 };
 
 /** A way to order apps */
 export type ClientOrder =
   { definedAt: Ordering; };
+
+/** What a guest granted it sees of the organization: the objects put in it, and what is part of them. */
+export type Collaboration = {
+  __typename?: 'Collaboration';
+  createdAt: Scalars['DateTime']['output'];
+  description?: Maybe<Scalars['String']['output']>;
+  id: Scalars['ID']['output'];
+  /** How many objects are in the collaboration: all of them, or (`brought`) only those put in by hand (false) or only those that came along with one (true) */
+  itemCount: Scalars['Int']['output'];
+  /** What is in the collaboration, oldest first; what is part of these is in it too. `brought` keeps what was put in by hand (false) or only what came along with it (true) */
+  items: Array<CollaborationItem>;
+  /** The collaboration's key across the hub: what lok grants, and what names it in every service */
+  key: Scalars['ID']['output'];
+  name: Scalars['String']['output'];
+};
+
+
+/** What a guest granted it sees of the organization: the objects put in it, and what is part of them. */
+export type CollaborationItemCountArgs = {
+  brought?: InputMaybe<Scalars['Boolean']['input']>;
+};
+
+
+/** What a guest granted it sees of the organization: the objects put in it, and what is part of them. */
+export type CollaborationItemsArgs = {
+  brought?: InputMaybe<Scalars['Boolean']['input']>;
+  pagination?: InputMaybe<OffsetPaginationInput>;
+};
+
+/** One object in a collaboration: put there, or brought along with one that needs it to be seen. */
+export type CollaborationItem = {
+  __typename?: 'CollaborationItem';
+  addedAt: Scalars['DateTime']['output'];
+  /** Whether it is in the collaboration only as what another object in it needs to be seen */
+  brought: Scalars['Boolean']['output'];
+  id: Scalars['ID']['output'];
+  /** The structure the object is known by across the hub: @mikro/scene */
+  identifier?: Maybe<Scalars['String']['output']>;
+  /** The object's id, in its structure */
+  objectId: Scalars['String']['output'];
+};
+
+/** An object to put in, or take out of, a collaboration */
+export type CollaborationObjectInput = {
+  /** The collaboration's key (lok's) */
+  collaboration: Scalars['ID']['input'];
+  /** The structure the object is known by: @mikro/scene */
+  identifier: Scalars['String']['input'];
+  /** The collaboration's name, kept here when this is the first thing put in */
+  name?: InputMaybe<Scalars['String']['input']>;
+  /** The object's id */
+  object: Scalars['ID']['input'];
+};
+
+/** An object, by its structure and id */
+export type CollaborationObjectRef = {
+  /** The structure the object is known by: @mikro/scene */
+  identifier: Scalars['String']['input'];
+  /** The object's id */
+  object: Scalars['ID']['input'];
+};
+
+/** How many collaborations the organization has (a guest: theirs), and how much is in them */
+export type CollaborationStats = {
+  __typename?: 'CollaborationStats';
+  /** How many collaborations */
+  count: Scalars['Int']['output'];
+  /** How many objects are in them altogether, brought along ones included */
+  itemCount: Scalars['Int']['output'];
+};
 
 /** The input for collecting a shelved item in a drawer. */
 export type CollectInput = {
@@ -2650,7 +2917,7 @@ export type HostedStructureFilter = {
   ids?: InputMaybe<Array<Scalars['ID']['input']>>;
   /** Keep the structures of this package, e.g. 'mikro' */
   package?: InputMaybe<Scalars['String']['input']>;
-  /** Keep structures whose identifier, label or description contains this text, or whose label and description mean something close to it. Substring matches rank first, then by similarity; an explicit `ordering` replaces that ranking. */
+  /** Keep structures whose identifier, label or description contains this text, or whose label and description mean something close to it. Ranked: an exact match, then a prefix, then other textual matches by trigram similarity, then by meaning; an explicit `ordering` replaces that ranking. */
   search?: InputMaybe<Scalars['String']['input']>;
   /** Keep the structures this service hosts, by its name */
   service?: InputMaybe<Scalars['String']['input']>;
@@ -2698,7 +2965,7 @@ export type Implementation = {
   action: Action;
   /** Agent running this implementation. */
   agent: Agent;
-  /** A hash of the implementation's code; a workflow is only resumed by an implementation with the same hash. */
+  /** A hash of the implementation's code; a resumed workflow is told whether it changed since its run started. */
   codeHash?: Maybe<Scalars['String']['output']>;
   /** Dependencies required by this action. */
   dependencies: Array<Dependency>;
@@ -2764,6 +3031,14 @@ export type ImplementationDependenciesArgs = {
 export type ImplementationLowerOrderImplementationsArgs = {
   filters?: InputMaybe<ImplementationFilter>;
   ordering?: Array<ImplementationOrder>;
+  pagination?: InputMaybe<OffsetPaginationInput>;
+};
+
+
+/** Represents a concrete implementation of an action. */
+export type ImplementationManipulatesArgs = {
+  filters?: InputMaybe<StateFilter>;
+  ordering?: Array<StateOrder>;
   pagination?: InputMaybe<OffsetPaginationInput>;
 };
 
@@ -2850,7 +3125,7 @@ export type ImplementationFit = {
 export type ImplementationInput = {
   /** The bloks this implementation asks a person through, declared up front: a task asks one by its key. */
   asks?: InputMaybe<Array<AskBlokInput>>;
-  /** A hash of the implementation's code. A workflow is only resumed by an implementation with the same hash. */
+  /** A hash of the implementation's code. A resumed workflow is told whether it changed since its run started. */
   codeHash?: InputMaybe<Scalars['String']['input']>;
   /** The definition of the implementation. This is used to uniquely identify the implementation */
   definition: DefinitionInput;
@@ -3081,7 +3356,7 @@ export type LatestTaskSnapshot = {
 
 export type LatestTaskSnapshotTaskChangeTaskEventChange = LatestTaskSnapshot | TaskChange | TaskEventChange;
 
-/** The kind of a blok local: a port kind, or ANY (an untyped value, which skips the bind and argument kind checks). No action port is ever ANY. */
+/** The kind of a blok local: a port kind (never CALLBACK, ASSET or BINDING, which only a catalog types by), or ANY (an untyped value, which skips the bind and argument kind checks). No action port is ever ANY. */
 export enum LocalKind {
   /** An untyped value: nothing gave the local a kind. A path below it is taken as written. */
   Any = 'ANY',
@@ -3216,6 +3491,8 @@ export type MaterializedBlok = {
   /** Whether this is its declaring agent's default blok for the blok's context. */
   isDefault: Scalars['Boolean']['output'];
   name?: Maybe<Scalars['String']['output']>;
+  /** Whether the caller pinned this materialization (not `pinnedRevision`, which holds its content). */
+  pinned: Scalars['Boolean']['output'];
   /** The revision this materialization stays at; null when it follows its blok's head. */
   pinnedRevision?: Maybe<BlokRevision>;
   /** The revision this materialization shows: the pinned one, else its blok's head. Null for a provided blok, which has none. */
@@ -3247,12 +3524,16 @@ export type MaterializedBlokFilter = {
   agent?: InputMaybe<Scalars['ID']['input']>;
   /** Only materialized bloks whose blok's args accept at least one of these demand sets. See `BlokFilter.anyDemands`. */
   anyDemands?: InputMaybe<Array<Array<PortDemandInput>>>;
+  /** Only materializations of the blok with exactly this name (case-sensitive), unlike the substring `search`. */
+  blokName?: InputMaybe<Scalars['String']['input']>;
   /** Only bloks that render in one of these contexts: PANEL and SCENE are interfaces to open, LOGO draws an agent or an action. */
   contexts?: InputMaybe<Array<ComponentContext>>;
   /** Only materialized bloks whose blok's args accept these demands: what an item opens in. See `BlokFilter.demands`. */
   demands?: InputMaybe<Array<PortDemandInput>>;
   /** Filter by IDs */
   ids?: InputMaybe<Array<Scalars['ID']['input']>>;
+  /** Only materializations the caller pinned (true) or did not (false). */
+  pinned?: InputMaybe<Scalars['Boolean']['input']>;
   /** Only agents' own materializations of the bloks they provide (true) or only ones users made (false). */
   provided?: InputMaybe<Scalars['Boolean']['input']>;
   /** Search by name */
@@ -3443,6 +3724,10 @@ export type ModuleBloksArgs = {
 /** Root mutation type for executing write operations on the API. */
 export type Mutation = {
   __typename?: 'Mutation';
+  /** Put several tasks in a collaboration (by its key) at once, each with what it needs to be seen: all of them, or none */
+  addManyToCollaboration: Collaboration;
+  /** Put a task in a collaboration (lok's, by its key), with what it needs to be seen: the action it ran, the tasks it caused as they are now, and the bloks it asked or informed with. Its events and logs are in with it, live. The collaboration's row here is made the first time something is put in */
+  addToCollaboration: Collaboration;
   /** Put an action on your auto list: under your runs an agent that asks for it gets it without a hold. Optionally only when one action asks. Yours alone: it changes nothing for anyone else. */
   allowAction: ActionAllowance;
   /** Assign a task to an agent. */
@@ -3487,6 +3772,8 @@ export type Mutation = {
   deleteAgent: Scalars['ID']['output'];
   /** Delete a blok by ID. */
   deleteBlok: Scalars['Boolean']['output'];
+  /** Take everything rekuest put in a collaboration (by its key) out of it: whoever was granted it sees nothing of it here any more. lok's collaboration, and its grants, stay */
+  deleteCollaboration: Scalars['ID']['output'];
   /** Delete a dashboard by ID. */
   deleteDashboard: Scalars['Boolean']['output'];
   /** Delete a registered implementation. */
@@ -3531,14 +3818,20 @@ export type Mutation = {
   pauseProbe: Probe;
   /** Pin an agent to the user. */
   pinAgent: Agent;
-  /** Keep a materialization at one revision of its blok, or let it follow the head again. */
+  /** Pin a blok of any kind for the caller, or unpin it. */
+  pinBlok: Blok;
+  /** Pin a materialization of any kind for the caller, or unpin it. */
   pinMaterializedBlok: MaterializedBlok;
+  /** Keep a materialization at one revision of its blok, or let it follow the head again. */
+  pinMaterializedBlokRevision: MaterializedBlok;
   /** Fire a probe at an agent — zero persistence, redis-held state under a TTL, never appears in task history. For high-frequency interactive work (previews, live parameter tweaks). */
   probe: Probe;
   /** Reissue upload credentials for a media upload still in flight, to the same key, so a write that outlives its credentials carries on. Only the uploader may, never for a finished store, and never past the upload's time limit */
   refreshMediaUpload: MediaUploadGrant;
   /** Register a module: the components and operations a UI app can render and evaluate beyond the spec's catalogs, and the catalogs it implements whole (upsert by name in the caller's organization). Bloks (`module`) and definitions (`catalogs`) that name it are validated against it. */
   registerModule: Module;
+  /** Take a task out of a collaboration, with what it brought that nothing else there needs */
+  removeFromCollaboration: Collaboration;
   /** A media upload grant for one asset. Issued for a file the caller's own agent declares (it registered with it), or, to an admin, for a file an agent of the organization names a source for; and only if its size passes the policy. */
   requestAssetUpload: AssetUploadGrant;
   /** Request temporary S3 read credentials for a media file */
@@ -3557,6 +3850,8 @@ export type Mutation = {
   revokeAllowance: Scalars['ID']['output'];
   /** Keep where an agent stands in a space (a room), for everyone: the space a blok's `room` names, made when none has it yet. */
   savePlacement: Placement;
+  /** Put a workflow (a root task of the organization: one someone started, or a schedule or trigger did) in a collaboration, as it is now: the root and every task it caused, with their actions, events and logs. Tasks it causes later are not; `dryRun` only says what would be put in */
+  shareWorkflow: WorkflowShare;
   /** Shelve data into a memory drawer. */
   shelveInMemoryDrawer: MemoryDrawer;
   /** Run a schedule now: its waiting run is moved to now. Refused while a run is executing. */
@@ -3579,6 +3874,18 @@ export type Mutation = {
   updateSchedule: Schedule;
   /** Change a trigger. */
   updateTrigger: Trigger;
+};
+
+
+/** Root mutation type for executing write operations on the API. */
+export type MutationAddManyToCollaborationArgs = {
+  input: AddManyToCollaborationInput;
+};
+
+
+/** Root mutation type for executing write operations on the API. */
+export type MutationAddToCollaborationArgs = {
+  input: CollaborationObjectInput;
 };
 
 
@@ -3715,6 +4022,12 @@ export type MutationDeleteBlokArgs = {
 
 
 /** Root mutation type for executing write operations on the API. */
+export type MutationDeleteCollaborationArgs = {
+  key: Scalars['ID']['input'];
+};
+
+
+/** Root mutation type for executing write operations on the API. */
 export type MutationDeleteDashboardArgs = {
   input: DeleteDashboardInput;
 };
@@ -3847,8 +4160,20 @@ export type MutationPinAgentArgs = {
 
 
 /** Root mutation type for executing write operations on the API. */
+export type MutationPinBlokArgs = {
+  input: PinInput;
+};
+
+
+/** Root mutation type for executing write operations on the API. */
 export type MutationPinMaterializedBlokArgs = {
-  input: PinMaterializedBlokInput;
+  input: PinInput;
+};
+
+
+/** Root mutation type for executing write operations on the API. */
+export type MutationPinMaterializedBlokRevisionArgs = {
+  input: PinMaterializedBlokRevisionInput;
 };
 
 
@@ -3867,6 +4192,12 @@ export type MutationRefreshMediaUploadArgs = {
 /** Root mutation type for executing write operations on the API. */
 export type MutationRegisterModuleArgs = {
   input: RegisterModuleInput;
+};
+
+
+/** Root mutation type for executing write operations on the API. */
+export type MutationRemoveFromCollaborationArgs = {
+  input: CollaborationObjectInput;
 };
 
 
@@ -3921,6 +4252,12 @@ export type MutationRevokeAllowanceArgs = {
 /** Root mutation type for executing write operations on the API. */
 export type MutationSavePlacementArgs = {
   input: SavePlacementInput;
+};
+
+
+/** Root mutation type for executing write operations on the API. */
+export type MutationShareWorkflowArgs = {
+  input: ShareWorkflowInput;
 };
 
 
@@ -4090,7 +4427,7 @@ export type PinInput = {
 };
 
 /** Keep a materialization at one revision of its blok, or let it follow the head. */
-export type PinMaterializedBlokInput = {
+export type PinMaterializedBlokRevisionInput = {
   /** The materialization. */
   id: Scalars['ID']['input'];
   /** The revision to stay at; null follows the head again. */
@@ -4171,8 +4508,14 @@ export type PortGroupInput = {
 
 /** The kind of a port: its structural type. Decides which of children, identifier and choices the port must, may or must not carry (see docs/design/ports.md). */
 export enum PortKind {
+  /** A catalog prop that names a file an app registered (`self.assets.<name>`). No children. Never an agent's port. */
+  Asset = 'ASSET',
+  /** A catalog prop that reads and writes a local (`bind`); its one child, keyed '...', is what it writes. Never an agent's port. */
+  Binding = 'BINDING',
   /** A boolean. No children. */
   Bool = 'BOOL',
+  /** A catalog prop that holds a call (onClick); its children are the payload it is called with. Never an agent's port. */
+  Callback = 'CALLBACK',
   /** An ISO-8601 date or datetime string. No children. */
   Date = 'DATE',
   /** A string-keyed map. One child keyed '...' describes a homogeneous value type; several named children describe the known keys. */
@@ -4399,6 +4742,8 @@ export type Query = {
   actions: Array<Action>;
   /** Fetch a specific agent by ID or by app, version and device_id. */
   agent: Agent;
+  /** Statistics about agents: how many (narrowed by filters, e.g. connected or kind) and when they registered or were last seen. */
+  agentStats: AgentStats;
   /** Retrieve all compute agents. */
   agents: Array<Agent>;
   /** The stored asset of this reference ('sha256:...') in the caller's organization, or null if no agent has uploaded it. */
@@ -4413,12 +4758,20 @@ export type Query = {
   bloks: Array<Blok>;
   /** The html bloks registered to decorate the model of this reference. */
   bloksForModel: Array<Blok>;
+  /** The html bloks registered to decorate any of these models (each names its own in `forModel`): one request for every model a scene shows. */
+  bloksForModels: Array<Blok>;
   /** Materialize the latest state for a specific agent */
   checkout: StateValue;
   /** Materialize the latest states for a specific agent */
   checkoutAgent: AgentWithValues;
   /** List all registered clients. */
   clients: Array<Client>;
+  /** Get a single collaboration by its key (lok's): what was put in it here */
+  collaboration: Collaboration;
+  /** List the organization's collaborations that hold tasks here: what a guest granted one sees of rekuest (a guest: the collaborations granted to them) */
+  collaborations: Array<Collaboration>;
+  /** How many collaborations hold tasks here (a guest: of those granted to them), and how many objects are in them */
+  collaborationsStats: CollaborationStats;
   /** Get dashboard by ID. */
   dashboard: Dashboard;
   /** All dashboards. */
@@ -4453,6 +4806,8 @@ export type Query = {
   interface: Interface;
   /** All interfaces referenced by the org's action ports (derived, not registered). */
   interfaces: Array<Interface>;
+  /** How many of the organization's stored signals of this kind and structure satisfy the conditions: the uncapped count behind `matchingSignals`. Fires nothing. */
+  matchingSignalCount: Scalars['Int']['output'];
   /** A dry run for a trigger not written yet: the organization's stored signals of this kind and structure whose descriptors satisfy the conditions, newest first. Fires nothing. */
   matchingSignals: Array<Signal>;
   /** Get a materialized blok by ID. */
@@ -4537,6 +4892,8 @@ export type Query = {
   stateAtGlobalRev: Array<Snapshot>;
   /** Retrieve state for a specific context. */
   stateFor: State;
+  /** The states of the agents in the caller's organization. */
+  states: Array<State>;
   /** Fetch a structure by its '@package/key' identifier: one a port references or a service hosts. */
   structure: Structure;
   /** Fetch a structure package by its key (derived from port identifiers). */
@@ -4545,6 +4902,8 @@ export type Query = {
   structurePackages: Array<StructurePackage>;
   /** All structures: those the org's action ports reference, and those a service of this hub hosts. */
   structures: Array<Structure>;
+  /** The apps that provisioned the organization's agents (e.g. 'plugin_engine'), as lok signed them into their tokens, with how many agents each (narrowed by filters, e.g. connected). */
+  supervisors: Array<Supervisor>;
   /** Fetch task by ID. */
   task: Task;
   /** Get task boundaries. */
@@ -4612,6 +4971,11 @@ export type QueryAgentArgs = {
 };
 
 
+export type QueryAgentStatsArgs = {
+  filters?: InputMaybe<AgentFilter>;
+};
+
+
 export type QueryAgentsArgs = {
   filters?: InputMaybe<AgentFilter>;
   ordering?: Array<AgentOrder>;
@@ -4637,6 +5001,11 @@ export type QueryBloksArgs = {
 
 export type QueryBloksForModelArgs = {
   ref: Scalars['String']['input'];
+};
+
+
+export type QueryBloksForModelsArgs = {
+  refs: Array<Scalars['String']['input']>;
 };
 
 
@@ -4667,8 +5036,23 @@ export type QueryClientsArgs = {
 };
 
 
+export type QueryCollaborationArgs = {
+  key: Scalars['ID']['input'];
+};
+
+
+export type QueryCollaborationsArgs = {
+  pagination?: InputMaybe<OffsetPaginationInput>;
+};
+
+
 export type QueryDashboardArgs = {
   id: Scalars['ID']['input'];
+};
+
+
+export type QueryDashboardsArgs = {
+  pagination?: InputMaybe<OffsetPaginationInput>;
 };
 
 
@@ -4757,7 +5141,15 @@ export type QueryInterfaceArgs = {
 
 
 export type QueryInterfacesArgs = {
+  pagination?: InputMaybe<OffsetPaginationInput>;
   search?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryMatchingSignalCountArgs = {
+  conditions?: InputMaybe<Scalars['AnyDefault']['input']>;
+  identifier: Scalars['String']['input'];
+  kind: SignalKind;
 };
 
 
@@ -4999,6 +5391,13 @@ export type QueryStateForArgs = {
 };
 
 
+export type QueryStatesArgs = {
+  filters?: InputMaybe<StateFilter>;
+  ordering?: Array<StateOrder>;
+  pagination?: InputMaybe<OffsetPaginationInput>;
+};
+
+
 export type QueryStructureArgs = {
   identifier: Scalars['ID']['input'];
 };
@@ -5010,12 +5409,19 @@ export type QueryStructurePackageArgs = {
 
 
 export type QueryStructurePackagesArgs = {
+  pagination?: InputMaybe<OffsetPaginationInput>;
   search?: InputMaybe<Scalars['String']['input']>;
 };
 
 
 export type QueryStructuresArgs = {
+  pagination?: InputMaybe<OffsetPaginationInput>;
   search?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QuerySupervisorsArgs = {
+  filters?: InputMaybe<AgentFilter>;
 };
 
 
@@ -5542,9 +5948,10 @@ export type ScheduleIdInput = {
 };
 
 export type ScheduleOrder =
-  { createdAt: Ordering; name?: never; updatedAt?: never; }
-  |  { createdAt?: never; name: Ordering; updatedAt?: never; }
-  |  { createdAt?: never; name?: never; updatedAt: Ordering; };
+  { consecutiveFailures: Ordering; createdAt?: never; name?: never; updatedAt?: never; }
+  |  { consecutiveFailures?: never; createdAt: Ordering; name?: never; updatedAt?: never; }
+  |  { consecutiveFailures?: never; createdAt?: never; name: Ordering; updatedAt?: never; }
+  |  { consecutiveFailures?: never; createdAt?: never; name?: never; updatedAt: Ordering; };
 
 /** Whether a schedule's run may start while its previous one is still open. SKIP: the next run is planned once the previous finished. ALLOW: it is planned as soon as the previous was handed over, so runs may overlap. */
 export enum ScheduleOverlap {
@@ -5633,6 +6040,27 @@ export type SessionFilter = {
 export type SessionOrder =
   /** When the session started. */
   { startedAt: Ordering; };
+
+/** Put what a workflow created in a collaboration, as it is now */
+export type ShareWorkflowInput = {
+  /** The collaboration's key (lok's) */
+  collaboration: Scalars['ID']['input'];
+  /** Only say what would be put in, and what left out */
+  dryRun?: Scalars['Boolean']['input'];
+  /** The collaboration's name, kept here when this puts the first things in */
+  name?: InputMaybe<Scalars['String']['input']>;
+  /** The workflow: the id of the task a person started, the root of every task it caused */
+  rootTask: Scalars['ID']['input'];
+};
+
+/** An object, by its structure and id */
+export type SharedObject = {
+  __typename?: 'SharedObject';
+  /** The structure the object is known by: @mikro/scene */
+  identifier?: Maybe<Scalars['String']['output']>;
+  /** The object's id */
+  object: Scalars['ID']['output'];
+};
 
 export type ShelveInMemoryDrawerInput = {
   /** The description of the drawer. This is used to identify the drawer in the system. */
@@ -5850,6 +6278,19 @@ export type SignalOrder =
   { occurredAt: Ordering; receivedAt?: never; }
   |  { occurredAt?: never; receivedAt: Ordering; };
 
+/** Created in the workflow, but part of something made before it that is not shared: left out */
+export type SkippedObject = {
+  __typename?: 'SkippedObject';
+  /** The structure the object is known by */
+  identifier?: Maybe<Scalars['String']['output']>;
+  /** The object's id */
+  object: Scalars['ID']['output'];
+  /** The id of what it is part of: put that in, and share the workflow again, to bring it */
+  whole: Scalars['ID']['output'];
+  /** The structure of what it is part of */
+  wholeIdentifier?: Maybe<Scalars['String']['output']>;
+};
+
 export type SliderAssignWidget = AssignWidget & {
   __typename?: 'SliderAssignWidget';
   followValue?: Maybe<Scalars['String']['output']>;
@@ -5927,6 +6368,7 @@ export type SpaceOrder =
   |  { createdAt?: never; name: Ordering; updatedAt?: never; }
   |  { createdAt?: never; name?: never; updatedAt: Ordering; };
 
+/** A state an agent keeps up to date and shares, such as a stage's position. */
 export type State = {
   __typename?: 'State';
   /** The agent to which this state belongs. */
@@ -6070,6 +6512,22 @@ export type StateDependencyInput = {
   optional?: Scalars['Boolean']['input'];
 };
 
+/** A way to filter states */
+export type StateFilter = {
+  AND?: InputMaybe<StateFilter>;
+  DISTINCT?: InputMaybe<Scalars['Boolean']['input']>;
+  NOT?: InputMaybe<StateFilter>;
+  OR?: InputMaybe<StateFilter>;
+  /** Only the states of this agent. */
+  agent?: InputMaybe<Scalars['ID']['input']>;
+  /** Only the states of the app with this identifier. */
+  appIdentifier?: InputMaybe<Scalars['String']['input']>;
+  /** Filter by IDs */
+  ids?: InputMaybe<Array<Scalars['ID']['input']>>;
+  /** Search by interface, key or the agent's name (case-insensitive substring). */
+  search?: InputMaybe<Scalars['String']['input']>;
+};
+
 /** A state implementation is a blueprint for a state. It is composed of a definition, a list of dependencies, and a list of params. */
 export type StateImplementationInput = {
   /** The identifier of the app providing this state. Defaults to the registering agent's app identifier when omitted. */
@@ -6081,6 +6539,10 @@ export type StateImplementationInput = {
   /** The stable identity key of the state, matched by state demands. Defaults to the interface when omitted. */
   key?: InputMaybe<Scalars['String']['input']>;
 };
+
+export type StateOrder =
+  { createdAt: Ordering; updatedAt?: never; }
+  |  { createdAt?: never; updatedAt: Ordering; };
 
 /** One update of a state, with no model cross-references. Its operations are applied in order and together: the state is at `globalRevision` once all of them are. */
 export type StatePatchEvent = {
@@ -6240,7 +6702,7 @@ export type StructureDescriptorFilter = {
   key?: InputMaybe<Scalars['String']['input']>;
   /** Keep the descriptors of structures in this package, e.g. 'mikro' */
   package?: InputMaybe<Scalars['String']['input']>;
-  /** Keep descriptors whose key or description contains this text, or whose description means something close to it. Substring matches rank first, then by similarity; an explicit `ordering` replaces that ranking. */
+  /** Keep descriptors whose key or description contains this text, or whose description means something close to it. Ranked: an exact match, then a prefix, then other textual matches by trigram similarity, then by meaning; an explicit `ordering` replaces that ranking. */
   search?: InputMaybe<Scalars['String']['input']>;
   /** Keep the descriptors declared by this service, by its name */
   service?: InputMaybe<Scalars['String']['input']>;
@@ -6270,35 +6732,72 @@ export type StructurePackage = {
 /** Root subscription type for real-time event streams from the system. */
 export type Subscription = {
   __typename?: 'Subscription';
-  /** Subscribe to task create/update for a specific agent. */
+  /**
+   * Subscribe to task create/update for a specific agent.
+   * @deprecated Follow the caller session's `agent:<agent>/tasks` topic on takt (`/session`) instead.
+   */
   agentTasks: AgentTaskUpdate;
-  /** Subscribe to updates on agent connections and statuses. */
+  /**
+   * Subscribe to updates on agent connections and statuses.
+   * @deprecated Follow the caller session's `agents:org` topic on takt (`/session`) instead.
+   */
   agents: AgentChangeEvent;
-  /** Subscribe to all descendant task changes of a task. */
+  /** The organization's assets as they are stored (only those of `refs`, if given): an agent's declared asset becomes available the moment one with its ref arrives. */
+  assets: AssetChange;
+  /**
+   * Subscribe to all descendant task changes of a task.
+   * @deprecated Follow the caller session's `children:<task>` topic on takt (`/session`) instead.
+   */
   childTasks: ChildTaskEvent;
   /** Subscribe to changes in implementations. */
   implementationChange: Implementation;
   /** Subscribe to creation or updates of implementations. */
   implementations: ImplementationUpdate;
-  /** The task an agent's action last ran as, whoever started it, kept current. Yields a `LatestTaskSnapshot` first, then that task's events (`TaskEventChange`: progress, results, its end) and, as a `TaskChange`, every task of the action that starts or ends: a started one with a higher id is the latest from then on. A snapshot without an implementation means the agent offers no action under that interface, and nothing follows. */
+  /**
+   * The task an agent's action last ran as, whoever started it, kept current. Yields a `LatestTaskSnapshot` first, then that task's events (`TaskEventChange`: progress, results, its end) and, as a `TaskChange`, every task of the action that starts or ends: a started one with a higher id is the latest from then on. A snapshot without an implementation means the agent offers no action under that interface, and nothing follows.
+   * @deprecated Follow the caller session's `latest:<agent>/<interface>` topic on takt (`/session`) instead.
+   */
   latestTask: LatestTaskSnapshotTaskChangeTaskEventChange;
-  /** Subscribe to root tasks created by this client (caller-scoped). */
+  /**
+   * Subscribe to root tasks created by this client (caller-scoped).
+   * @deprecated Follow the caller session's `tasks:mine` topic on takt (`/session`) instead.
+   */
   mytasks: TaskChangeEvent;
-  /** Stream the events of one probe (caller-scoped, payload-carrying). Emits a state snapshot first when events already happened. */
+  /**
+   * Stream the events of one probe (caller-scoped, payload-carrying). Emits a state snapshot first when events already happened.
+   * @deprecated Follow the caller session's `probe:<probe>` topic on takt (`/session`) instead.
+   */
   probeEvents: ProbeEvent;
   /** Subscribe to the organization's schedules being created, changed (by a user or by their runs) or deleted. */
   schedules: RuleChangeEvent;
   /** Subscribe to the signals services send about the organization's objects: one arrived, or triggers were matched against it. */
   signals: SignalChangeEvent;
-  /** Subscribe to updates of state values and patches. */
+  /**
+   * Subscribe to updates of state values and patches.
+   * @deprecated Follow the caller session's `state:<agent>/<interface>` topic on takt (`/session`) instead.
+   */
   stateUpdateEvents: State;
-  /** Subscribe to root task changes across the whole organization. */
+  /**
+   * One task's events, whoever started it: those already recorded (all, or those newer than `after`), oldest first, then each new one as it is recorded, logs included. Replaces polling a task's event history.
+   * @deprecated Follow the caller session's `task:<task>` topic on takt (`/session`) instead.
+   */
+  taskEvents: TaskEventChange;
+  /**
+   * Subscribe to root task changes across the whole organization.
+   * @deprecated Follow the caller session's `tasks:org` topic on takt (`/session`) instead.
+   */
   tasks: TaskChangeEvent;
   /** Subscribe to the organization's triggers being created, changed (by a user or by their firings) or deleted. */
   triggers: RuleChangeEvent;
-  /** Watch an agent: yields snapshots for all states then streams patches. */
+  /**
+   * Watch an agent: yields snapshots for all states then streams patches.
+   * @deprecated Follow the caller session's `states:<agent>` topic on takt (`/session`) instead.
+   */
   watchAgent: AgentSnapshotEventStatePatchEvent;
-  /** Watch a state: yields the current snapshot then streams patches. */
+  /**
+   * Watch a state: yields the current snapshot then streams patches.
+   * @deprecated Follow the caller session's `state:<agent>/<interface>` topic on takt (`/session`) instead.
+   */
   watchState: StateSnapshotEventStatePatchEvent;
 };
 
@@ -6306,6 +6805,12 @@ export type Subscription = {
 /** Root subscription type for real-time event streams from the system. */
 export type SubscriptionAgentTasksArgs = {
   agent: Scalars['ID']['input'];
+};
+
+
+/** Root subscription type for real-time event streams from the system. */
+export type SubscriptionAssetsArgs = {
+  refs?: InputMaybe<Array<Scalars['String']['input']>>;
 };
 
 
@@ -6347,6 +6852,14 @@ export type SubscriptionStateUpdateEventsArgs = {
 
 
 /** Root subscription type for real-time event streams from the system. */
+export type SubscriptionTaskEventsArgs = {
+  after?: InputMaybe<Scalars['ID']['input']>;
+  afterSeq?: InputMaybe<Scalars['Int']['input']>;
+  task: Scalars['ID']['input'];
+};
+
+
+/** Root subscription type for real-time event streams from the system. */
 export type SubscriptionWatchAgentArgs = {
   agentId: Scalars['ID']['input'];
 };
@@ -6357,6 +6870,17 @@ export type SubscriptionWatchStateArgs = {
   agentId?: InputMaybe<Scalars['ID']['input']>;
   interface?: InputMaybe<Scalars['String']['input']>;
   stateId?: InputMaybe<Scalars['ID']['input']>;
+};
+
+/** An app that provisioned agents of the organization (a plugin engine, a launcher), as lok signed it into their tokens. Its agents are `agents(filters: {supervisor: identifier})`. */
+export type Supervisor = {
+  __typename?: 'Supervisor';
+  /** How many of the organization's agents it provisioned (of those the filters keep). */
+  agentCount: Scalars['Int']['output'];
+  /** How many of those have a live connection now. */
+  connectedCount: Scalars['Int']['output'];
+  /** The app's identifier, as the agents carry it in `supervisor` (e.g. 'plugin_engine'). */
+  identifier: Scalars['String']['output'];
 };
 
 /** Tracks the assignment of an implementation to a specific task. */
@@ -6388,6 +6912,10 @@ export type Task = {
   children: Array<Task>;
   /** Creation timestamp. */
   createdAt: Scalars['DateTime']['output'];
+  /** Whether a window's session holds the task's dead man switch (it is armed). */
+  deadmanArmed: Scalars['Boolean']['output'];
+  /** The dead man switch: the task is cancelled when the window holding it has been gone this many seconds. Null: it never depends on a window. */
+  deadmanSeconds?: Maybe<Scalars['Int']['output']>;
   /** The used dependencies for this assignemnet */
   dependencies: Scalars['AnyDefault']['output'];
   /** The dependency thats linked to the parents execution if applicable. */
@@ -6583,6 +7111,8 @@ export type TaskEvent = {
   step?: Maybe<Scalars['Int']['output']>;
   /** Associated task. */
   task: Task;
+  /** The event's number within its task (1, 2, 3 …) in commit order; the cursor to resume a task's events from. */
+  taskSeq?: Maybe<Scalars['Int']['output']>;
   /** EFFECT events: the value the task took (NOW: epoch seconds, RANDOM: hex, SLEEP: deadline). HELD: what waits for a decision ({kind: "assign", prompt, action, agent, args, caller_task, caller_agent} for a child an agent asked for, with held: the child's id on its parent and root; {kind: "self", prompt, details} for a task's own hold). DECIDED: the decision ({approved, answer, auto, user}). DENIED: {answer, user}. FAILED: {code} when the failure has one the protocol names (STATE_PRECONDITION: the agent's state did not match the task's stateRequires, and nothing of it ran). LOST: what is known about the lost run. */
   value?: Maybe<Scalars['AnyDefault']['output']>;
 };
@@ -6597,6 +7127,8 @@ export type TaskEventChange = {
   progress?: Maybe<Scalars['Int']['output']>;
   returns?: Maybe<Scalars['AnyDefault']['output']>;
   task: Scalars['ID']['output'];
+  /** The event's number within its task (1, 2, 3 …) in commit order: resume from it with `afterSeq`, never from the id. */
+  taskSeq?: Maybe<Scalars['Int']['output']>;
   /** EFFECT: the value taken. LOST: what is known (started, last_progress, effects, reason). */
   value?: Maybe<Scalars['AnyDefault']['output']>;
 };
@@ -6667,7 +7199,7 @@ export type TaskFilter = {
   agent?: InputMaybe<Scalars['ID']['input']>;
   /** Filter by the canonical args hash (the replay-discovery key) */
   argsHash?: InputMaybe<Scalars['String']['input']>;
-  /** Filter by the caller (client/user/organization) that created the task */
+  /** Filter by the caller that created the task: the ID of a Caller row (one client, user and organization), not a user. For a person use `user`. */
   caller?: InputMaybe<Scalars['ID']['input']>;
   /** Filter by the client ID of the app the executing agent is registered to */
   clientId?: InputMaybe<Scalars['ID']['input']>;
@@ -6675,10 +7207,16 @@ export type TaskFilter = {
   createdAfter?: InputMaybe<Scalars['DateTime']['input']>;
   /** Only tasks created before this timestamp */
   createdBefore?: InputMaybe<Scalars['DateTime']['input']>;
+  /** Only what the workflow (its root task id) created */
+  createdUnder?: InputMaybe<Scalars['ID']['input']>;
+  /** Keep only workflows someone started (true): root tasks no schedule ran and no trigger or signal fired: what a person would share (`shareWorkflow` takes any root task). False keeps every other task */
+  humanInduced?: InputMaybe<Scalars['Boolean']['input']>;
   /** Filter by IDs of the tasks */
   ids?: InputMaybe<Array<Scalars['ID']['input']>>;
   /** Filter by the implementation the task is currently mapped to */
   implementation?: InputMaybe<Scalars['ID']['input']>;
+  /** Only what is in this collaboration (its key): put in, or part of what was */
+  inCollaboration?: InputMaybe<Scalars['ID']['input']>;
   /** Filter by whether the task has finished */
   isDone?: InputMaybe<Scalars['Boolean']['input']>;
   /** Filter by the direct parent task */
@@ -6697,6 +7235,8 @@ export type TaskFilter = {
   state?: InputMaybe<Array<TaskEventKind>>;
   /** Keep the runs this trigger fired */
   trigger?: InputMaybe<Scalars['ID']['input']>;
+  /** Filter by the user (their sub) on whose behalf the task was created, whatever client they used. */
+  user?: InputMaybe<Scalars['ID']['input']>;
 };
 
 /** What is known of a task someone asked about: what its agent said of it, or, where the agent was not asked (it is away, or has not acknowledged the assign yet), what the server knows. */
@@ -7062,9 +7602,10 @@ export type TriggerIdInput = {
 };
 
 export type TriggerOrder =
-  { createdAt: Ordering; name?: never; updatedAt?: never; }
-  |  { createdAt?: never; name: Ordering; updatedAt?: never; }
-  |  { createdAt?: never; name?: never; updatedAt: Ordering; };
+  { consecutiveFailures: Ordering; createdAt?: never; name?: never; updatedAt?: never; }
+  |  { consecutiveFailures?: never; createdAt: Ordering; name?: never; updatedAt?: never; }
+  |  { consecutiveFailures?: never; createdAt?: never; name: Ordering; updatedAt?: never; }
+  |  { consecutiveFailures?: never; createdAt?: never; name?: never; updatedAt: Ordering; };
 
 /** Remove a shortcut's binding to a user. */
 export type UnbindShortcutInput = {
@@ -7389,6 +7930,23 @@ export type WiregramInput = {
   triggers?: InputMaybe<Array<WireTriggerInput>>;
 };
 
+/** What sharing a workflow put in a collaboration here (or, tried, would put in) */
+export type WorkflowShare = {
+  __typename?: 'WorkflowShare';
+  /** Put in, with what each needs to be seen */
+  added: Array<SharedObject>;
+  /** The collaboration's key */
+  collaboration: Scalars['ID']['output'];
+  /** How many parts came along with their whole, without being put in themselves */
+  covered: Scalars['Int']['output'];
+  /** Whether nothing was written */
+  dryRun: Scalars['Boolean']['output'];
+  /** Left out: parts of something made before the workflow and not shared */
+  skipped: Array<SkippedObject>;
+  /** Structures here that cannot say what created their objects: not looked at */
+  unknown: Array<Scalars['String']['output']>;
+};
+
 export type _Entity = MediaStore | Session | User;
 
 export type _Service = {
@@ -7596,9 +8154,9 @@ export type ChildTaskFragment = { __typename?: 'Task', id: string, reference?: s
 
 export type DetailTaskFragment = { __typename?: 'Task', id: string, reference?: string | null, latestEventKind: TaskEventKind, latestInstructKind: TaskInstructKind, isDone: boolean, args: any, createdAt: any, finishedAt?: any | null, action: { __typename?: 'Action', id: string, name: string, description?: string | null, args: Array<{ __typename?: 'ArgPort', key: string, label?: string | null, kind: PortKind, identifier?: any | null, description?: string | null }>, returns: Array<{ __typename?: 'ReturnPort', key: string, label?: string | null, kind: PortKind, identifier?: any | null, description?: string | null }> }, implementation?: { __typename?: 'Implementation', id: string, interface: string } | null, agent?: { __typename?: 'Agent', id: string, name: string, connected: boolean } | null, parent?: { __typename?: 'Task', id: string, action: { __typename?: 'Action', id: string, name: string } } | null, root?: { __typename?: 'Task', id: string } | null, events: Array<{ __typename?: 'TaskEvent', id: string, kind: TaskEventKind, level: LogLevel, message?: string | null, progress?: number | null, returns?: any | null, createdAt: any }>, children: Array<{ __typename?: 'Task', id: string, reference?: string | null, latestEventKind: TaskEventKind, isDone: boolean, createdAt: any, finishedAt?: any | null, parentStep?: number | null, callKey?: string | null, action: { __typename?: 'Action', id: string, name: string } }> };
 
-export type TaskChangeFragment = { __typename?: 'TaskChange', id: string, reference?: string | null, isDone: boolean, latestEventKind: TaskEventKind, latestInstructKind: TaskInstructKind, root?: string | null, parent?: string | null, createdAt: any, updatedAt: any, finishedAt?: any | null };
+export type TaskChangeFragment = { __typename?: 'TaskChange', id: string, reference?: string | null, isDone: boolean, latestEventKind: TaskEventKind, latestInstructKind: TaskInstructKind, action: string, implementation?: string | null, agent?: string | null, root?: string | null, parent?: string | null, createdAt: any, updatedAt: any, finishedAt?: any | null };
 
-export type TaskEventChangeFragment = { __typename?: 'TaskEventChange', id: string, task: string, kind: TaskEventKind, message?: string | null, progress?: number | null, returns?: any | null, value?: any | null, createdAt: any };
+export type TaskEventChangeFragment = { __typename?: 'TaskEventChange', id: string, task: string, taskSeq?: number | null, kind: TaskEventKind, message?: string | null, progress?: number | null, returns?: any | null, value?: any | null, createdAt: any };
 
 export type ReplyerActionFragment = { __typename?: 'Action', id: string, name: string, description?: string | null, args: Array<{ __typename: 'ArgPort', key: string, label?: string | null, nullable: boolean, description?: string | null, kind: PortKind, identifier?: any | null, referenceUnit?: string | null, proposedUnits?: Array<string> | null, dimension?: string | null, default?: any | null, effects?: Array<{ __typename: 'CustomEffect', kind: EffectKind, dependencies: Array<string>, source?: string | null, call: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null }> | null } } | { __typename: 'HideEffect', fade: boolean, kind: EffectKind, dependencies: Array<string>, source?: string | null, call: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null }> | null } } | { __typename: 'MessageEffect', kind: EffectKind, message: string, dependencies: Array<string>, source?: string | null, call: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null }> | null } }> | null, widget?: { __typename: 'BlokAssignWidget', kind: AssignWidgetKind } | { __typename: 'ChoiceAssignWidget', kind: AssignWidgetKind, followValue?: string | null, placeholder?: string | null } | { __typename: 'CustomAssignWidget', kind: AssignWidgetKind, followValue?: string | null, component: string, dependencies?: Array<string> | null, fallback?: { __typename: 'BlokAssignWidget', kind: AssignWidgetKind } | { __typename: 'ChoiceAssignWidget', kind: AssignWidgetKind, followValue?: string | null, placeholder?: string | null } | { __typename: 'CustomAssignWidget', kind: AssignWidgetKind } | { __typename: 'ProxyWidget', kind: AssignWidgetKind, followValue?: string | null, targetPort: string, targetAction: string, targetDependency?: string | null } | { __typename: 'SearchAssignWidget', kind: AssignWidgetKind, followValue?: string | null, query: string, ward: string, dependencies?: Array<string> | null, filters?: Array<{ __typename: 'ArgPort', kind: PortKind, key: string, identifier?: any | null, description?: string | null, nullable: boolean, widget?: { __typename?: 'BlokAssignWidget' } | { __typename?: 'ChoiceAssignWidget' } | { __typename?: 'CustomAssignWidget' } | { __typename?: 'ProxyWidget' } | { __typename?: 'SearchAssignWidget', query: string } | { __typename?: 'SliderAssignWidget' } | { __typename?: 'StateChoiceAssignWidget' } | { __typename?: 'StringAssignWidget' } | null }> | null } | { __typename: 'SliderAssignWidget', kind: AssignWidgetKind, followValue?: string | null, min?: number | null, max?: number | null, step?: number | null } | { __typename: 'StateChoiceAssignWidget', kind: AssignWidgetKind, followValue?: string | null, statePath?: string | null, dependency?: string | null, dependencies?: Array<string> | null, stateCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null }> | null } | null, stateAccessors?: Array<{ __typename?: 'StateAccessor', optionKey: OptionKey, path?: string | null, call?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null }> | null } | null }> | null } | { __typename: 'StringAssignWidget', kind: AssignWidgetKind, followValue?: string | null, placeholder?: string | null, asParagraph?: boolean | null } | null } | { __typename: 'ProxyWidget', kind: AssignWidgetKind, followValue?: string | null, targetPort: string, targetAction: string, targetDependency?: string | null } | { __typename: 'SearchAssignWidget', kind: AssignWidgetKind, followValue?: string | null, query: string, ward: string, dependencies?: Array<string> | null, filters?: Array<{ __typename: 'ArgPort', kind: PortKind, key: string, identifier?: any | null, description?: string | null, nullable: boolean, widget?: { __typename?: 'BlokAssignWidget' } | { __typename?: 'ChoiceAssignWidget' } | { __typename?: 'CustomAssignWidget' } | { __typename?: 'ProxyWidget' } | { __typename?: 'SearchAssignWidget', query: string } | { __typename?: 'SliderAssignWidget' } | { __typename?: 'StateChoiceAssignWidget' } | { __typename?: 'StringAssignWidget' } | null }> | null } | { __typename: 'SliderAssignWidget', kind: AssignWidgetKind, followValue?: string | null, min?: number | null, max?: number | null, step?: number | null } | { __typename: 'StateChoiceAssignWidget', kind: AssignWidgetKind, followValue?: string | null, statePath?: string | null, dependency?: string | null, dependencies?: Array<string> | null, stateCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null }> | null } | null, stateAccessors?: Array<{ __typename?: 'StateAccessor', optionKey: OptionKey, path?: string | null, call?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null }> | null } | null }> | null } | { __typename: 'StringAssignWidget', kind: AssignWidgetKind, followValue?: string | null, placeholder?: string | null, asParagraph?: boolean | null } | null, children?: Array<{ __typename: 'ArgPort', kind: PortKind, key: string, label?: string | null, identifier?: any | null, referenceUnit?: string | null, proposedUnits?: Array<string> | null, dimension?: string | null, nullable: boolean, description?: string | null, default?: any | null, children?: Array<{ __typename: 'ArgPort', kind: PortKind, key: string, label?: string | null, identifier?: any | null, referenceUnit?: string | null, proposedUnits?: Array<string> | null, dimension?: string | null, description?: string | null, nullable: boolean, default?: any | null, children?: Array<{ __typename: 'ArgPort', kind: PortKind, key: string, label?: string | null, identifier?: any | null, referenceUnit?: string | null, proposedUnits?: Array<string> | null, dimension?: string | null, description?: string | null, nullable: boolean, default?: any | null, choices?: Array<{ __typename?: 'Choice', value: any, label: string, description?: string | null }> | null, widget?: { __typename: 'BlokAssignWidget', kind: AssignWidgetKind } | { __typename: 'ChoiceAssignWidget', kind: AssignWidgetKind, followValue?: string | null, placeholder?: string | null } | { __typename: 'CustomAssignWidget', kind: AssignWidgetKind, followValue?: string | null, component: string, dependencies?: Array<string> | null, fallback?: { __typename: 'BlokAssignWidget', kind: AssignWidgetKind } | { __typename: 'ChoiceAssignWidget', kind: AssignWidgetKind, followValue?: string | null, placeholder?: string | null } | { __typename: 'CustomAssignWidget', kind: AssignWidgetKind } | { __typename: 'ProxyWidget', kind: AssignWidgetKind, followValue?: string | null, targetPort: string, targetAction: string, targetDependency?: string | null } | { __typename: 'SearchAssignWidget', kind: AssignWidgetKind, followValue?: string | null, query: string, ward: string, dependencies?: Array<string> | null, filters?: Array<{ __typename: 'ArgPort', kind: PortKind, key: string, identifier?: any | null, description?: string | null, nullable: boolean, widget?: { __typename?: 'BlokAssignWidget' } | { __typename?: 'ChoiceAssignWidget' } | { __typename?: 'CustomAssignWidget' } | { __typename?: 'ProxyWidget' } | { __typename?: 'SearchAssignWidget', query: string } | { __typename?: 'SliderAssignWidget' } | { __typename?: 'StateChoiceAssignWidget' } | { __typename?: 'StringAssignWidget' } | null }> | null } | { __typename: 'SliderAssignWidget', kind: AssignWidgetKind, followValue?: string | null, min?: number | null, max?: number | null, step?: number | null } | { __typename: 'StateChoiceAssignWidget', kind: AssignWidgetKind, followValue?: string | null, statePath?: string | null, dependency?: string | null, dependencies?: Array<string> | null, stateCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null }> | null } | null, stateAccessors?: Array<{ __typename?: 'StateAccessor', optionKey: OptionKey, path?: string | null, call?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null }> | null } | null }> | null } | { __typename: 'StringAssignWidget', kind: AssignWidgetKind, followValue?: string | null, placeholder?: string | null, asParagraph?: boolean | null } | null } | { __typename: 'ProxyWidget', kind: AssignWidgetKind, followValue?: string | null, targetPort: string, targetAction: string, targetDependency?: string | null } | { __typename: 'SearchAssignWidget', kind: AssignWidgetKind, followValue?: string | null, query: string, ward: string, dependencies?: Array<string> | null, filters?: Array<{ __typename: 'ArgPort', kind: PortKind, key: string, identifier?: any | null, description?: string | null, nullable: boolean, widget?: { __typename?: 'BlokAssignWidget' } | { __typename?: 'ChoiceAssignWidget' } | { __typename?: 'CustomAssignWidget' } | { __typename?: 'ProxyWidget' } | { __typename?: 'SearchAssignWidget', query: string } | { __typename?: 'SliderAssignWidget' } | { __typename?: 'StateChoiceAssignWidget' } | { __typename?: 'StringAssignWidget' } | null }> | null } | { __typename: 'SliderAssignWidget', kind: AssignWidgetKind, followValue?: string | null, min?: number | null, max?: number | null, step?: number | null } | { __typename: 'StateChoiceAssignWidget', kind: AssignWidgetKind, followValue?: string | null, statePath?: string | null, dependency?: string | null, dependencies?: Array<string> | null, stateCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null }> | null } | null, stateAccessors?: Array<{ __typename?: 'StateAccessor', optionKey: OptionKey, path?: string | null, call?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null }> | null } | null }> | null } | { __typename: 'StringAssignWidget', kind: AssignWidgetKind, followValue?: string | null, placeholder?: string | null, asParagraph?: boolean | null } | null, children?: Array<{ __typename: 'ArgPort', kind: PortKind, key: string, identifier?: any | null, nullable: boolean, widget?: { __typename: 'BlokAssignWidget', kind: AssignWidgetKind } | { __typename: 'ChoiceAssignWidget', kind: AssignWidgetKind, followValue?: string | null, placeholder?: string | null } | { __typename: 'CustomAssignWidget', kind: AssignWidgetKind, followValue?: string | null, component: string, dependencies?: Array<string> | null, fallback?: { __typename: 'BlokAssignWidget', kind: AssignWidgetKind } | { __typename: 'ChoiceAssignWidget', kind: AssignWidgetKind, followValue?: string | null, placeholder?: string | null } | { __typename: 'CustomAssignWidget', kind: AssignWidgetKind } | { __typename: 'ProxyWidget', kind: AssignWidgetKind, followValue?: string | null, targetPort: string, targetAction: string, targetDependency?: string | null } | { __typename: 'SearchAssignWidget', kind: AssignWidgetKind, followValue?: string | null, query: string, ward: string, dependencies?: Array<string> | null, filters?: Array<{ __typename: 'ArgPort', kind: PortKind, key: string, identifier?: any | null, description?: string | null, nullable: boolean, widget?: { __typename?: 'BlokAssignWidget' } | { __typename?: 'ChoiceAssignWidget' } | { __typename?: 'CustomAssignWidget' } | { __typename?: 'ProxyWidget' } | { __typename?: 'SearchAssignWidget', query: string } | { __typename?: 'SliderAssignWidget' } | { __typename?: 'StateChoiceAssignWidget' } | { __typename?: 'StringAssignWidget' } | null }> | null } | { __typename: 'SliderAssignWidget', kind: AssignWidgetKind, followValue?: string | null, min?: number | null, max?: number | null, step?: number | null } | { __typename: 'StateChoiceAssignWidget', kind: AssignWidgetKind, followValue?: string | null, statePath?: string | null, dependency?: string | null, dependencies?: Array<string> | null, stateCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null }> | null } | null, stateAccessors?: Array<{ __typename?: 'StateAccessor', optionKey: OptionKey, path?: string | null, call?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null }> | null } | null }> | null } | { __typename: 'StringAssignWidget', kind: AssignWidgetKind, followValue?: string | null, placeholder?: string | null, asParagraph?: boolean | null } | null } | { __typename: 'ProxyWidget', kind: AssignWidgetKind, followValue?: string | null, targetPort: string, targetAction: string, targetDependency?: string | null } | { __typename: 'SearchAssignWidget', kind: AssignWidgetKind, followValue?: string | null, query: string, ward: string, dependencies?: Array<string> | null, filters?: Array<{ __typename: 'ArgPort', kind: PortKind, key: string, identifier?: any | null, description?: string | null, nullable: boolean, widget?: { __typename?: 'BlokAssignWidget' } | { __typename?: 'ChoiceAssignWidget' } | { __typename?: 'CustomAssignWidget' } | { __typename?: 'ProxyWidget' } | { __typename?: 'SearchAssignWidget', query: string } | { __typename?: 'SliderAssignWidget' } | { __typename?: 'StateChoiceAssignWidget' } | { __typename?: 'StringAssignWidget' } | null }> | null } | { __typename: 'SliderAssignWidget', kind: AssignWidgetKind, followValue?: string | null, min?: number | null, max?: number | null, step?: number | null } | { __typename: 'StateChoiceAssignWidget', kind: AssignWidgetKind, followValue?: string | null, statePath?: string | null, dependency?: string | null, dependencies?: Array<string> | null, stateCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null }> | null } | null, stateAccessors?: Array<{ __typename?: 'StateAccessor', optionKey: OptionKey, path?: string | null, call?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null }> | null } | null }> | null } | { __typename: 'StringAssignWidget', kind: AssignWidgetKind, followValue?: string | null, placeholder?: string | null, asParagraph?: boolean | null } | null }> | null }> | null, choices?: Array<{ __typename?: 'Choice', value: any, label: string, description?: string | null }> | null, widget?: { __typename: 'BlokAssignWidget', kind: AssignWidgetKind } | { __typename: 'ChoiceAssignWidget', kind: AssignWidgetKind, followValue?: string | null, placeholder?: string | null } | { __typename: 'CustomAssignWidget', kind: AssignWidgetKind, followValue?: string | null, component: string, dependencies?: Array<string> | null, fallback?: { __typename: 'BlokAssignWidget', kind: AssignWidgetKind } | { __typename: 'ChoiceAssignWidget', kind: AssignWidgetKind, followValue?: string | null, placeholder?: string | null } | { __typename: 'CustomAssignWidget', kind: AssignWidgetKind } | { __typename: 'ProxyWidget', kind: AssignWidgetKind, followValue?: string | null, targetPort: string, targetAction: string, targetDependency?: string | null } | { __typename: 'SearchAssignWidget', kind: AssignWidgetKind, followValue?: string | null, query: string, ward: string, dependencies?: Array<string> | null, filters?: Array<{ __typename: 'ArgPort', kind: PortKind, key: string, identifier?: any | null, description?: string | null, nullable: boolean, widget?: { __typename?: 'BlokAssignWidget' } | { __typename?: 'ChoiceAssignWidget' } | { __typename?: 'CustomAssignWidget' } | { __typename?: 'ProxyWidget' } | { __typename?: 'SearchAssignWidget', query: string } | { __typename?: 'SliderAssignWidget' } | { __typename?: 'StateChoiceAssignWidget' } | { __typename?: 'StringAssignWidget' } | null }> | null } | { __typename: 'SliderAssignWidget', kind: AssignWidgetKind, followValue?: string | null, min?: number | null, max?: number | null, step?: number | null } | { __typename: 'StateChoiceAssignWidget', kind: AssignWidgetKind, followValue?: string | null, statePath?: string | null, dependency?: string | null, dependencies?: Array<string> | null, stateCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null }> | null } | null, stateAccessors?: Array<{ __typename?: 'StateAccessor', optionKey: OptionKey, path?: string | null, call?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null }> | null } | null }> | null } | { __typename: 'StringAssignWidget', kind: AssignWidgetKind, followValue?: string | null, placeholder?: string | null, asParagraph?: boolean | null } | null } | { __typename: 'ProxyWidget', kind: AssignWidgetKind, followValue?: string | null, targetPort: string, targetAction: string, targetDependency?: string | null } | { __typename: 'SearchAssignWidget', kind: AssignWidgetKind, followValue?: string | null, query: string, ward: string, dependencies?: Array<string> | null, filters?: Array<{ __typename: 'ArgPort', kind: PortKind, key: string, identifier?: any | null, description?: string | null, nullable: boolean, widget?: { __typename?: 'BlokAssignWidget' } | { __typename?: 'ChoiceAssignWidget' } | { __typename?: 'CustomAssignWidget' } | { __typename?: 'ProxyWidget' } | { __typename?: 'SearchAssignWidget', query: string } | { __typename?: 'SliderAssignWidget' } | { __typename?: 'StateChoiceAssignWidget' } | { __typename?: 'StringAssignWidget' } | null }> | null } | { __typename: 'SliderAssignWidget', kind: AssignWidgetKind, followValue?: string | null, min?: number | null, max?: number | null, step?: number | null } | { __typename: 'StateChoiceAssignWidget', kind: AssignWidgetKind, followValue?: string | null, statePath?: string | null, dependency?: string | null, dependencies?: Array<string> | null, stateCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null }> | null } | null, stateAccessors?: Array<{ __typename?: 'StateAccessor', optionKey: OptionKey, path?: string | null, call?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null }> | null } | null }> | null } | { __typename: 'StringAssignWidget', kind: AssignWidgetKind, followValue?: string | null, placeholder?: string | null, asParagraph?: boolean | null } | null, effects?: Array<{ __typename: 'CustomEffect', kind: EffectKind, dependencies: Array<string>, source?: string | null, call: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null }> | null } } | { __typename: 'HideEffect', fade: boolean, kind: EffectKind, dependencies: Array<string>, source?: string | null, call: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null }> | null } } | { __typename: 'MessageEffect', kind: EffectKind, message: string, dependencies: Array<string>, source?: string | null, call: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null }> | null } }> | null, validators?: Array<{ __typename?: 'Validator', dependencies?: Array<string> | null, label?: string | null, errorMessage?: string | null, source?: string | null, call: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null }> | null } }> | null }> | null, widget?: { __typename: 'BlokAssignWidget', kind: AssignWidgetKind } | { __typename: 'ChoiceAssignWidget', kind: AssignWidgetKind, followValue?: string | null, placeholder?: string | null } | { __typename: 'CustomAssignWidget', kind: AssignWidgetKind, followValue?: string | null, component: string, dependencies?: Array<string> | null, fallback?: { __typename: 'BlokAssignWidget', kind: AssignWidgetKind } | { __typename: 'ChoiceAssignWidget', kind: AssignWidgetKind, followValue?: string | null, placeholder?: string | null } | { __typename: 'CustomAssignWidget', kind: AssignWidgetKind } | { __typename: 'ProxyWidget', kind: AssignWidgetKind, followValue?: string | null, targetPort: string, targetAction: string, targetDependency?: string | null } | { __typename: 'SearchAssignWidget', kind: AssignWidgetKind, followValue?: string | null, query: string, ward: string, dependencies?: Array<string> | null, filters?: Array<{ __typename: 'ArgPort', kind: PortKind, key: string, identifier?: any | null, description?: string | null, nullable: boolean, widget?: { __typename?: 'BlokAssignWidget' } | { __typename?: 'ChoiceAssignWidget' } | { __typename?: 'CustomAssignWidget' } | { __typename?: 'ProxyWidget' } | { __typename?: 'SearchAssignWidget', query: string } | { __typename?: 'SliderAssignWidget' } | { __typename?: 'StateChoiceAssignWidget' } | { __typename?: 'StringAssignWidget' } | null }> | null } | { __typename: 'SliderAssignWidget', kind: AssignWidgetKind, followValue?: string | null, min?: number | null, max?: number | null, step?: number | null } | { __typename: 'StateChoiceAssignWidget', kind: AssignWidgetKind, followValue?: string | null, statePath?: string | null, dependency?: string | null, dependencies?: Array<string> | null, stateCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null }> | null } | null, stateAccessors?: Array<{ __typename?: 'StateAccessor', optionKey: OptionKey, path?: string | null, call?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null }> | null } | null }> | null } | { __typename: 'StringAssignWidget', kind: AssignWidgetKind, followValue?: string | null, placeholder?: string | null, asParagraph?: boolean | null } | null } | { __typename: 'ProxyWidget', kind: AssignWidgetKind, followValue?: string | null, targetPort: string, targetAction: string, targetDependency?: string | null } | { __typename: 'SearchAssignWidget', kind: AssignWidgetKind, followValue?: string | null, query: string, ward: string, dependencies?: Array<string> | null, filters?: Array<{ __typename: 'ArgPort', kind: PortKind, key: string, identifier?: any | null, description?: string | null, nullable: boolean, widget?: { __typename?: 'BlokAssignWidget' } | { __typename?: 'ChoiceAssignWidget' } | { __typename?: 'CustomAssignWidget' } | { __typename?: 'ProxyWidget' } | { __typename?: 'SearchAssignWidget', query: string } | { __typename?: 'SliderAssignWidget' } | { __typename?: 'StateChoiceAssignWidget' } | { __typename?: 'StringAssignWidget' } | null }> | null } | { __typename: 'SliderAssignWidget', kind: AssignWidgetKind, followValue?: string | null, min?: number | null, max?: number | null, step?: number | null } | { __typename: 'StateChoiceAssignWidget', kind: AssignWidgetKind, followValue?: string | null, statePath?: string | null, dependency?: string | null, dependencies?: Array<string> | null, stateCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null }> | null } | null, stateAccessors?: Array<{ __typename?: 'StateAccessor', optionKey: OptionKey, path?: string | null, call?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null }> | null } | null }> | null } | { __typename: 'StringAssignWidget', kind: AssignWidgetKind, followValue?: string | null, placeholder?: string | null, asParagraph?: boolean | null } | null, effects?: Array<{ __typename: 'CustomEffect', kind: EffectKind, dependencies: Array<string>, source?: string | null, call: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null }> | null } } | { __typename: 'HideEffect', fade: boolean, kind: EffectKind, dependencies: Array<string>, source?: string | null, call: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null }> | null } } | { __typename: 'MessageEffect', kind: EffectKind, message: string, dependencies: Array<string>, source?: string | null, call: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null }> | null } }> | null, validators?: Array<{ __typename?: 'Validator', dependencies?: Array<string> | null, label?: string | null, errorMessage?: string | null, source?: string | null, call: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null }> | null } }> | null, choices?: Array<{ __typename?: 'Choice', value: any, label: string, description?: string | null }> | null }> | null, choices?: Array<{ __typename?: 'Choice', value: any, label: string, description?: string | null }> | null, validators?: Array<{ __typename?: 'Validator', dependencies?: Array<string> | null, label?: string | null, errorMessage?: string | null, source?: string | null, call: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null }> | null } }> | null, requires?: Array<{ __typename?: 'Requires', key: string, operator: DescriptorOperator, value?: any | null }> | null }>, portGroups: Array<{ __typename?: 'PortGroup', key: string, title?: string | null, description?: string | null, ports: Array<string>, effects?: Array<{ __typename: 'CustomEffect', kind: EffectKind, dependencies: Array<string>, source?: string | null, call: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null }> | null } } | { __typename: 'HideEffect', fade: boolean, kind: EffectKind, dependencies: Array<string>, source?: string | null, call: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null }> | null } } | { __typename: 'MessageEffect', kind: EffectKind, message: string, dependencies: Array<string>, source?: string | null, call: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null }> | null } }> | null }>, latestTask?: { __typename?: 'Task', id: string, args: any } | null };
 
@@ -7854,27 +8412,6 @@ export type ReplyerActionsQueryVariables = Exact<{ [key: string]: never; }>;
 
 
 export type ReplyerActionsQuery = { __typename?: 'Query', actions: Array<{ __typename?: 'Action', id: string, name: string, description?: string | null, args: Array<{ __typename: 'ArgPort', key: string, label?: string | null, nullable: boolean, description?: string | null, kind: PortKind, identifier?: any | null, referenceUnit?: string | null, proposedUnits?: Array<string> | null, dimension?: string | null, default?: any | null, effects?: Array<{ __typename: 'CustomEffect', kind: EffectKind, dependencies: Array<string>, source?: string | null, call: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null }> | null } } | { __typename: 'HideEffect', fade: boolean, kind: EffectKind, dependencies: Array<string>, source?: string | null, call: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null }> | null } } | { __typename: 'MessageEffect', kind: EffectKind, message: string, dependencies: Array<string>, source?: string | null, call: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null }> | null } }> | null, widget?: { __typename: 'BlokAssignWidget', kind: AssignWidgetKind } | { __typename: 'ChoiceAssignWidget', kind: AssignWidgetKind, followValue?: string | null, placeholder?: string | null } | { __typename: 'CustomAssignWidget', kind: AssignWidgetKind, followValue?: string | null, component: string, dependencies?: Array<string> | null, fallback?: { __typename: 'BlokAssignWidget', kind: AssignWidgetKind } | { __typename: 'ChoiceAssignWidget', kind: AssignWidgetKind, followValue?: string | null, placeholder?: string | null } | { __typename: 'CustomAssignWidget', kind: AssignWidgetKind } | { __typename: 'ProxyWidget', kind: AssignWidgetKind, followValue?: string | null, targetPort: string, targetAction: string, targetDependency?: string | null } | { __typename: 'SearchAssignWidget', kind: AssignWidgetKind, followValue?: string | null, query: string, ward: string, dependencies?: Array<string> | null, filters?: Array<{ __typename: 'ArgPort', kind: PortKind, key: string, identifier?: any | null, description?: string | null, nullable: boolean, widget?: { __typename?: 'BlokAssignWidget' } | { __typename?: 'ChoiceAssignWidget' } | { __typename?: 'CustomAssignWidget' } | { __typename?: 'ProxyWidget' } | { __typename?: 'SearchAssignWidget', query: string } | { __typename?: 'SliderAssignWidget' } | { __typename?: 'StateChoiceAssignWidget' } | { __typename?: 'StringAssignWidget' } | null }> | null } | { __typename: 'SliderAssignWidget', kind: AssignWidgetKind, followValue?: string | null, min?: number | null, max?: number | null, step?: number | null } | { __typename: 'StateChoiceAssignWidget', kind: AssignWidgetKind, followValue?: string | null, statePath?: string | null, dependency?: string | null, dependencies?: Array<string> | null, stateCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null }> | null } | null, stateAccessors?: Array<{ __typename?: 'StateAccessor', optionKey: OptionKey, path?: string | null, call?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null }> | null } | null }> | null } | { __typename: 'StringAssignWidget', kind: AssignWidgetKind, followValue?: string | null, placeholder?: string | null, asParagraph?: boolean | null } | null } | { __typename: 'ProxyWidget', kind: AssignWidgetKind, followValue?: string | null, targetPort: string, targetAction: string, targetDependency?: string | null } | { __typename: 'SearchAssignWidget', kind: AssignWidgetKind, followValue?: string | null, query: string, ward: string, dependencies?: Array<string> | null, filters?: Array<{ __typename: 'ArgPort', kind: PortKind, key: string, identifier?: any | null, description?: string | null, nullable: boolean, widget?: { __typename?: 'BlokAssignWidget' } | { __typename?: 'ChoiceAssignWidget' } | { __typename?: 'CustomAssignWidget' } | { __typename?: 'ProxyWidget' } | { __typename?: 'SearchAssignWidget', query: string } | { __typename?: 'SliderAssignWidget' } | { __typename?: 'StateChoiceAssignWidget' } | { __typename?: 'StringAssignWidget' } | null }> | null } | { __typename: 'SliderAssignWidget', kind: AssignWidgetKind, followValue?: string | null, min?: number | null, max?: number | null, step?: number | null } | { __typename: 'StateChoiceAssignWidget', kind: AssignWidgetKind, followValue?: string | null, statePath?: string | null, dependency?: string | null, dependencies?: Array<string> | null, stateCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null }> | null } | null, stateAccessors?: Array<{ __typename?: 'StateAccessor', optionKey: OptionKey, path?: string | null, call?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null }> | null } | null }> | null } | { __typename: 'StringAssignWidget', kind: AssignWidgetKind, followValue?: string | null, placeholder?: string | null, asParagraph?: boolean | null } | null, children?: Array<{ __typename: 'ArgPort', kind: PortKind, key: string, label?: string | null, identifier?: any | null, referenceUnit?: string | null, proposedUnits?: Array<string> | null, dimension?: string | null, nullable: boolean, description?: string | null, default?: any | null, children?: Array<{ __typename: 'ArgPort', kind: PortKind, key: string, label?: string | null, identifier?: any | null, referenceUnit?: string | null, proposedUnits?: Array<string> | null, dimension?: string | null, description?: string | null, nullable: boolean, default?: any | null, children?: Array<{ __typename: 'ArgPort', kind: PortKind, key: string, label?: string | null, identifier?: any | null, referenceUnit?: string | null, proposedUnits?: Array<string> | null, dimension?: string | null, description?: string | null, nullable: boolean, default?: any | null, choices?: Array<{ __typename?: 'Choice', value: any, label: string, description?: string | null }> | null, widget?: { __typename: 'BlokAssignWidget', kind: AssignWidgetKind } | { __typename: 'ChoiceAssignWidget', kind: AssignWidgetKind, followValue?: string | null, placeholder?: string | null } | { __typename: 'CustomAssignWidget', kind: AssignWidgetKind, followValue?: string | null, component: string, dependencies?: Array<string> | null, fallback?: { __typename: 'BlokAssignWidget', kind: AssignWidgetKind } | { __typename: 'ChoiceAssignWidget', kind: AssignWidgetKind, followValue?: string | null, placeholder?: string | null } | { __typename: 'CustomAssignWidget', kind: AssignWidgetKind } | { __typename: 'ProxyWidget', kind: AssignWidgetKind, followValue?: string | null, targetPort: string, targetAction: string, targetDependency?: string | null } | { __typename: 'SearchAssignWidget', kind: AssignWidgetKind, followValue?: string | null, query: string, ward: string, dependencies?: Array<string> | null, filters?: Array<{ __typename: 'ArgPort', kind: PortKind, key: string, identifier?: any | null, description?: string | null, nullable: boolean, widget?: { __typename?: 'BlokAssignWidget' } | { __typename?: 'ChoiceAssignWidget' } | { __typename?: 'CustomAssignWidget' } | { __typename?: 'ProxyWidget' } | { __typename?: 'SearchAssignWidget', query: string } | { __typename?: 'SliderAssignWidget' } | { __typename?: 'StateChoiceAssignWidget' } | { __typename?: 'StringAssignWidget' } | null }> | null } | { __typename: 'SliderAssignWidget', kind: AssignWidgetKind, followValue?: string | null, min?: number | null, max?: number | null, step?: number | null } | { __typename: 'StateChoiceAssignWidget', kind: AssignWidgetKind, followValue?: string | null, statePath?: string | null, dependency?: string | null, dependencies?: Array<string> | null, stateCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null }> | null } | null, stateAccessors?: Array<{ __typename?: 'StateAccessor', optionKey: OptionKey, path?: string | null, call?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null }> | null } | null }> | null } | { __typename: 'StringAssignWidget', kind: AssignWidgetKind, followValue?: string | null, placeholder?: string | null, asParagraph?: boolean | null } | null } | { __typename: 'ProxyWidget', kind: AssignWidgetKind, followValue?: string | null, targetPort: string, targetAction: string, targetDependency?: string | null } | { __typename: 'SearchAssignWidget', kind: AssignWidgetKind, followValue?: string | null, query: string, ward: string, dependencies?: Array<string> | null, filters?: Array<{ __typename: 'ArgPort', kind: PortKind, key: string, identifier?: any | null, description?: string | null, nullable: boolean, widget?: { __typename?: 'BlokAssignWidget' } | { __typename?: 'ChoiceAssignWidget' } | { __typename?: 'CustomAssignWidget' } | { __typename?: 'ProxyWidget' } | { __typename?: 'SearchAssignWidget', query: string } | { __typename?: 'SliderAssignWidget' } | { __typename?: 'StateChoiceAssignWidget' } | { __typename?: 'StringAssignWidget' } | null }> | null } | { __typename: 'SliderAssignWidget', kind: AssignWidgetKind, followValue?: string | null, min?: number | null, max?: number | null, step?: number | null } | { __typename: 'StateChoiceAssignWidget', kind: AssignWidgetKind, followValue?: string | null, statePath?: string | null, dependency?: string | null, dependencies?: Array<string> | null, stateCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null }> | null } | null, stateAccessors?: Array<{ __typename?: 'StateAccessor', optionKey: OptionKey, path?: string | null, call?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null }> | null } | null }> | null } | { __typename: 'StringAssignWidget', kind: AssignWidgetKind, followValue?: string | null, placeholder?: string | null, asParagraph?: boolean | null } | null, children?: Array<{ __typename: 'ArgPort', kind: PortKind, key: string, identifier?: any | null, nullable: boolean, widget?: { __typename: 'BlokAssignWidget', kind: AssignWidgetKind } | { __typename: 'ChoiceAssignWidget', kind: AssignWidgetKind, followValue?: string | null, placeholder?: string | null } | { __typename: 'CustomAssignWidget', kind: AssignWidgetKind, followValue?: string | null, component: string, dependencies?: Array<string> | null, fallback?: { __typename: 'BlokAssignWidget', kind: AssignWidgetKind } | { __typename: 'ChoiceAssignWidget', kind: AssignWidgetKind, followValue?: string | null, placeholder?: string | null } | { __typename: 'CustomAssignWidget', kind: AssignWidgetKind } | { __typename: 'ProxyWidget', kind: AssignWidgetKind, followValue?: string | null, targetPort: string, targetAction: string, targetDependency?: string | null } | { __typename: 'SearchAssignWidget', kind: AssignWidgetKind, followValue?: string | null, query: string, ward: string, dependencies?: Array<string> | null, filters?: Array<{ __typename: 'ArgPort', kind: PortKind, key: string, identifier?: any | null, description?: string | null, nullable: boolean, widget?: { __typename?: 'BlokAssignWidget' } | { __typename?: 'ChoiceAssignWidget' } | { __typename?: 'CustomAssignWidget' } | { __typename?: 'ProxyWidget' } | { __typename?: 'SearchAssignWidget', query: string } | { __typename?: 'SliderAssignWidget' } | { __typename?: 'StateChoiceAssignWidget' } | { __typename?: 'StringAssignWidget' } | null }> | null } | { __typename: 'SliderAssignWidget', kind: AssignWidgetKind, followValue?: string | null, min?: number | null, max?: number | null, step?: number | null } | { __typename: 'StateChoiceAssignWidget', kind: AssignWidgetKind, followValue?: string | null, statePath?: string | null, dependency?: string | null, dependencies?: Array<string> | null, stateCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null }> | null } | null, stateAccessors?: Array<{ __typename?: 'StateAccessor', optionKey: OptionKey, path?: string | null, call?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null }> | null } | null }> | null } | { __typename: 'StringAssignWidget', kind: AssignWidgetKind, followValue?: string | null, placeholder?: string | null, asParagraph?: boolean | null } | null } | { __typename: 'ProxyWidget', kind: AssignWidgetKind, followValue?: string | null, targetPort: string, targetAction: string, targetDependency?: string | null } | { __typename: 'SearchAssignWidget', kind: AssignWidgetKind, followValue?: string | null, query: string, ward: string, dependencies?: Array<string> | null, filters?: Array<{ __typename: 'ArgPort', kind: PortKind, key: string, identifier?: any | null, description?: string | null, nullable: boolean, widget?: { __typename?: 'BlokAssignWidget' } | { __typename?: 'ChoiceAssignWidget' } | { __typename?: 'CustomAssignWidget' } | { __typename?: 'ProxyWidget' } | { __typename?: 'SearchAssignWidget', query: string } | { __typename?: 'SliderAssignWidget' } | { __typename?: 'StateChoiceAssignWidget' } | { __typename?: 'StringAssignWidget' } | null }> | null } | { __typename: 'SliderAssignWidget', kind: AssignWidgetKind, followValue?: string | null, min?: number | null, max?: number | null, step?: number | null } | { __typename: 'StateChoiceAssignWidget', kind: AssignWidgetKind, followValue?: string | null, statePath?: string | null, dependency?: string | null, dependencies?: Array<string> | null, stateCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null }> | null } | null, stateAccessors?: Array<{ __typename?: 'StateAccessor', optionKey: OptionKey, path?: string | null, call?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null }> | null } | null }> | null } | { __typename: 'StringAssignWidget', kind: AssignWidgetKind, followValue?: string | null, placeholder?: string | null, asParagraph?: boolean | null } | null }> | null }> | null, choices?: Array<{ __typename?: 'Choice', value: any, label: string, description?: string | null }> | null, widget?: { __typename: 'BlokAssignWidget', kind: AssignWidgetKind } | { __typename: 'ChoiceAssignWidget', kind: AssignWidgetKind, followValue?: string | null, placeholder?: string | null } | { __typename: 'CustomAssignWidget', kind: AssignWidgetKind, followValue?: string | null, component: string, dependencies?: Array<string> | null, fallback?: { __typename: 'BlokAssignWidget', kind: AssignWidgetKind } | { __typename: 'ChoiceAssignWidget', kind: AssignWidgetKind, followValue?: string | null, placeholder?: string | null } | { __typename: 'CustomAssignWidget', kind: AssignWidgetKind } | { __typename: 'ProxyWidget', kind: AssignWidgetKind, followValue?: string | null, targetPort: string, targetAction: string, targetDependency?: string | null } | { __typename: 'SearchAssignWidget', kind: AssignWidgetKind, followValue?: string | null, query: string, ward: string, dependencies?: Array<string> | null, filters?: Array<{ __typename: 'ArgPort', kind: PortKind, key: string, identifier?: any | null, description?: string | null, nullable: boolean, widget?: { __typename?: 'BlokAssignWidget' } | { __typename?: 'ChoiceAssignWidget' } | { __typename?: 'CustomAssignWidget' } | { __typename?: 'ProxyWidget' } | { __typename?: 'SearchAssignWidget', query: string } | { __typename?: 'SliderAssignWidget' } | { __typename?: 'StateChoiceAssignWidget' } | { __typename?: 'StringAssignWidget' } | null }> | null } | { __typename: 'SliderAssignWidget', kind: AssignWidgetKind, followValue?: string | null, min?: number | null, max?: number | null, step?: number | null } | { __typename: 'StateChoiceAssignWidget', kind: AssignWidgetKind, followValue?: string | null, statePath?: string | null, dependency?: string | null, dependencies?: Array<string> | null, stateCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null }> | null } | null, stateAccessors?: Array<{ __typename?: 'StateAccessor', optionKey: OptionKey, path?: string | null, call?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null }> | null } | null }> | null } | { __typename: 'StringAssignWidget', kind: AssignWidgetKind, followValue?: string | null, placeholder?: string | null, asParagraph?: boolean | null } | null } | { __typename: 'ProxyWidget', kind: AssignWidgetKind, followValue?: string | null, targetPort: string, targetAction: string, targetDependency?: string | null } | { __typename: 'SearchAssignWidget', kind: AssignWidgetKind, followValue?: string | null, query: string, ward: string, dependencies?: Array<string> | null, filters?: Array<{ __typename: 'ArgPort', kind: PortKind, key: string, identifier?: any | null, description?: string | null, nullable: boolean, widget?: { __typename?: 'BlokAssignWidget' } | { __typename?: 'ChoiceAssignWidget' } | { __typename?: 'CustomAssignWidget' } | { __typename?: 'ProxyWidget' } | { __typename?: 'SearchAssignWidget', query: string } | { __typename?: 'SliderAssignWidget' } | { __typename?: 'StateChoiceAssignWidget' } | { __typename?: 'StringAssignWidget' } | null }> | null } | { __typename: 'SliderAssignWidget', kind: AssignWidgetKind, followValue?: string | null, min?: number | null, max?: number | null, step?: number | null } | { __typename: 'StateChoiceAssignWidget', kind: AssignWidgetKind, followValue?: string | null, statePath?: string | null, dependency?: string | null, dependencies?: Array<string> | null, stateCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null }> | null } | null, stateAccessors?: Array<{ __typename?: 'StateAccessor', optionKey: OptionKey, path?: string | null, call?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null }> | null } | null }> | null } | { __typename: 'StringAssignWidget', kind: AssignWidgetKind, followValue?: string | null, placeholder?: string | null, asParagraph?: boolean | null } | null, effects?: Array<{ __typename: 'CustomEffect', kind: EffectKind, dependencies: Array<string>, source?: string | null, call: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null }> | null } } | { __typename: 'HideEffect', fade: boolean, kind: EffectKind, dependencies: Array<string>, source?: string | null, call: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null }> | null } } | { __typename: 'MessageEffect', kind: EffectKind, message: string, dependencies: Array<string>, source?: string | null, call: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null }> | null } }> | null, validators?: Array<{ __typename?: 'Validator', dependencies?: Array<string> | null, label?: string | null, errorMessage?: string | null, source?: string | null, call: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null }> | null } }> | null }> | null, widget?: { __typename: 'BlokAssignWidget', kind: AssignWidgetKind } | { __typename: 'ChoiceAssignWidget', kind: AssignWidgetKind, followValue?: string | null, placeholder?: string | null } | { __typename: 'CustomAssignWidget', kind: AssignWidgetKind, followValue?: string | null, component: string, dependencies?: Array<string> | null, fallback?: { __typename: 'BlokAssignWidget', kind: AssignWidgetKind } | { __typename: 'ChoiceAssignWidget', kind: AssignWidgetKind, followValue?: string | null, placeholder?: string | null } | { __typename: 'CustomAssignWidget', kind: AssignWidgetKind } | { __typename: 'ProxyWidget', kind: AssignWidgetKind, followValue?: string | null, targetPort: string, targetAction: string, targetDependency?: string | null } | { __typename: 'SearchAssignWidget', kind: AssignWidgetKind, followValue?: string | null, query: string, ward: string, dependencies?: Array<string> | null, filters?: Array<{ __typename: 'ArgPort', kind: PortKind, key: string, identifier?: any | null, description?: string | null, nullable: boolean, widget?: { __typename?: 'BlokAssignWidget' } | { __typename?: 'ChoiceAssignWidget' } | { __typename?: 'CustomAssignWidget' } | { __typename?: 'ProxyWidget' } | { __typename?: 'SearchAssignWidget', query: string } | { __typename?: 'SliderAssignWidget' } | { __typename?: 'StateChoiceAssignWidget' } | { __typename?: 'StringAssignWidget' } | null }> | null } | { __typename: 'SliderAssignWidget', kind: AssignWidgetKind, followValue?: string | null, min?: number | null, max?: number | null, step?: number | null } | { __typename: 'StateChoiceAssignWidget', kind: AssignWidgetKind, followValue?: string | null, statePath?: string | null, dependency?: string | null, dependencies?: Array<string> | null, stateCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null }> | null } | null, stateAccessors?: Array<{ __typename?: 'StateAccessor', optionKey: OptionKey, path?: string | null, call?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null }> | null } | null }> | null } | { __typename: 'StringAssignWidget', kind: AssignWidgetKind, followValue?: string | null, placeholder?: string | null, asParagraph?: boolean | null } | null } | { __typename: 'ProxyWidget', kind: AssignWidgetKind, followValue?: string | null, targetPort: string, targetAction: string, targetDependency?: string | null } | { __typename: 'SearchAssignWidget', kind: AssignWidgetKind, followValue?: string | null, query: string, ward: string, dependencies?: Array<string> | null, filters?: Array<{ __typename: 'ArgPort', kind: PortKind, key: string, identifier?: any | null, description?: string | null, nullable: boolean, widget?: { __typename?: 'BlokAssignWidget' } | { __typename?: 'ChoiceAssignWidget' } | { __typename?: 'CustomAssignWidget' } | { __typename?: 'ProxyWidget' } | { __typename?: 'SearchAssignWidget', query: string } | { __typename?: 'SliderAssignWidget' } | { __typename?: 'StateChoiceAssignWidget' } | { __typename?: 'StringAssignWidget' } | null }> | null } | { __typename: 'SliderAssignWidget', kind: AssignWidgetKind, followValue?: string | null, min?: number | null, max?: number | null, step?: number | null } | { __typename: 'StateChoiceAssignWidget', kind: AssignWidgetKind, followValue?: string | null, statePath?: string | null, dependency?: string | null, dependencies?: Array<string> | null, stateCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null }> | null } | null, stateAccessors?: Array<{ __typename?: 'StateAccessor', optionKey: OptionKey, path?: string | null, call?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null }> | null } | null }> | null } | { __typename: 'StringAssignWidget', kind: AssignWidgetKind, followValue?: string | null, placeholder?: string | null, asParagraph?: boolean | null } | null, effects?: Array<{ __typename: 'CustomEffect', kind: EffectKind, dependencies: Array<string>, source?: string | null, call: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null }> | null } } | { __typename: 'HideEffect', fade: boolean, kind: EffectKind, dependencies: Array<string>, source?: string | null, call: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null }> | null } } | { __typename: 'MessageEffect', kind: EffectKind, message: string, dependencies: Array<string>, source?: string | null, call: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null }> | null } }> | null, validators?: Array<{ __typename?: 'Validator', dependencies?: Array<string> | null, label?: string | null, errorMessage?: string | null, source?: string | null, call: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null }> | null } }> | null, choices?: Array<{ __typename?: 'Choice', value: any, label: string, description?: string | null }> | null }> | null, choices?: Array<{ __typename?: 'Choice', value: any, label: string, description?: string | null }> | null, validators?: Array<{ __typename?: 'Validator', dependencies?: Array<string> | null, label?: string | null, errorMessage?: string | null, source?: string | null, call: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null }> | null } }> | null, requires?: Array<{ __typename?: 'Requires', key: string, operator: DescriptorOperator, value?: any | null }> | null }>, portGroups: Array<{ __typename?: 'PortGroup', key: string, title?: string | null, description?: string | null, ports: Array<string>, effects?: Array<{ __typename: 'CustomEffect', kind: EffectKind, dependencies: Array<string>, source?: string | null, call: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null }> | null } } | { __typename: 'HideEffect', fade: boolean, kind: EffectKind, dependencies: Array<string>, source?: string | null, call: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null }> | null } } | { __typename: 'MessageEffect', kind: EffectKind, message: string, dependencies: Array<string>, source?: string | null, call: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null, utilCall?: { __typename?: 'UtilCall', operation: string, arguments?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null } | null, valueList?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null, valueDict?: Array<{ __typename?: 'ActionArgument', key?: string | null, valueLiteral?: any | null, valuePath?: string | null }> | null }> | null }> | null } }> | null }>, latestTask?: { __typename?: 'Task', id: string, args: any } | null }> };
-
-export type WatchStateSubscriptionVariables = Exact<{
-  stateID?: InputMaybe<Scalars['ID']['input']>;
-  agentID?: InputMaybe<Scalars['ID']['input']>;
-  interface?: InputMaybe<Scalars['String']['input']>;
-}>;
-
-
-export type WatchStateSubscription = { __typename?: 'Subscription', watchState: { __typename?: 'StatePatchEvent', stateId: string, agentId: string, globalRevision: number, sessionId?: string | null, timestamp?: any | null, interface: string, ops: Array<{ __typename?: 'JSONPatch', op: JsonPatchOperation, path: string, value?: any | null }> } | { __typename?: 'StateSnapshotEvent', stateId: string, agentId: string, interface: string, value: any, globalRevision: number, sessionId?: string | null, timestamp?: any | null } };
-
-export type WatchTasksSubscriptionVariables = Exact<{ [key: string]: never; }>;
-
-
-export type WatchTasksSubscription = { __typename?: 'Subscription', tasks: { __typename?: 'TaskChangeEvent', create?: { __typename?: 'TaskChange', id: string, reference?: string | null, isDone: boolean, latestEventKind: TaskEventKind, latestInstructKind: TaskInstructKind, root?: string | null, parent?: string | null, createdAt: any, updatedAt: any, finishedAt?: any | null } | null, event?: { __typename?: 'TaskEventChange', id: string, task: string, kind: TaskEventKind, message?: string | null, progress?: number | null, returns?: any | null, value?: any | null, createdAt: any } | null } };
-
-export type WatchChildTasksSubscriptionVariables = Exact<{
-  id: Scalars['ID']['input'];
-}>;
-
-
-export type WatchChildTasksSubscription = { __typename?: 'Subscription', childTasks: { __typename?: 'ChildTaskEvent', create?: { __typename?: 'TaskChange', id: string, reference?: string | null, isDone: boolean, latestEventKind: TaskEventKind, latestInstructKind: TaskInstructKind, root?: string | null, parent?: string | null, createdAt: any, updatedAt: any, finishedAt?: any | null } | null, update?: { __typename?: 'TaskChange', id: string, reference?: string | null, isDone: boolean, latestEventKind: TaskEventKind, latestInstructKind: TaskInstructKind, root?: string | null, parent?: string | null, createdAt: any, updatedAt: any, finishedAt?: any | null } | null } };
 
 export const BlokLogoFragmentDoc = gql`
     fragment BlokLogo on Blok {
@@ -9217,6 +9754,9 @@ export const TaskChangeFragmentDoc = gql`
   isDone
   latestEventKind
   latestInstructKind
+  action
+  implementation
+  agent
   root
   parent
   createdAt
@@ -9228,6 +9768,7 @@ export const TaskEventChangeFragmentDoc = gql`
     fragment TaskEventChange on TaskEventChange {
   id
   task
+  taskSeq
   kind
   message
   progress
@@ -10521,107 +11062,3 @@ export function useReplyerActionsLazyQuery(baseOptions?: ApolloReactHooks.LazyQu
 export type ReplyerActionsQueryHookResult = ReturnType<typeof useReplyerActionsQuery>;
 export type ReplyerActionsLazyQueryHookResult = ReturnType<typeof useReplyerActionsLazyQuery>;
 export type ReplyerActionsQueryResult = Apollo.QueryResult<ReplyerActionsQuery, ReplyerActionsQueryVariables>;
-export const WatchStateDocument = gql`
-    subscription WatchState($stateID: ID, $agentID: ID, $interface: String) {
-  watchState(stateId: $stateID, agentId: $agentID, interface: $interface) {
-    ...StatePatchEvent
-    ...StateSnapshotEvent
-  }
-}
-    ${StatePatchEventFragmentDoc}
-${StateSnapshotEventFragmentDoc}`;
-
-/**
- * __useWatchStateSubscription__
- *
- * To run a query within a React component, call `useWatchStateSubscription` and pass it any options that fit your needs.
- * When your component renders, `useWatchStateSubscription` returns an object from Apollo Client that contains loading, error, and data properties
- * you can use to render your UI.
- *
- * @param baseOptions options that will be passed into the subscription, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
- *
- * @example
- * const { data, loading, error } = useWatchStateSubscription({
- *   variables: {
- *      stateID: // value for 'stateID'
- *      agentID: // value for 'agentID'
- *      interface: // value for 'interface'
- *   },
- * });
- */
-export function useWatchStateSubscription(baseOptions?: ApolloReactHooks.SubscriptionHookOptions<WatchStateSubscription, WatchStateSubscriptionVariables>) {
-        const options = {...defaultOptions, ...baseOptions}
-        return ApolloReactHooks.useSubscription<WatchStateSubscription, WatchStateSubscriptionVariables>(WatchStateDocument, options);
-      }
-export type WatchStateSubscriptionHookResult = ReturnType<typeof useWatchStateSubscription>;
-export type WatchStateSubscriptionResult = Apollo.SubscriptionResult<WatchStateSubscription>;
-export const WatchTasksDocument = gql`
-    subscription WatchTasks {
-  tasks {
-    create {
-      ...TaskChange
-    }
-    event {
-      ...TaskEventChange
-    }
-  }
-}
-    ${TaskChangeFragmentDoc}
-${TaskEventChangeFragmentDoc}`;
-
-/**
- * __useWatchTasksSubscription__
- *
- * To run a query within a React component, call `useWatchTasksSubscription` and pass it any options that fit your needs.
- * When your component renders, `useWatchTasksSubscription` returns an object from Apollo Client that contains loading, error, and data properties
- * you can use to render your UI.
- *
- * @param baseOptions options that will be passed into the subscription, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
- *
- * @example
- * const { data, loading, error } = useWatchTasksSubscription({
- *   variables: {
- *   },
- * });
- */
-export function useWatchTasksSubscription(baseOptions?: ApolloReactHooks.SubscriptionHookOptions<WatchTasksSubscription, WatchTasksSubscriptionVariables>) {
-        const options = {...defaultOptions, ...baseOptions}
-        return ApolloReactHooks.useSubscription<WatchTasksSubscription, WatchTasksSubscriptionVariables>(WatchTasksDocument, options);
-      }
-export type WatchTasksSubscriptionHookResult = ReturnType<typeof useWatchTasksSubscription>;
-export type WatchTasksSubscriptionResult = Apollo.SubscriptionResult<WatchTasksSubscription>;
-export const WatchChildTasksDocument = gql`
-    subscription WatchChildTasks($id: ID!) {
-  childTasks(id: $id) {
-    create {
-      ...TaskChange
-    }
-    update {
-      ...TaskChange
-    }
-  }
-}
-    ${TaskChangeFragmentDoc}`;
-
-/**
- * __useWatchChildTasksSubscription__
- *
- * To run a query within a React component, call `useWatchChildTasksSubscription` and pass it any options that fit your needs.
- * When your component renders, `useWatchChildTasksSubscription` returns an object from Apollo Client that contains loading, error, and data properties
- * you can use to render your UI.
- *
- * @param baseOptions options that will be passed into the subscription, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
- *
- * @example
- * const { data, loading, error } = useWatchChildTasksSubscription({
- *   variables: {
- *      id: // value for 'id'
- *   },
- * });
- */
-export function useWatchChildTasksSubscription(baseOptions: ApolloReactHooks.SubscriptionHookOptions<WatchChildTasksSubscription, WatchChildTasksSubscriptionVariables>) {
-        const options = {...defaultOptions, ...baseOptions}
-        return ApolloReactHooks.useSubscription<WatchChildTasksSubscription, WatchChildTasksSubscriptionVariables>(WatchChildTasksDocument, options);
-      }
-export type WatchChildTasksSubscriptionHookResult = ReturnType<typeof useWatchChildTasksSubscription>;
-export type WatchChildTasksSubscriptionResult = Apollo.SubscriptionResult<WatchChildTasksSubscription>;

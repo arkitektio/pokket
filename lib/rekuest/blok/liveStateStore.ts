@@ -5,7 +5,7 @@ import { applyPatch, type Operation } from "fast-json-patch";
  * `${agentID}:${interface}` no matter how many widgets watch it.
  *
  * Before this, every `useAgentLiveState` consumer (each `StateChoiceWidget`,
- * each materialized-blok dependency sync) opened its own `WatchState`
+ * each materialized-blok dependency sync) opened its own state watch
  * subscription for the same key and re-rendered on every patch. Here the
  * subscription is refcounted (the last consumer to leave closes it), the
  * patches are applied to the store's copy, and consumers are notified at most
@@ -67,6 +67,8 @@ export const liveStateKey = (agentID: string, stateInterface: string) =>
   `${agentID}:${stateInterface}`;
 
 type Entry = {
+  /** What it is subscribed through: a rebuilt connection brings another. */
+  client: unknown;
   refs: number;
   listeners: Set<() => void>;
   unsubscribe: () => void;
@@ -183,8 +185,24 @@ export const createLiveStateStore = <C>(options: LiveStateStoreOptions<C>) => {
     ): () => void {
       const key = liveStateKey(agentID, stateInterface);
       let entry = entries.get(key);
+      if (entry && entry.client !== client) {
+        // The connection was rebuilt: its first consumer back moves the subscription onto the
+        // new client (the old one is closed). What is held and who listens stay.
+        const moved = entry;
+        moved.unsubscribe();
+        moved.client = client;
+        moved.unsubscribe = options.subscribe(
+          client,
+          { agentID, interface: stateInterface },
+          {
+            next: (event) => onEvent(moved, event),
+            error: (error) => console.error("Error in state subscription:", error),
+          },
+        );
+      }
       if (!entry) {
         const created: Entry = {
+          client,
           refs: 0,
           listeners: new Set(),
           unsubscribe: () => {},

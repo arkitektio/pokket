@@ -100,6 +100,11 @@ export type Service<T = unknown> = {
   client: T;
   clearCache?: () => Promise<void>;
   type?: string;
+  /**
+   * Close what the service holds open beyond its client (a socket of its own). Called once
+   * its connection is replaced or gone: a connection is rebuilt whole, service by service.
+   */
+  dispose?: () => void;
 };
 
 /**

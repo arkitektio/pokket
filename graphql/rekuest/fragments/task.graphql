@@ -109,14 +109,18 @@ fragment DetailTask on Task {
   }
 }
 
-# Thin subscription deltas: relations are scalar ids, so the client merges hot
-# scalars and events into the normalized cache and refetches on creates.
+# Thin deltas, as the caller session's topics carry them (`lib/rekuest/session/frames.ts`):
+# relations are scalar ids, so the client merges hot scalars and events into the
+# normalized cache and refetches on creates.
 fragment TaskChange on TaskChange {
   id
   reference
   isDone
   latestEventKind
   latestInstructKind
+  action
+  implementation
+  agent
   root
   parent
   createdAt
@@ -127,6 +131,8 @@ fragment TaskChange on TaskChange {
 fragment TaskEventChange on TaskEventChange {
   id
   task
+  # The task's own counter: what drops an event that arrives twice at a resume's seam.
+  taskSeq
   kind
   message
   progress

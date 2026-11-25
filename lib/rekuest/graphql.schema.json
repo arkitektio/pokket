@@ -116,6 +116,22 @@
             "deprecationReason": null
           },
           {
+            "name": "availability",
+            "description": "Whether it can run: RUNNABLE now, RECENT (an implementing agent seen in the last 24 hours), OFFLINE, or NONE (no implementation). The same rank `ActionOrder.availability` orders and `ActionFilter.availability` filters by.",
+            "args": [],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "ActionAvailability",
+                "kind": "ENUM",
+                "ofType": null
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
             "name": "bloks",
             "description": "The action's own bloks, at most one per context (PANEL for a task panel, SCENE a 3D view, as a `Space` placing the run's dependencies): declared with the action, the latest registration's. Not part of its hash.",
             "args": [],
@@ -1519,6 +1535,42 @@
         "possibleTypes": null
       },
       {
+        "kind": "ENUM",
+        "name": "ActionAvailability",
+        "description": "Whether an action can run, as a list groups it: RUNNABLE now (`Action.assignable`), RECENT (an implementing agent was seen in the last 24 hours), OFFLINE (implemented, but no agent seen for longer), NONE (no implementation). In that order, which is `ActionOrder.availability` ascending.",
+        "isOneOf": null,
+        "fields": null,
+        "inputFields": null,
+        "interfaces": null,
+        "enumValues": [
+          {
+            "name": "NONE",
+            "description": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "OFFLINE",
+            "description": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "RECENT",
+            "description": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "RUNNABLE",
+            "description": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          }
+        ],
+        "possibleTypes": null
+      },
+      {
         "kind": "OBJECT",
         "name": "ActionBlok",
         "description": "An action's own blok for one context: how a client shows a run of the action there. It names devices only by the action's dependency keys: a run binds them through `Task.dependencyAgents`, a preview through the `dependencyTree` dry run.",
@@ -2480,6 +2532,26 @@
             "deprecationReason": null
           },
           {
+            "name": "availability",
+            "description": "Only actions of these availabilities (`Action.availability`). An empty list is ignored.",
+            "type": {
+              "kind": "LIST",
+              "name": null,
+              "ofType": {
+                "name": null,
+                "kind": "NON_NULL",
+                "ofType": {
+                  "name": "ActionAvailability",
+                  "kind": "ENUM",
+                  "ofType": null
+                }
+              }
+            },
+            "defaultValue": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
             "name": "calls",
             "description": "Whether any of its implementations may call other actions (a declared dependency, or `dynamicCalls`). False: none ever calls.",
             "type": {
@@ -2669,7 +2741,7 @@
           },
           {
             "name": "search",
-            "description": "Search by name: a case-insensitive substring, or semantic similarity of the query to the action's name and description. Substring matches rank first, then by similarity; an explicit `ordering` replaces that ranking.",
+            "description": "Search by name: a case-insensitive substring, or semantic similarity of the query to the action's name and description. Ranked: an exact match, then a prefix, then other textual matches by trigram similarity, then by meaning; an explicit `ordering` replaces that ranking.",
             "type": {
               "kind": "SCALAR",
               "name": "String",
@@ -2763,8 +2835,44 @@
         "fields": null,
         "inputFields": [
           {
+            "name": "appIdentifier",
+            "description": "By the identifier of the app the action belongs to, so one app's actions stay together across pages.",
+            "type": {
+              "kind": "ENUM",
+              "name": "Ordering",
+              "ofType": null
+            },
+            "defaultValue": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
             "name": "assignable",
             "description": "Runnable first (DESC) or last (ASC) by `Action.assignable`. The order the filters set (a `search`'s ranking) is kept as the tie-break, so `search` with this ordering lists runnable matches first, each group still ranked by relevance.",
+            "type": {
+              "kind": "ENUM",
+              "name": "Ordering",
+              "ofType": null
+            },
+            "defaultValue": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "availability",
+            "description": "By `Action.availability`: runnable now first (ASC), then recently active, offline, and without an implementation; DESC reverses it. Keeps each availability group together across pages.",
+            "type": {
+              "kind": "ENUM",
+              "name": "Ordering",
+              "ofType": null
+            },
+            "defaultValue": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "collection",
+            "description": "By the name of the action's first collection (alphabetically): the collection a grouped list files it under. Actions in no collection come last.",
             "type": {
               "kind": "ENUM",
               "name": "Ordering",
@@ -2789,6 +2897,18 @@
           {
             "name": "estimatedRuntime",
             "description": "Runnable first, then by the estimate for the object named in the `estimatedRuntime` filter, with no estimate last. Does nothing without that filter.",
+            "type": {
+              "kind": "ENUM",
+              "name": "Ordering",
+              "ofType": null
+            },
+            "defaultValue": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "kind",
+            "description": null,
             "type": {
               "kind": "ENUM",
               "name": "Ordering",
@@ -3117,6 +3237,70 @@
             "deprecationReason": null
           }
         ],
+        "possibleTypes": null
+      },
+      {
+        "kind": "INPUT_OBJECT",
+        "name": "AddManyToCollaborationInput",
+        "description": "Objects to put in a collaboration at once: all of them, or none",
+        "isOneOf": false,
+        "fields": null,
+        "inputFields": [
+          {
+            "name": "collaboration",
+            "description": "The collaboration's key (lok's)",
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "ID",
+                "kind": "SCALAR",
+                "ofType": null
+              }
+            },
+            "defaultValue": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "name",
+            "description": "The collaboration's name, kept here when these are the first things put in",
+            "type": {
+              "kind": "SCALAR",
+              "name": "String",
+              "ofType": null
+            },
+            "defaultValue": "null",
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "objects",
+            "description": "What to put in; a whole before its parts",
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": null,
+                "kind": "LIST",
+                "ofType": {
+                  "name": null,
+                  "kind": "NON_NULL",
+                  "ofType": {
+                    "name": "CollaborationObjectRef",
+                    "kind": "INPUT_OBJECT",
+                    "ofType": null
+                  }
+                }
+              }
+            },
+            "defaultValue": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          }
+        ],
+        "interfaces": null,
+        "enumValues": null,
         "possibleTypes": null
       },
       {
@@ -3870,7 +4054,56 @@
           {
             "name": "states",
             "description": "Current and historical states associated with the agent.",
-            "args": [],
+            "args": [
+              {
+                "name": "filters",
+                "description": null,
+                "type": {
+                  "kind": "INPUT_OBJECT",
+                  "name": "StateFilter",
+                  "ofType": null
+                },
+                "defaultValue": null,
+                "isDeprecated": false,
+                "deprecationReason": null
+              },
+              {
+                "name": "ordering",
+                "description": null,
+                "type": {
+                  "kind": "NON_NULL",
+                  "name": null,
+                  "ofType": {
+                    "name": null,
+                    "kind": "LIST",
+                    "ofType": {
+                      "name": null,
+                      "kind": "NON_NULL",
+                      "ofType": {
+                        "name": "StateOrder",
+                        "kind": "INPUT_OBJECT",
+                        "ofType": null
+                      }
+                    }
+                  }
+                },
+                "defaultValue": "[]",
+                "isDeprecated": false,
+                "deprecationReason": null
+              },
+              {
+                "name": "pagination",
+                "description": null,
+                "type": {
+                  "kind": "INPUT_OBJECT",
+                  "name": "OffsetPaginationInput",
+                  "ofType": null
+                },
+                "defaultValue": null,
+                "isDeprecated": false,
+                "deprecationReason": null
+              }
+            ],
             "type": {
               "kind": "NON_NULL",
               "name": null,
@@ -3893,7 +4126,7 @@
           },
           {
             "name": "supervisor",
-            "description": "The app this agent says controls its lifecycle (e.g. 'plugin_engine'), as stated on its last registration. Self-declared: a hint for pickers (descriptor @rekuest/supervisor), never authority.",
+            "description": "The app that provisioned this agent's client (e.g. 'plugin_engine'), as lok signed it into the token of its last registration. Null for an agent whose client nobody provisioned. Pickers match it as the descriptor @rekuest/supervisor.",
             "args": [],
             "type": {
               "kind": "SCALAR",
@@ -4684,6 +4917,30 @@
         "possibleTypes": null
       },
       {
+        "kind": "ENUM",
+        "name": "AgentField",
+        "description": "Numeric/aggregatable fields of Agent",
+        "isOneOf": null,
+        "fields": null,
+        "inputFields": null,
+        "interfaces": null,
+        "enumValues": [
+          {
+            "name": "INSTALLED_AT",
+            "description": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "LAST_SEEN",
+            "description": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          }
+        ],
+        "possibleTypes": null
+      },
+      {
         "kind": "INPUT_OBJECT",
         "name": "AgentFilter",
         "description": "A way to filter agents",
@@ -4819,6 +5076,18 @@
             "deprecationReason": null
           },
           {
+            "name": "connected",
+            "description": "Agents with a live connection (true): connected, with a fresh heartbeat. False keeps every other agent, webhook agents included. Unlike `available`, a webhook agent is never connected.",
+            "type": {
+              "kind": "SCALAR",
+              "name": "Boolean",
+              "ofType": null
+            },
+            "defaultValue": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
             "name": "dependency",
             "description": null,
             "type": {
@@ -4935,6 +5204,18 @@
             "deprecationReason": null
           },
           {
+            "name": "kind",
+            "description": "Filter by the kind of agent (websocket, webhook, ...)",
+            "type": {
+              "kind": "ENUM",
+              "name": "AgentKind",
+              "ofType": null
+            },
+            "defaultValue": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
             "name": "pinned",
             "description": "Filter by pinned agents",
             "type": {
@@ -4999,8 +5280,20 @@
             "deprecationReason": null
           },
           {
+            "name": "supervised",
+            "description": "Agents whose client an app provisioned (true), or nobody (false), as of their last registration.",
+            "type": {
+              "kind": "SCALAR",
+              "name": "Boolean",
+              "ofType": null
+            },
+            "defaultValue": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
             "name": "supervisor",
-            "description": "Agents whose self-declared supervisor is this app (e.g. 'plugin_engine').",
+            "description": "Agents whose client this app provisioned (e.g. 'plugin_engine'), as lok signed it into their token.",
             "type": {
               "kind": "SCALAR",
               "name": "String",
@@ -5311,6 +5604,18 @@
         "fields": null,
         "inputFields": [
           {
+            "name": "installedAt",
+            "description": null,
+            "type": {
+              "kind": "ENUM",
+              "name": "Ordering",
+              "ofType": null
+            },
+            "defaultValue": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
             "name": "lastSeen",
             "description": null,
             "type": {
@@ -5499,6 +5804,256 @@
       },
       {
         "kind": "OBJECT",
+        "name": "AgentStats",
+        "description": null,
+        "isOneOf": null,
+        "fields": [
+          {
+            "name": "avg",
+            "description": "Average",
+            "args": [
+              {
+                "name": "field",
+                "description": null,
+                "type": {
+                  "kind": "NON_NULL",
+                  "name": null,
+                  "ofType": {
+                    "name": "AgentField",
+                    "kind": "ENUM",
+                    "ofType": null
+                  }
+                },
+                "defaultValue": null,
+                "isDeprecated": false,
+                "deprecationReason": null
+              }
+            ],
+            "type": {
+              "kind": "SCALAR",
+              "name": "Float",
+              "ofType": null
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "count",
+            "description": "Total number of agents in the selection. Ask once with `filters: {connected: true}` (aliased) for how many are online.",
+            "args": [],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "Int",
+                "kind": "SCALAR",
+                "ofType": null
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "distinctCount",
+            "description": "Number of distinct values for the field",
+            "args": [
+              {
+                "name": "field",
+                "description": null,
+                "type": {
+                  "kind": "NON_NULL",
+                  "name": null,
+                  "ofType": {
+                    "name": "AgentField",
+                    "kind": "ENUM",
+                    "ofType": null
+                  }
+                },
+                "defaultValue": null,
+                "isDeprecated": false,
+                "deprecationReason": null
+              }
+            ],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "Int",
+                "kind": "SCALAR",
+                "ofType": null
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "max",
+            "description": "Maximum",
+            "args": [
+              {
+                "name": "field",
+                "description": null,
+                "type": {
+                  "kind": "NON_NULL",
+                  "name": null,
+                  "ofType": {
+                    "name": "AgentField",
+                    "kind": "ENUM",
+                    "ofType": null
+                  }
+                },
+                "defaultValue": null,
+                "isDeprecated": false,
+                "deprecationReason": null
+              }
+            ],
+            "type": {
+              "kind": "SCALAR",
+              "name": "Float",
+              "ofType": null
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "min",
+            "description": "Minimum",
+            "args": [
+              {
+                "name": "field",
+                "description": null,
+                "type": {
+                  "kind": "NON_NULL",
+                  "name": null,
+                  "ofType": {
+                    "name": "AgentField",
+                    "kind": "ENUM",
+                    "ofType": null
+                  }
+                },
+                "defaultValue": null,
+                "isDeprecated": false,
+                "deprecationReason": null
+              }
+            ],
+            "type": {
+              "kind": "SCALAR",
+              "name": "Float",
+              "ofType": null
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "series",
+            "description": "Time-bucketed stats over a datetime field.",
+            "args": [
+              {
+                "name": "by",
+                "description": null,
+                "type": {
+                  "kind": "NON_NULL",
+                  "name": null,
+                  "ofType": {
+                    "name": "Granularity",
+                    "kind": "ENUM",
+                    "ofType": null
+                  }
+                },
+                "defaultValue": null,
+                "isDeprecated": false,
+                "deprecationReason": null
+              },
+              {
+                "name": "field",
+                "description": null,
+                "type": {
+                  "kind": "NON_NULL",
+                  "name": null,
+                  "ofType": {
+                    "name": "AgentField",
+                    "kind": "ENUM",
+                    "ofType": null
+                  }
+                },
+                "defaultValue": null,
+                "isDeprecated": false,
+                "deprecationReason": null
+              },
+              {
+                "name": "timestampField",
+                "description": null,
+                "type": {
+                  "kind": "NON_NULL",
+                  "name": null,
+                  "ofType": {
+                    "name": "AgentTimestampField",
+                    "kind": "ENUM",
+                    "ofType": null
+                  }
+                },
+                "defaultValue": null,
+                "isDeprecated": false,
+                "deprecationReason": null
+              }
+            ],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": null,
+                "kind": "LIST",
+                "ofType": {
+                  "name": null,
+                  "kind": "NON_NULL",
+                  "ofType": {
+                    "name": "TimeBucket",
+                    "kind": "OBJECT",
+                    "ofType": null
+                  }
+                }
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "sum",
+            "description": "Sum",
+            "args": [
+              {
+                "name": "field",
+                "description": null,
+                "type": {
+                  "kind": "NON_NULL",
+                  "name": null,
+                  "ofType": {
+                    "name": "AgentField",
+                    "kind": "ENUM",
+                    "ofType": null
+                  }
+                },
+                "defaultValue": null,
+                "isDeprecated": false,
+                "deprecationReason": null
+              }
+            ],
+            "type": {
+              "kind": "SCALAR",
+              "name": "Float",
+              "ofType": null
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          }
+        ],
+        "inputFields": null,
+        "interfaces": [],
+        "enumValues": null,
+        "possibleTypes": null
+      },
+      {
+        "kind": "OBJECT",
         "name": "AgentTaskUpdate",
         "description": null,
         "isOneOf": null,
@@ -5531,6 +6086,30 @@
         "inputFields": null,
         "interfaces": [],
         "enumValues": null,
+        "possibleTypes": null
+      },
+      {
+        "kind": "ENUM",
+        "name": "AgentTimestampField",
+        "description": "Datetime fields of Agent for bucketing",
+        "isOneOf": null,
+        "fields": null,
+        "inputFields": null,
+        "interfaces": null,
+        "enumValues": [
+          {
+            "name": "INSTALLED_AT",
+            "description": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "LAST_SEEN",
+            "description": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          }
+        ],
         "possibleTypes": null
       },
       {
@@ -6692,6 +7271,66 @@
               "kind": "SCALAR",
               "name": "Int",
               "ofType": null
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          }
+        ],
+        "inputFields": null,
+        "interfaces": [],
+        "enumValues": null,
+        "possibleTypes": null
+      },
+      {
+        "kind": "OBJECT",
+        "name": "AssetChange",
+        "description": "An asset that was just stored: enough to tell whether it is the one awaited.",
+        "isOneOf": null,
+        "fields": [
+          {
+            "name": "id",
+            "description": null,
+            "args": [],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "ID",
+                "kind": "SCALAR",
+                "ofType": null
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "kind",
+            "description": "What the file is (AssetKind).",
+            "args": [],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "String",
+                "kind": "SCALAR",
+                "ofType": null
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "ref",
+            "description": "'sha256:' and the hex SHA-256 of the file's bytes: what an agent's declared asset names.",
+            "args": [],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "String",
+                "kind": "SCALAR",
+                "ofType": null
+              }
             },
             "isDeprecated": false,
             "deprecationReason": null
@@ -8365,6 +9004,22 @@
             "deprecationReason": null
           },
           {
+            "name": "hasLogo",
+            "description": "Whether the blok declares a logo of its own (`<logo>`, a child of its `<Blok>`): what lists, pins and tabs draw for it instead of its context's icon. Read it before asking for the tree, which a list never needs otherwise.",
+            "args": [],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "Boolean",
+                "kind": "SCALAR",
+                "ofType": null
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
             "name": "hash",
             "description": "A SHA-256 of what the blok renders: its component tree (its declarations included), context, language version, catalogs and demo. Two bloks with the same hash draw the same thing, so a client may cache what it rendered under it.",
             "args": [],
@@ -8549,6 +9204,22 @@
               "kind": "SCALAR",
               "name": "String",
               "ofType": null
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "pinned",
+            "description": "Whether the caller pinned this blok.",
+            "args": [],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "Boolean",
+                "kind": "SCALAR",
+                "ofType": null
+              }
             },
             "isDeprecated": false,
             "deprecationReason": null
@@ -9750,6 +10421,26 @@
             "deprecationReason": null
           },
           {
+            "name": "contexts",
+            "description": "Only bloks that render in one of these contexts: PANEL and SCENE are interfaces to open, LOGO draws an agent or an action.",
+            "type": {
+              "kind": "LIST",
+              "name": null,
+              "ofType": {
+                "name": null,
+                "kind": "NON_NULL",
+                "ofType": {
+                  "name": "ComponentContext",
+                  "kind": "ENUM",
+                  "ofType": null
+                }
+              }
+            },
+            "defaultValue": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
             "name": "demands",
             "description": "Only bloks whose args accept these demands: the bloks an item opens in. Same matching as `ActionFilter.demands`, so a match's `descriptors` are checked against each arg's `requires`. Only `ARGS` demands; a blok without args matches none.",
             "type": {
@@ -9782,6 +10473,18 @@
             "deprecationReason": null
           },
           {
+            "name": "nameStartsWith",
+            "description": "Only bloks whose name starts with this (case-insensitive): the names a new blok would collide with, e.g. `X panel` and `X panel 2` for `X panel`.",
+            "type": {
+              "kind": "SCALAR",
+              "name": "String",
+              "ofType": null
+            },
+            "defaultValue": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
             "name": "origins",
             "description": "Only bloks installed from one of these origins.",
             "type": {
@@ -9802,6 +10505,18 @@
             "deprecationReason": null
           },
           {
+            "name": "pinned",
+            "description": "Only bloks the caller pinned (true) or did not (false).",
+            "type": {
+              "kind": "SCALAR",
+              "name": "Boolean",
+              "ofType": null
+            },
+            "defaultValue": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
             "name": "provided",
             "description": "Only bloks an app provides (true) or only custom bloks users made (false).",
             "type": {
@@ -9815,7 +10530,7 @@
           },
           {
             "name": "search",
-            "description": "Search by name",
+            "description": "Search by name or description (case-insensitive substring).",
             "type": {
               "kind": "SCALAR",
               "name": "String",
@@ -10899,17 +11614,13 @@
             "deprecationReason": null
           },
           {
-            "name": "kind",
+            "name": "port",
             "description": null,
             "args": [],
             "type": {
-              "kind": "NON_NULL",
-              "name": null,
-              "ofType": {
-                "name": "CatalogValueKind",
-                "kind": "ENUM",
-                "ofType": null
-              }
+              "kind": "OBJECT",
+              "name": "CatalogPort",
+              "ofType": null
             },
             "isDeprecated": false,
             "deprecationReason": null
@@ -10972,18 +11683,14 @@
             "deprecationReason": null
           },
           {
-            "name": "kind",
-            "description": "The value kind of the argument.",
+            "name": "port",
+            "description": "What it takes; none: open (any value).",
             "type": {
-              "kind": "NON_NULL",
-              "name": null,
-              "ofType": {
-                "name": "CatalogValueKind",
-                "kind": "ENUM",
-                "ofType": null
-              }
+              "kind": "INPUT_OBJECT",
+              "name": "CatalogPortInput",
+              "ofType": null
             },
-            "defaultValue": null,
+            "defaultValue": "null",
             "isDeprecated": false,
             "deprecationReason": null
           },
@@ -11000,6 +11707,478 @@
               }
             },
             "defaultValue": "true",
+            "isDeprecated": false,
+            "deprecationReason": null
+          }
+        ],
+        "interfaces": null,
+        "enumValues": null,
+        "possibleTypes": null
+      },
+      {
+        "kind": "OBJECT",
+        "name": "CatalogChildPort",
+        "description": "A catalog port below another: an item ('...'), a field, a variant, a payload field.",
+        "isOneOf": null,
+        "fields": [
+          {
+            "name": "children",
+            "description": null,
+            "args": [],
+            "type": {
+              "kind": "LIST",
+              "name": null,
+              "ofType": {
+                "name": null,
+                "kind": "NON_NULL",
+                "ofType": {
+                  "name": "CatalogChildPort",
+                  "kind": "OBJECT",
+                  "ofType": null
+                }
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "choices",
+            "description": null,
+            "args": [],
+            "type": {
+              "kind": "LIST",
+              "name": null,
+              "ofType": {
+                "name": null,
+                "kind": "NON_NULL",
+                "ofType": {
+                  "name": "CatalogChoice",
+                  "kind": "OBJECT",
+                  "ofType": null
+                }
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "default",
+            "description": null,
+            "args": [],
+            "type": {
+              "kind": "SCALAR",
+              "name": "AnyDefault",
+              "ofType": null
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "description",
+            "description": null,
+            "args": [],
+            "type": {
+              "kind": "SCALAR",
+              "name": "String",
+              "ofType": null
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "dimension",
+            "description": null,
+            "args": [],
+            "type": {
+              "kind": "SCALAR",
+              "name": "String",
+              "ofType": null
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "identifier",
+            "description": null,
+            "args": [],
+            "type": {
+              "kind": "SCALAR",
+              "name": "String",
+              "ofType": null
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "key",
+            "description": null,
+            "args": [],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "String",
+                "kind": "SCALAR",
+                "ofType": null
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "kind",
+            "description": null,
+            "args": [],
+            "type": {
+              "kind": "ENUM",
+              "name": "PortKind",
+              "ofType": null
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "nullable",
+            "description": null,
+            "args": [],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "Boolean",
+                "kind": "SCALAR",
+                "ofType": null
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "proposedUnits",
+            "description": null,
+            "args": [],
+            "type": {
+              "kind": "LIST",
+              "name": null,
+              "ofType": {
+                "name": null,
+                "kind": "NON_NULL",
+                "ofType": {
+                  "name": "String",
+                  "kind": "SCALAR",
+                  "ofType": null
+                }
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "referenceUnit",
+            "description": null,
+            "args": [],
+            "type": {
+              "kind": "SCALAR",
+              "name": "String",
+              "ofType": null
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "tree",
+            "description": "The whole port, children at every depth, as a catalog writes it (camelCase, empty fields left out): what a client compares a catalog by.",
+            "args": [],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "JSONSerializable",
+                "kind": "SCALAR",
+                "ofType": null
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          }
+        ],
+        "inputFields": null,
+        "interfaces": [],
+        "enumValues": null,
+        "possibleTypes": null
+      },
+      {
+        "kind": "INPUT_OBJECT",
+        "name": "CatalogChildPortInput",
+        "description": "A catalog port below another: an item ('...'), a field, a variant, a payload field.",
+        "isOneOf": false,
+        "fields": null,
+        "inputFields": [
+          {
+            "name": "children",
+            "description": "LIST/BINDING: its one item, keyed '...'; DICT/MODEL: its fields; UNION: its variants; CALLBACK: its payload.",
+            "type": {
+              "kind": "LIST",
+              "name": null,
+              "ofType": {
+                "name": null,
+                "kind": "NON_NULL",
+                "ofType": {
+                  "name": "CatalogChildPortInput",
+                  "kind": "INPUT_OBJECT",
+                  "ofType": null
+                }
+              }
+            },
+            "defaultValue": "null",
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "choices",
+            "description": "The values it takes (required for ENUM).",
+            "type": {
+              "kind": "LIST",
+              "name": null,
+              "ofType": {
+                "name": null,
+                "kind": "NON_NULL",
+                "ofType": {
+                  "name": "CatalogChoiceInput",
+                  "kind": "INPUT_OBJECT",
+                  "ofType": null
+                }
+              }
+            },
+            "defaultValue": "null",
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "default",
+            "description": "Its default value.",
+            "type": {
+              "kind": "SCALAR",
+              "name": "AnyDefault",
+              "ofType": null
+            },
+            "defaultValue": "null",
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "description",
+            "description": "What it is.",
+            "type": {
+              "kind": "SCALAR",
+              "name": "String",
+              "ofType": null
+            },
+            "defaultValue": "null",
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "dimension",
+            "description": "For a QUANTITY: its dimensionality.",
+            "type": {
+              "kind": "SCALAR",
+              "name": "String",
+              "ofType": null
+            },
+            "defaultValue": "null",
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "identifier",
+            "description": "STRUCTURE, MEMORY_STRUCTURE, INTERFACE: what it references (`*`: any).",
+            "type": {
+              "kind": "SCALAR",
+              "name": "String",
+              "ofType": null
+            },
+            "defaultValue": "null",
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "key",
+            "description": "Its key (may be `value`).",
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "String",
+                "kind": "SCALAR",
+                "ofType": null
+              }
+            },
+            "defaultValue": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "kind",
+            "description": "Its kind; none: open (any value).",
+            "type": {
+              "kind": "ENUM",
+              "name": "PortKind",
+              "ofType": null
+            },
+            "defaultValue": "null",
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "nullable",
+            "description": "Whether it takes null.",
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "Boolean",
+                "kind": "SCALAR",
+                "ofType": null
+              }
+            },
+            "defaultValue": "false",
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "proposedUnits",
+            "description": "For a QUANTITY: the units offered.",
+            "type": {
+              "kind": "LIST",
+              "name": null,
+              "ofType": {
+                "name": null,
+                "kind": "NON_NULL",
+                "ofType": {
+                  "name": "String",
+                  "kind": "SCALAR",
+                  "ofType": null
+                }
+              }
+            },
+            "defaultValue": "null",
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "referenceUnit",
+            "description": "For a QUANTITY: its reference unit.",
+            "type": {
+              "kind": "SCALAR",
+              "name": "String",
+              "ofType": null
+            },
+            "defaultValue": "null",
+            "isDeprecated": false,
+            "deprecationReason": null
+          }
+        ],
+        "interfaces": null,
+        "enumValues": null,
+        "possibleTypes": null
+      },
+      {
+        "kind": "OBJECT",
+        "name": "CatalogChoice",
+        "description": "A value a catalog port takes.",
+        "isOneOf": null,
+        "fields": [
+          {
+            "name": "description",
+            "description": null,
+            "args": [],
+            "type": {
+              "kind": "SCALAR",
+              "name": "String",
+              "ofType": null
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "label",
+            "description": null,
+            "args": [],
+            "type": {
+              "kind": "SCALAR",
+              "name": "String",
+              "ofType": null
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "value",
+            "description": null,
+            "args": [],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "AnyDefault",
+                "kind": "SCALAR",
+                "ofType": null
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          }
+        ],
+        "inputFields": null,
+        "interfaces": [],
+        "enumValues": null,
+        "possibleTypes": null
+      },
+      {
+        "kind": "INPUT_OBJECT",
+        "name": "CatalogChoiceInput",
+        "description": "A value a catalog port takes.",
+        "isOneOf": false,
+        "fields": null,
+        "inputFields": [
+          {
+            "name": "description",
+            "description": "What it means.",
+            "type": {
+              "kind": "SCALAR",
+              "name": "String",
+              "ofType": null
+            },
+            "defaultValue": "null",
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "label",
+            "description": "How it is shown.",
+            "type": {
+              "kind": "SCALAR",
+              "name": "String",
+              "ofType": null
+            },
+            "defaultValue": "null",
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "value",
+            "description": "The value (any JSON value fitting the port's kind).",
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "AnyDefault",
+                "kind": "SCALAR",
+                "ofType": null
+              }
+            },
+            "defaultValue": null,
             "isDeprecated": false,
             "deprecationReason": null
           }
@@ -11402,118 +12581,6 @@
       },
       {
         "kind": "OBJECT",
-        "name": "CatalogEventField",
-        "description": "A field of the event a CALLBACK prop hands its callback.",
-        "isOneOf": null,
-        "fields": [
-          {
-            "name": "description",
-            "description": null,
-            "args": [],
-            "type": {
-              "kind": "SCALAR",
-              "name": "String",
-              "ofType": null
-            },
-            "isDeprecated": false,
-            "deprecationReason": null
-          },
-          {
-            "name": "key",
-            "description": null,
-            "args": [],
-            "type": {
-              "kind": "NON_NULL",
-              "name": null,
-              "ofType": {
-                "name": "String",
-                "kind": "SCALAR",
-                "ofType": null
-              }
-            },
-            "isDeprecated": false,
-            "deprecationReason": null
-          },
-          {
-            "name": "kind",
-            "description": null,
-            "args": [],
-            "type": {
-              "kind": "NON_NULL",
-              "name": null,
-              "ofType": {
-                "name": "CatalogValueKind",
-                "kind": "ENUM",
-                "ofType": null
-              }
-            },
-            "isDeprecated": false,
-            "deprecationReason": null
-          }
-        ],
-        "inputFields": null,
-        "interfaces": [],
-        "enumValues": null,
-        "possibleTypes": null
-      },
-      {
-        "kind": "INPUT_OBJECT",
-        "name": "CatalogEventFieldInput",
-        "description": "A field of the event a CALLBACK prop hands its callback (`event.<key>`).",
-        "isOneOf": false,
-        "fields": null,
-        "inputFields": [
-          {
-            "name": "description",
-            "description": "Human-readable description of the field.",
-            "type": {
-              "kind": "SCALAR",
-              "name": "String",
-              "ofType": null
-            },
-            "defaultValue": "null",
-            "isDeprecated": false,
-            "deprecationReason": null
-          },
-          {
-            "name": "key",
-            "description": "The field a callback reads as `event.<key>`.",
-            "type": {
-              "kind": "NON_NULL",
-              "name": null,
-              "ofType": {
-                "name": "String",
-                "kind": "SCALAR",
-                "ofType": null
-              }
-            },
-            "defaultValue": null,
-            "isDeprecated": false,
-            "deprecationReason": null
-          },
-          {
-            "name": "kind",
-            "description": "The value kind of the field.",
-            "type": {
-              "kind": "NON_NULL",
-              "name": null,
-              "ofType": {
-                "name": "CatalogValueKind",
-                "kind": "ENUM",
-                "ofType": null
-              }
-            },
-            "defaultValue": null,
-            "isDeprecated": false,
-            "deprecationReason": null
-          }
-        ],
-        "interfaces": null,
-        "enumValues": null,
-        "possibleTypes": null
-      },
-      {
-        "kind": "OBJECT",
         "name": "CatalogOperation",
         "description": "A pure operation a UI catalog can evaluate for UtilCalls.",
         "isOneOf": null,
@@ -11575,13 +12642,9 @@
             "description": null,
             "args": [],
             "type": {
-              "kind": "NON_NULL",
-              "name": null,
-              "ofType": {
-                "name": "CatalogValueKind",
-                "kind": "ENUM",
-                "ofType": null
-              }
+              "kind": "OBJECT",
+              "name": "CatalogPort",
+              "ofType": null
             },
             "isDeprecated": false,
             "deprecationReason": null
@@ -11653,17 +12716,325 @@
           },
           {
             "name": "returns",
-            "description": "The kind of value the operation returns (BOOL for effect and validator calls).",
+            "description": "What it returns (BOOL for effect and validator calls); none: open.",
+            "type": {
+              "kind": "INPUT_OBJECT",
+              "name": "CatalogPortInput",
+              "ofType": null
+            },
+            "defaultValue": "null",
+            "isDeprecated": false,
+            "deprecationReason": null
+          }
+        ],
+        "interfaces": null,
+        "enumValues": null,
+        "possibleTypes": null
+      },
+      {
+        "kind": "OBJECT",
+        "name": "CatalogPort",
+        "description": "The port a catalog types a prop, an operation argument or a result by: an action's port, plus CALLBACK, ASSET and BINDING and the open identifier `*`. No kind: open (any value).",
+        "isOneOf": null,
+        "fields": [
+          {
+            "name": "children",
+            "description": null,
+            "args": [],
+            "type": {
+              "kind": "LIST",
+              "name": null,
+              "ofType": {
+                "name": null,
+                "kind": "NON_NULL",
+                "ofType": {
+                  "name": "CatalogChildPort",
+                  "kind": "OBJECT",
+                  "ofType": null
+                }
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "choices",
+            "description": null,
+            "args": [],
+            "type": {
+              "kind": "LIST",
+              "name": null,
+              "ofType": {
+                "name": null,
+                "kind": "NON_NULL",
+                "ofType": {
+                  "name": "CatalogChoice",
+                  "kind": "OBJECT",
+                  "ofType": null
+                }
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "default",
+            "description": null,
+            "args": [],
+            "type": {
+              "kind": "SCALAR",
+              "name": "AnyDefault",
+              "ofType": null
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "dimension",
+            "description": null,
+            "args": [],
+            "type": {
+              "kind": "SCALAR",
+              "name": "String",
+              "ofType": null
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "identifier",
+            "description": null,
+            "args": [],
+            "type": {
+              "kind": "SCALAR",
+              "name": "String",
+              "ofType": null
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "kind",
+            "description": null,
+            "args": [],
+            "type": {
+              "kind": "ENUM",
+              "name": "PortKind",
+              "ofType": null
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "nullable",
+            "description": null,
+            "args": [],
             "type": {
               "kind": "NON_NULL",
               "name": null,
               "ofType": {
-                "name": "CatalogValueKind",
-                "kind": "ENUM",
+                "name": "Boolean",
+                "kind": "SCALAR",
                 "ofType": null
               }
             },
-            "defaultValue": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "proposedUnits",
+            "description": null,
+            "args": [],
+            "type": {
+              "kind": "LIST",
+              "name": null,
+              "ofType": {
+                "name": null,
+                "kind": "NON_NULL",
+                "ofType": {
+                  "name": "String",
+                  "kind": "SCALAR",
+                  "ofType": null
+                }
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "referenceUnit",
+            "description": null,
+            "args": [],
+            "type": {
+              "kind": "SCALAR",
+              "name": "String",
+              "ofType": null
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "tree",
+            "description": "The whole port, children at every depth, as a catalog writes it (camelCase, empty fields left out): what a client compares a catalog by.",
+            "args": [],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "JSONSerializable",
+                "kind": "SCALAR",
+                "ofType": null
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          }
+        ],
+        "inputFields": null,
+        "interfaces": [],
+        "enumValues": null,
+        "possibleTypes": null
+      },
+      {
+        "kind": "INPUT_OBJECT",
+        "name": "CatalogPortInput",
+        "description": "The port a catalog types a prop, an operation argument or a result by: an action's port, plus CALLBACK, ASSET and BINDING and the open identifier `*`. No kind: open (any value).",
+        "isOneOf": false,
+        "fields": null,
+        "inputFields": [
+          {
+            "name": "children",
+            "description": "LIST/BINDING: its one item, keyed '...'; DICT/MODEL: its fields; UNION: its variants; CALLBACK: its payload.",
+            "type": {
+              "kind": "LIST",
+              "name": null,
+              "ofType": {
+                "name": null,
+                "kind": "NON_NULL",
+                "ofType": {
+                  "name": "CatalogChildPortInput",
+                  "kind": "INPUT_OBJECT",
+                  "ofType": null
+                }
+              }
+            },
+            "defaultValue": "null",
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "choices",
+            "description": "The values it takes (required for ENUM).",
+            "type": {
+              "kind": "LIST",
+              "name": null,
+              "ofType": {
+                "name": null,
+                "kind": "NON_NULL",
+                "ofType": {
+                  "name": "CatalogChoiceInput",
+                  "kind": "INPUT_OBJECT",
+                  "ofType": null
+                }
+              }
+            },
+            "defaultValue": "null",
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "default",
+            "description": "Its default value.",
+            "type": {
+              "kind": "SCALAR",
+              "name": "AnyDefault",
+              "ofType": null
+            },
+            "defaultValue": "null",
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "dimension",
+            "description": "For a QUANTITY: its dimensionality.",
+            "type": {
+              "kind": "SCALAR",
+              "name": "String",
+              "ofType": null
+            },
+            "defaultValue": "null",
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "identifier",
+            "description": "STRUCTURE, MEMORY_STRUCTURE, INTERFACE: what it references (`*`: any).",
+            "type": {
+              "kind": "SCALAR",
+              "name": "String",
+              "ofType": null
+            },
+            "defaultValue": "null",
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "kind",
+            "description": "Its kind; none: open (any value).",
+            "type": {
+              "kind": "ENUM",
+              "name": "PortKind",
+              "ofType": null
+            },
+            "defaultValue": "null",
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "nullable",
+            "description": "Whether it takes null.",
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "Boolean",
+                "kind": "SCALAR",
+                "ofType": null
+              }
+            },
+            "defaultValue": "false",
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "proposedUnits",
+            "description": "For a QUANTITY: the units offered.",
+            "type": {
+              "kind": "LIST",
+              "name": null,
+              "ofType": {
+                "name": null,
+                "kind": "NON_NULL",
+                "ofType": {
+                  "name": "String",
+                  "kind": "SCALAR",
+                  "ofType": null
+                }
+              }
+            },
+            "defaultValue": "null",
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "referenceUnit",
+            "description": "For a QUANTITY: its reference unit.",
+            "type": {
+              "kind": "SCALAR",
+              "name": "String",
+              "ofType": null
+            },
+            "defaultValue": "null",
             "isDeprecated": false,
             "deprecationReason": null
           }
@@ -11691,26 +13062,6 @@
             "deprecationReason": null
           },
           {
-            "name": "event",
-            "description": null,
-            "args": [],
-            "type": {
-              "kind": "LIST",
-              "name": null,
-              "ofType": {
-                "name": null,
-                "kind": "NON_NULL",
-                "ofType": {
-                  "name": "CatalogEventField",
-                  "kind": "OBJECT",
-                  "ofType": null
-                }
-              }
-            },
-            "isDeprecated": false,
-            "deprecationReason": null
-          },
-          {
             "name": "key",
             "description": null,
             "args": [],
@@ -11727,17 +13078,13 @@
             "deprecationReason": null
           },
           {
-            "name": "kind",
+            "name": "port",
             "description": null,
             "args": [],
             "type": {
-              "kind": "NON_NULL",
-              "name": null,
-              "ofType": {
-                "name": "CatalogValueKind",
-                "kind": "ENUM",
-                "ofType": null
-              }
+              "kind": "OBJECT",
+              "name": "CatalogPort",
+              "ofType": null
             },
             "isDeprecated": false,
             "deprecationReason": null
@@ -11751,6 +13098,22 @@
               "name": null,
               "ofType": {
                 "name": "Boolean",
+                "kind": "SCALAR",
+                "ofType": null
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "since",
+            "description": null,
+            "args": [],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "Int",
                 "kind": "SCALAR",
                 "ofType": null
               }
@@ -11784,26 +13147,6 @@
             "deprecationReason": null
           },
           {
-            "name": "event",
-            "description": "For a CALLBACK prop: the fields of the event it hands its callback (`event.<key>`); none when it hands none.",
-            "type": {
-              "kind": "LIST",
-              "name": null,
-              "ofType": {
-                "name": null,
-                "kind": "NON_NULL",
-                "ofType": {
-                  "name": "CatalogEventFieldInput",
-                  "kind": "INPUT_OBJECT",
-                  "ofType": null
-                }
-              }
-            },
-            "defaultValue": "null",
-            "isDeprecated": false,
-            "deprecationReason": null
-          },
-          {
             "name": "key",
             "description": "The prop key a ComponentProp.key must match.",
             "type": {
@@ -11820,18 +13163,14 @@
             "deprecationReason": null
           },
           {
-            "name": "kind",
-            "description": "The value kind this prop accepts. CALLBACK props hold one task call or one effect. On `bind`, the kind the control writes (`locals.bind_kinds`).",
+            "name": "port",
+            "description": "What it takes; none: open (the language's own props). CALLBACK props hold one task call or one effect; `bind` is a BINDING.",
             "type": {
-              "kind": "NON_NULL",
-              "name": null,
-              "ofType": {
-                "name": "CatalogValueKind",
-                "kind": "ENUM",
-                "ofType": null
-              }
+              "kind": "INPUT_OBJECT",
+              "name": "CatalogPortInput",
+              "ofType": null
             },
-            "defaultValue": null,
+            "defaultValue": "null",
             "isDeprecated": false,
             "deprecationReason": null
           },
@@ -11850,76 +13189,26 @@
             "defaultValue": "false",
             "isDeprecated": false,
             "deprecationReason": null
+          },
+          {
+            "name": "since",
+            "description": "The catalog minor that added it; 0: from the start.",
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "Int",
+                "kind": "SCALAR",
+                "ofType": null
+              }
+            },
+            "defaultValue": "0",
+            "isDeprecated": false,
+            "deprecationReason": null
           }
         ],
         "interfaces": null,
         "enumValues": null,
-        "possibleTypes": null
-      },
-      {
-        "kind": "ENUM",
-        "name": "CatalogValueKind",
-        "description": "The kind of value a catalog component prop accepts or a catalog operation argument/return carries.",
-        "isOneOf": null,
-        "fields": null,
-        "inputFields": null,
-        "interfaces": null,
-        "enumValues": [
-          {
-            "name": "ANY",
-            "description": null,
-            "isDeprecated": false,
-            "deprecationReason": null
-          },
-          {
-            "name": "ASSET",
-            "description": null,
-            "isDeprecated": false,
-            "deprecationReason": null
-          },
-          {
-            "name": "BOOL",
-            "description": null,
-            "isDeprecated": false,
-            "deprecationReason": null
-          },
-          {
-            "name": "CALLBACK",
-            "description": null,
-            "isDeprecated": false,
-            "deprecationReason": null
-          },
-          {
-            "name": "DICT",
-            "description": null,
-            "isDeprecated": false,
-            "deprecationReason": null
-          },
-          {
-            "name": "FLOAT",
-            "description": null,
-            "isDeprecated": false,
-            "deprecationReason": null
-          },
-          {
-            "name": "INT",
-            "description": null,
-            "isDeprecated": false,
-            "deprecationReason": null
-          },
-          {
-            "name": "LIST",
-            "description": null,
-            "isDeprecated": false,
-            "deprecationReason": null
-          },
-          {
-            "name": "STRING",
-            "description": null,
-            "isDeprecated": false,
-            "deprecationReason": null
-          }
-        ],
         "possibleTypes": null
       },
       {
@@ -12452,6 +13741,18 @@
             "defaultValue": null,
             "isDeprecated": false,
             "deprecationReason": null
+          },
+          {
+            "name": "search",
+            "description": "Search by OAuth client id, name, app identifier, release version or device id (case-insensitive substring).",
+            "type": {
+              "kind": "SCALAR",
+              "name": "String",
+              "ofType": null
+            },
+            "defaultValue": null,
+            "isDeprecated": false,
+            "deprecationReason": null
           }
         ],
         "interfaces": null,
@@ -12479,6 +13780,420 @@
           }
         ],
         "interfaces": null,
+        "enumValues": null,
+        "possibleTypes": null
+      },
+      {
+        "kind": "OBJECT",
+        "name": "Collaboration",
+        "description": "What a guest granted it sees of the organization: the objects put in it, and what is part of them.",
+        "isOneOf": null,
+        "fields": [
+          {
+            "name": "createdAt",
+            "description": null,
+            "args": [],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "DateTime",
+                "kind": "SCALAR",
+                "ofType": null
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "description",
+            "description": null,
+            "args": [],
+            "type": {
+              "kind": "SCALAR",
+              "name": "String",
+              "ofType": null
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "id",
+            "description": null,
+            "args": [],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "ID",
+                "kind": "SCALAR",
+                "ofType": null
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "itemCount",
+            "description": "How many objects are in the collaboration: all of them, or (`brought`) only those put in by hand (false) or only those that came along with one (true)",
+            "args": [
+              {
+                "name": "brought",
+                "description": null,
+                "type": {
+                  "kind": "SCALAR",
+                  "name": "Boolean",
+                  "ofType": null
+                },
+                "defaultValue": "null",
+                "isDeprecated": false,
+                "deprecationReason": null
+              }
+            ],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "Int",
+                "kind": "SCALAR",
+                "ofType": null
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "items",
+            "description": "What is in the collaboration, oldest first; what is part of these is in it too. `brought` keeps what was put in by hand (false) or only what came along with it (true)",
+            "args": [
+              {
+                "name": "brought",
+                "description": null,
+                "type": {
+                  "kind": "SCALAR",
+                  "name": "Boolean",
+                  "ofType": null
+                },
+                "defaultValue": "null",
+                "isDeprecated": false,
+                "deprecationReason": null
+              },
+              {
+                "name": "pagination",
+                "description": null,
+                "type": {
+                  "kind": "INPUT_OBJECT",
+                  "name": "OffsetPaginationInput",
+                  "ofType": null
+                },
+                "defaultValue": "null",
+                "isDeprecated": false,
+                "deprecationReason": null
+              }
+            ],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": null,
+                "kind": "LIST",
+                "ofType": {
+                  "name": null,
+                  "kind": "NON_NULL",
+                  "ofType": {
+                    "name": "CollaborationItem",
+                    "kind": "OBJECT",
+                    "ofType": null
+                  }
+                }
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "key",
+            "description": "The collaboration's key across the hub: what lok grants, and what names it in every service",
+            "args": [],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "ID",
+                "kind": "SCALAR",
+                "ofType": null
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "name",
+            "description": null,
+            "args": [],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "String",
+                "kind": "SCALAR",
+                "ofType": null
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          }
+        ],
+        "inputFields": null,
+        "interfaces": [],
+        "enumValues": null,
+        "possibleTypes": null
+      },
+      {
+        "kind": "OBJECT",
+        "name": "CollaborationItem",
+        "description": "One object in a collaboration: put there, or brought along with one that needs it to be seen.",
+        "isOneOf": null,
+        "fields": [
+          {
+            "name": "addedAt",
+            "description": null,
+            "args": [],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "DateTime",
+                "kind": "SCALAR",
+                "ofType": null
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "brought",
+            "description": "Whether it is in the collaboration only as what another object in it needs to be seen",
+            "args": [],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "Boolean",
+                "kind": "SCALAR",
+                "ofType": null
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "id",
+            "description": null,
+            "args": [],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "ID",
+                "kind": "SCALAR",
+                "ofType": null
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "identifier",
+            "description": "The structure the object is known by across the hub: @mikro/scene",
+            "args": [],
+            "type": {
+              "kind": "SCALAR",
+              "name": "String",
+              "ofType": null
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "objectId",
+            "description": "The object's id, in its structure",
+            "args": [],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "String",
+                "kind": "SCALAR",
+                "ofType": null
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          }
+        ],
+        "inputFields": null,
+        "interfaces": [],
+        "enumValues": null,
+        "possibleTypes": null
+      },
+      {
+        "kind": "INPUT_OBJECT",
+        "name": "CollaborationObjectInput",
+        "description": "An object to put in, or take out of, a collaboration",
+        "isOneOf": false,
+        "fields": null,
+        "inputFields": [
+          {
+            "name": "collaboration",
+            "description": "The collaboration's key (lok's)",
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "ID",
+                "kind": "SCALAR",
+                "ofType": null
+              }
+            },
+            "defaultValue": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "identifier",
+            "description": "The structure the object is known by: @mikro/scene",
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "String",
+                "kind": "SCALAR",
+                "ofType": null
+              }
+            },
+            "defaultValue": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "name",
+            "description": "The collaboration's name, kept here when this is the first thing put in",
+            "type": {
+              "kind": "SCALAR",
+              "name": "String",
+              "ofType": null
+            },
+            "defaultValue": "null",
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "object",
+            "description": "The object's id",
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "ID",
+                "kind": "SCALAR",
+                "ofType": null
+              }
+            },
+            "defaultValue": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          }
+        ],
+        "interfaces": null,
+        "enumValues": null,
+        "possibleTypes": null
+      },
+      {
+        "kind": "INPUT_OBJECT",
+        "name": "CollaborationObjectRef",
+        "description": "An object, by its structure and id",
+        "isOneOf": false,
+        "fields": null,
+        "inputFields": [
+          {
+            "name": "identifier",
+            "description": "The structure the object is known by: @mikro/scene",
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "String",
+                "kind": "SCALAR",
+                "ofType": null
+              }
+            },
+            "defaultValue": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "object",
+            "description": "The object's id",
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "ID",
+                "kind": "SCALAR",
+                "ofType": null
+              }
+            },
+            "defaultValue": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          }
+        ],
+        "interfaces": null,
+        "enumValues": null,
+        "possibleTypes": null
+      },
+      {
+        "kind": "OBJECT",
+        "name": "CollaborationStats",
+        "description": "How many collaborations the organization has (a guest: theirs), and how much is in them",
+        "isOneOf": null,
+        "fields": [
+          {
+            "name": "count",
+            "description": "How many collaborations",
+            "args": [],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "Int",
+                "kind": "SCALAR",
+                "ofType": null
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "itemCount",
+            "description": "How many objects are in them altogether, brought along ones included",
+            "args": [],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "Int",
+                "kind": "SCALAR",
+                "ofType": null
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          }
+        ],
+        "inputFields": null,
+        "interfaces": [],
         "enumValues": null,
         "possibleTypes": null
       },
@@ -18305,7 +20020,7 @@
           },
           {
             "name": "search",
-            "description": "Keep structures whose identifier, label or description contains this text, or whose label and description mean something close to it. Substring matches rank first, then by similarity; an explicit `ordering` replaces that ranking.",
+            "description": "Keep structures whose identifier, label or description contains this text, or whose label and description mean something close to it. Ranked: an exact match, then a prefix, then other textual matches by trigram similarity, then by meaning; an explicit `ordering` replaces that ranking.",
             "type": {
               "kind": "SCALAR",
               "name": "String",
@@ -18646,7 +20361,7 @@
           },
           {
             "name": "codeHash",
-            "description": "A hash of the implementation's code; a workflow is only resumed by an implementation with the same hash.",
+            "description": "A hash of the implementation's code; a resumed workflow is told whether it changed since its run started.",
             "args": [],
             "type": {
               "kind": "SCALAR",
@@ -19041,7 +20756,56 @@
           {
             "name": "manipulates",
             "description": "States that this implementation manipulates.",
-            "args": [],
+            "args": [
+              {
+                "name": "filters",
+                "description": null,
+                "type": {
+                  "kind": "INPUT_OBJECT",
+                  "name": "StateFilter",
+                  "ofType": null
+                },
+                "defaultValue": null,
+                "isDeprecated": false,
+                "deprecationReason": null
+              },
+              {
+                "name": "ordering",
+                "description": null,
+                "type": {
+                  "kind": "NON_NULL",
+                  "name": null,
+                  "ofType": {
+                    "name": null,
+                    "kind": "LIST",
+                    "ofType": {
+                      "name": null,
+                      "kind": "NON_NULL",
+                      "ofType": {
+                        "name": "StateOrder",
+                        "kind": "INPUT_OBJECT",
+                        "ofType": null
+                      }
+                    }
+                  }
+                },
+                "defaultValue": "[]",
+                "isDeprecated": false,
+                "deprecationReason": null
+              },
+              {
+                "name": "pagination",
+                "description": null,
+                "type": {
+                  "kind": "INPUT_OBJECT",
+                  "name": "OffsetPaginationInput",
+                  "ofType": null
+                },
+                "defaultValue": null,
+                "isDeprecated": false,
+                "deprecationReason": null
+              }
+            ],
             "type": {
               "kind": "NON_NULL",
               "name": null,
@@ -19938,7 +21702,7 @@
           },
           {
             "name": "codeHash",
-            "description": "A hash of the implementation's code. A workflow is only resumed by an implementation with the same hash.",
+            "description": "A hash of the implementation's code. A resumed workflow is told whether it changed since its run started.",
             "type": {
               "kind": "SCALAR",
               "name": "String",
@@ -21644,7 +23408,7 @@
       {
         "kind": "ENUM",
         "name": "LocalKind",
-        "description": "The kind of a blok local: a port kind, or ANY (an untyped value, which skips the bind and argument kind checks). No action port is ever ANY.",
+        "description": "The kind of a blok local: a port kind (never CALLBACK, ASSET or BINDING, which only a catalog types by), or ANY (an untyped value, which skips the bind and argument kind checks). No action port is ever ANY.",
         "isOneOf": null,
         "fields": null,
         "inputFields": null,
@@ -22456,6 +24220,22 @@
             "deprecationReason": null
           },
           {
+            "name": "pinned",
+            "description": "Whether the caller pinned this materialization (not `pinnedRevision`, which holds its content).",
+            "args": [],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "Boolean",
+                "kind": "SCALAR",
+                "ofType": null
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
             "name": "pinnedRevision",
             "description": "The revision this materialization stays at; null when it follows its blok's head.",
             "args": [],
@@ -22649,6 +24429,18 @@
             "deprecationReason": null
           },
           {
+            "name": "blokName",
+            "description": "Only materializations of the blok with exactly this name (case-sensitive), unlike the substring `search`.",
+            "type": {
+              "kind": "SCALAR",
+              "name": "String",
+              "ofType": null
+            },
+            "defaultValue": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
             "name": "contexts",
             "description": "Only bloks that render in one of these contexts: PANEL and SCENE are interfaces to open, LOGO draws an agent or an action.",
             "type": {
@@ -22703,6 +24495,18 @@
                   "ofType": null
                 }
               }
+            },
+            "defaultValue": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "pinned",
+            "description": "Only materializations the caller pinned (true) or did not (false).",
+            "type": {
+              "kind": "SCALAR",
+              "name": "Boolean",
+              "ofType": null
             },
             "defaultValue": null,
             "isDeprecated": false,
@@ -24387,6 +26191,72 @@
         "isOneOf": null,
         "fields": [
           {
+            "name": "addManyToCollaboration",
+            "description": "Put several tasks in a collaboration (by its key) at once, each with what it needs to be seen: all of them, or none",
+            "args": [
+              {
+                "name": "input",
+                "description": null,
+                "type": {
+                  "kind": "NON_NULL",
+                  "name": null,
+                  "ofType": {
+                    "name": "AddManyToCollaborationInput",
+                    "kind": "INPUT_OBJECT",
+                    "ofType": null
+                  }
+                },
+                "defaultValue": null,
+                "isDeprecated": false,
+                "deprecationReason": null
+              }
+            ],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "Collaboration",
+                "kind": "OBJECT",
+                "ofType": null
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "addToCollaboration",
+            "description": "Put a task in a collaboration (lok's, by its key), with what it needs to be seen: the action it ran, the tasks it caused as they are now, and the bloks it asked or informed with. Its events and logs are in with it, live. The collaboration's row here is made the first time something is put in",
+            "args": [
+              {
+                "name": "input",
+                "description": null,
+                "type": {
+                  "kind": "NON_NULL",
+                  "name": null,
+                  "ofType": {
+                    "name": "CollaborationObjectInput",
+                    "kind": "INPUT_OBJECT",
+                    "ofType": null
+                  }
+                },
+                "defaultValue": null,
+                "isDeprecated": false,
+                "deprecationReason": null
+              }
+            ],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "Collaboration",
+                "kind": "OBJECT",
+                "ofType": null
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
             "name": "allowAction",
             "description": "Put an action on your auto list: under your runs an agent that asks for it gets it without a hold. Optionally only when one action asks. Yours alone: it changes nothing for anyone else.",
             "args": [
@@ -25125,6 +26995,39 @@
             "deprecationReason": null
           },
           {
+            "name": "deleteCollaboration",
+            "description": "Take everything rekuest put in a collaboration (by its key) out of it: whoever was granted it sees nothing of it here any more. lok's collaboration, and its grants, stay",
+            "args": [
+              {
+                "name": "key",
+                "description": null,
+                "type": {
+                  "kind": "NON_NULL",
+                  "name": null,
+                  "ofType": {
+                    "name": "ID",
+                    "kind": "SCALAR",
+                    "ofType": null
+                  }
+                },
+                "defaultValue": null,
+                "isDeprecated": false,
+                "deprecationReason": null
+              }
+            ],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "ID",
+                "kind": "SCALAR",
+                "ofType": null
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
             "name": "deleteDashboard",
             "description": "Delete a dashboard by ID.",
             "args": [
@@ -25851,7 +27754,73 @@
             "deprecationReason": null
           },
           {
+            "name": "pinBlok",
+            "description": "Pin a blok of any kind for the caller, or unpin it.",
+            "args": [
+              {
+                "name": "input",
+                "description": null,
+                "type": {
+                  "kind": "NON_NULL",
+                  "name": null,
+                  "ofType": {
+                    "name": "PinInput",
+                    "kind": "INPUT_OBJECT",
+                    "ofType": null
+                  }
+                },
+                "defaultValue": null,
+                "isDeprecated": false,
+                "deprecationReason": null
+              }
+            ],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "Blok",
+                "kind": "OBJECT",
+                "ofType": null
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
             "name": "pinMaterializedBlok",
+            "description": "Pin a materialization of any kind for the caller, or unpin it.",
+            "args": [
+              {
+                "name": "input",
+                "description": null,
+                "type": {
+                  "kind": "NON_NULL",
+                  "name": null,
+                  "ofType": {
+                    "name": "PinInput",
+                    "kind": "INPUT_OBJECT",
+                    "ofType": null
+                  }
+                },
+                "defaultValue": null,
+                "isDeprecated": false,
+                "deprecationReason": null
+              }
+            ],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "MaterializedBlok",
+                "kind": "OBJECT",
+                "ofType": null
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "pinMaterializedBlokRevision",
             "description": "Keep a materialization at one revision of its blok, or let it follow the head again.",
             "args": [
               {
@@ -25861,7 +27830,7 @@
                   "kind": "NON_NULL",
                   "name": null,
                   "ofType": {
-                    "name": "PinMaterializedBlokInput",
+                    "name": "PinMaterializedBlokRevisionInput",
                     "kind": "INPUT_OBJECT",
                     "ofType": null
                   }
@@ -25975,6 +27944,39 @@
               "name": null,
               "ofType": {
                 "name": "Module",
+                "kind": "OBJECT",
+                "ofType": null
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "removeFromCollaboration",
+            "description": "Take a task out of a collaboration, with what it brought that nothing else there needs",
+            "args": [
+              {
+                "name": "input",
+                "description": null,
+                "type": {
+                  "kind": "NON_NULL",
+                  "name": null,
+                  "ofType": {
+                    "name": "CollaborationObjectInput",
+                    "kind": "INPUT_OBJECT",
+                    "ofType": null
+                  }
+                },
+                "defaultValue": null,
+                "isDeprecated": false,
+                "deprecationReason": null
+              }
+            ],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "Collaboration",
                 "kind": "OBJECT",
                 "ofType": null
               }
@@ -26268,6 +28270,39 @@
               "name": null,
               "ofType": {
                 "name": "Placement",
+                "kind": "OBJECT",
+                "ofType": null
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "shareWorkflow",
+            "description": "Put a workflow (a root task of the organization: one someone started, or a schedule or trigger did) in a collaboration, as it is now: the root and every task it caused, with their actions, events and logs. Tasks it causes later are not; `dryRun` only says what would be put in",
+            "args": [
+              {
+                "name": "input",
+                "description": null,
+                "type": {
+                  "kind": "NON_NULL",
+                  "name": null,
+                  "ofType": {
+                    "name": "ShareWorkflowInput",
+                    "kind": "INPUT_OBJECT",
+                    "ofType": null
+                  }
+                },
+                "defaultValue": null,
+                "isDeprecated": false,
+                "deprecationReason": null
+              }
+            ],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "WorkflowShare",
                 "kind": "OBJECT",
                 "ofType": null
               }
@@ -27244,7 +29279,7 @@
       },
       {
         "kind": "INPUT_OBJECT",
-        "name": "PinMaterializedBlokInput",
+        "name": "PinMaterializedBlokRevisionInput",
         "description": "Keep a materialization at one revision of its blok, or let it follow the head.",
         "isOneOf": false,
         "fields": null,
@@ -27840,8 +29875,26 @@
         "interfaces": null,
         "enumValues": [
           {
+            "name": "ASSET",
+            "description": "A catalog prop that names a file an app registered (`self.assets.<name>`). No children. Never an agent's port.",
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "BINDING",
+            "description": "A catalog prop that reads and writes a local (`bind`); its one child, keyed '...', is what it writes. Never an agent's port.",
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
             "name": "BOOL",
             "description": "A boolean. No children.",
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "CALLBACK",
+            "description": "A catalog prop that holds a call (onClick); its children are the payload it is called with. Never an agent's port.",
             "isDeprecated": false,
             "deprecationReason": null
           },
@@ -29557,6 +31610,35 @@
             "deprecationReason": null
           },
           {
+            "name": "agentStats",
+            "description": "Statistics about agents: how many (narrowed by filters, e.g. connected or kind) and when they registered or were last seen.",
+            "args": [
+              {
+                "name": "filters",
+                "description": null,
+                "type": {
+                  "kind": "INPUT_OBJECT",
+                  "name": "AgentFilter",
+                  "ofType": null
+                },
+                "defaultValue": "null",
+                "isDeprecated": false,
+                "deprecationReason": null
+              }
+            ],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "AgentStats",
+                "kind": "OBJECT",
+                "ofType": null
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
             "name": "agents",
             "description": "Retrieve all compute agents.",
             "args": [
@@ -29786,6 +31868,55 @@
                     "name": "String",
                     "kind": "SCALAR",
                     "ofType": null
+                  }
+                },
+                "defaultValue": null,
+                "isDeprecated": false,
+                "deprecationReason": null
+              }
+            ],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": null,
+                "kind": "LIST",
+                "ofType": {
+                  "name": null,
+                  "kind": "NON_NULL",
+                  "ofType": {
+                    "name": "Blok",
+                    "kind": "OBJECT",
+                    "ofType": null
+                  }
+                }
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "bloksForModels",
+            "description": "The html bloks registered to decorate any of these models (each names its own in `forModel`): one request for every model a scene shows.",
+            "args": [
+              {
+                "name": "refs",
+                "description": null,
+                "type": {
+                  "kind": "NON_NULL",
+                  "name": null,
+                  "ofType": {
+                    "name": null,
+                    "kind": "LIST",
+                    "ofType": {
+                      "name": null,
+                      "kind": "NON_NULL",
+                      "ofType": {
+                        "name": "String",
+                        "kind": "SCALAR",
+                        "ofType": null
+                      }
+                    }
                   }
                 },
                 "defaultValue": null,
@@ -30089,6 +32220,92 @@
             "deprecationReason": null
           },
           {
+            "name": "collaboration",
+            "description": "Get a single collaboration by its key (lok's): what was put in it here",
+            "args": [
+              {
+                "name": "key",
+                "description": null,
+                "type": {
+                  "kind": "NON_NULL",
+                  "name": null,
+                  "ofType": {
+                    "name": "ID",
+                    "kind": "SCALAR",
+                    "ofType": null
+                  }
+                },
+                "defaultValue": null,
+                "isDeprecated": false,
+                "deprecationReason": null
+              }
+            ],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "Collaboration",
+                "kind": "OBJECT",
+                "ofType": null
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "collaborations",
+            "description": "List the organization's collaborations that hold tasks here: what a guest granted one sees of rekuest (a guest: the collaborations granted to them)",
+            "args": [
+              {
+                "name": "pagination",
+                "description": null,
+                "type": {
+                  "kind": "INPUT_OBJECT",
+                  "name": "OffsetPaginationInput",
+                  "ofType": null
+                },
+                "defaultValue": "null",
+                "isDeprecated": false,
+                "deprecationReason": null
+              }
+            ],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": null,
+                "kind": "LIST",
+                "ofType": {
+                  "name": null,
+                  "kind": "NON_NULL",
+                  "ofType": {
+                    "name": "Collaboration",
+                    "kind": "OBJECT",
+                    "ofType": null
+                  }
+                }
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "collaborationsStats",
+            "description": "How many collaborations hold tasks here (a guest: of those granted to them), and how many objects are in them",
+            "args": [],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "CollaborationStats",
+                "kind": "OBJECT",
+                "ofType": null
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
             "name": "dashboard",
             "description": "Get dashboard by ID.",
             "args": [
@@ -30124,7 +32341,20 @@
           {
             "name": "dashboards",
             "description": "All dashboards.",
-            "args": [],
+            "args": [
+              {
+                "name": "pagination",
+                "description": null,
+                "type": {
+                  "kind": "INPUT_OBJECT",
+                  "name": "OffsetPaginationInput",
+                  "ofType": null
+                },
+                "defaultValue": null,
+                "isDeprecated": false,
+                "deprecationReason": null
+              }
+            ],
             "type": {
               "kind": "NON_NULL",
               "name": null,
@@ -30856,6 +33086,18 @@
             "description": "All interfaces referenced by the org's action ports (derived, not registered).",
             "args": [
               {
+                "name": "pagination",
+                "description": null,
+                "type": {
+                  "kind": "INPUT_OBJECT",
+                  "name": "OffsetPaginationInput",
+                  "ofType": null
+                },
+                "defaultValue": "null",
+                "isDeprecated": false,
+                "deprecationReason": null
+              },
+              {
                 "name": "search",
                 "description": null,
                 "type": {
@@ -30883,6 +33125,67 @@
                     "ofType": null
                   }
                 }
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "matchingSignalCount",
+            "description": "How many of the organization's stored signals of this kind and structure satisfy the conditions: the uncapped count behind `matchingSignals`. Fires nothing.",
+            "args": [
+              {
+                "name": "conditions",
+                "description": null,
+                "type": {
+                  "kind": "SCALAR",
+                  "name": "AnyDefault",
+                  "ofType": null
+                },
+                "defaultValue": "null",
+                "isDeprecated": false,
+                "deprecationReason": null
+              },
+              {
+                "name": "identifier",
+                "description": null,
+                "type": {
+                  "kind": "NON_NULL",
+                  "name": null,
+                  "ofType": {
+                    "name": "String",
+                    "kind": "SCALAR",
+                    "ofType": null
+                  }
+                },
+                "defaultValue": null,
+                "isDeprecated": false,
+                "deprecationReason": null
+              },
+              {
+                "name": "kind",
+                "description": null,
+                "type": {
+                  "kind": "NON_NULL",
+                  "name": null,
+                  "ofType": {
+                    "name": "SignalKind",
+                    "kind": "ENUM",
+                    "ofType": null
+                  }
+                },
+                "defaultValue": null,
+                "isDeprecated": false,
+                "deprecationReason": null
+              }
+            ],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "Int",
+                "kind": "SCALAR",
+                "ofType": null
               }
             },
             "isDeprecated": false,
@@ -32415,7 +34718,7 @@
               },
               {
                 "name": "search",
-                "description": "Keep signals whose identifier or description contains this text, or whose description means something close to it; substring matches first, then by similarity",
+                "description": "Keep signals whose identifier or description contains this text, or whose description means something close to it; ranked: an exact identifier, then a prefix, then other substring matches by trigram similarity, then by meaning",
                 "type": {
                   "kind": "SCALAR",
                   "name": "String",
@@ -32988,6 +35291,79 @@
             "deprecationReason": null
           },
           {
+            "name": "states",
+            "description": "The states of the agents in the caller's organization.",
+            "args": [
+              {
+                "name": "filters",
+                "description": null,
+                "type": {
+                  "kind": "INPUT_OBJECT",
+                  "name": "StateFilter",
+                  "ofType": null
+                },
+                "defaultValue": null,
+                "isDeprecated": false,
+                "deprecationReason": null
+              },
+              {
+                "name": "ordering",
+                "description": null,
+                "type": {
+                  "kind": "NON_NULL",
+                  "name": null,
+                  "ofType": {
+                    "name": null,
+                    "kind": "LIST",
+                    "ofType": {
+                      "name": null,
+                      "kind": "NON_NULL",
+                      "ofType": {
+                        "name": "StateOrder",
+                        "kind": "INPUT_OBJECT",
+                        "ofType": null
+                      }
+                    }
+                  }
+                },
+                "defaultValue": "[]",
+                "isDeprecated": false,
+                "deprecationReason": null
+              },
+              {
+                "name": "pagination",
+                "description": null,
+                "type": {
+                  "kind": "INPUT_OBJECT",
+                  "name": "OffsetPaginationInput",
+                  "ofType": null
+                },
+                "defaultValue": null,
+                "isDeprecated": false,
+                "deprecationReason": null
+              }
+            ],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": null,
+                "kind": "LIST",
+                "ofType": {
+                  "name": null,
+                  "kind": "NON_NULL",
+                  "ofType": {
+                    "name": "State",
+                    "kind": "OBJECT",
+                    "ofType": null
+                  }
+                }
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
             "name": "structure",
             "description": "Fetch a structure by its '@package/key' identifier: one a port references or a service hosts.",
             "args": [
@@ -33058,6 +35434,18 @@
             "description": "All structure packages referenced by the org's action ports (derived, not registered).",
             "args": [
               {
+                "name": "pagination",
+                "description": null,
+                "type": {
+                  "kind": "INPUT_OBJECT",
+                  "name": "OffsetPaginationInput",
+                  "ofType": null
+                },
+                "defaultValue": "null",
+                "isDeprecated": false,
+                "deprecationReason": null
+              },
+              {
                 "name": "search",
                 "description": null,
                 "type": {
@@ -33095,6 +35483,18 @@
             "description": "All structures: those the org's action ports reference, and those a service of this hub hosts.",
             "args": [
               {
+                "name": "pagination",
+                "description": null,
+                "type": {
+                  "kind": "INPUT_OBJECT",
+                  "name": "OffsetPaginationInput",
+                  "ofType": null
+                },
+                "defaultValue": "null",
+                "isDeprecated": false,
+                "deprecationReason": null
+              },
+              {
                 "name": "search",
                 "description": null,
                 "type": {
@@ -33118,6 +35518,43 @@
                   "kind": "NON_NULL",
                   "ofType": {
                     "name": "Structure",
+                    "kind": "OBJECT",
+                    "ofType": null
+                  }
+                }
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "supervisors",
+            "description": "The apps that provisioned the organization's agents (e.g. 'plugin_engine'), as lok signed them into their tokens, with how many agents each (narrowed by filters, e.g. connected).",
+            "args": [
+              {
+                "name": "filters",
+                "description": null,
+                "type": {
+                  "kind": "INPUT_OBJECT",
+                  "name": "AgentFilter",
+                  "ofType": null
+                },
+                "defaultValue": "null",
+                "isDeprecated": false,
+                "deprecationReason": null
+              }
+            ],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": null,
+                "kind": "LIST",
+                "ofType": {
+                  "name": null,
+                  "kind": "NON_NULL",
+                  "ofType": {
+                    "name": "Supervisor",
                     "kind": "OBJECT",
                     "ofType": null
                   }
@@ -36961,6 +39398,18 @@
         "fields": null,
         "inputFields": [
           {
+            "name": "consecutiveFailures",
+            "description": null,
+            "type": {
+              "kind": "ENUM",
+              "name": "Ordering",
+              "ofType": null
+            },
+            "defaultValue": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
             "name": "createdAt",
             "description": null,
             "type": {
@@ -37703,6 +40152,118 @@
           }
         ],
         "interfaces": null,
+        "enumValues": null,
+        "possibleTypes": null
+      },
+      {
+        "kind": "INPUT_OBJECT",
+        "name": "ShareWorkflowInput",
+        "description": "Put what a workflow created in a collaboration, as it is now",
+        "isOneOf": false,
+        "fields": null,
+        "inputFields": [
+          {
+            "name": "collaboration",
+            "description": "The collaboration's key (lok's)",
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "ID",
+                "kind": "SCALAR",
+                "ofType": null
+              }
+            },
+            "defaultValue": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "dryRun",
+            "description": "Only say what would be put in, and what left out",
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "Boolean",
+                "kind": "SCALAR",
+                "ofType": null
+              }
+            },
+            "defaultValue": "false",
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "name",
+            "description": "The collaboration's name, kept here when this puts the first things in",
+            "type": {
+              "kind": "SCALAR",
+              "name": "String",
+              "ofType": null
+            },
+            "defaultValue": "null",
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "rootTask",
+            "description": "The workflow: the id of the task a person started, the root of every task it caused",
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "ID",
+                "kind": "SCALAR",
+                "ofType": null
+              }
+            },
+            "defaultValue": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          }
+        ],
+        "interfaces": null,
+        "enumValues": null,
+        "possibleTypes": null
+      },
+      {
+        "kind": "OBJECT",
+        "name": "SharedObject",
+        "description": "An object, by its structure and id",
+        "isOneOf": null,
+        "fields": [
+          {
+            "name": "identifier",
+            "description": "The structure the object is known by: @mikro/scene",
+            "args": [],
+            "type": {
+              "kind": "SCALAR",
+              "name": "String",
+              "ofType": null
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "object",
+            "description": "The object's id",
+            "args": [],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "ID",
+                "kind": "SCALAR",
+                "ofType": null
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          }
+        ],
+        "inputFields": null,
+        "interfaces": [],
         "enumValues": null,
         "possibleTypes": null
       },
@@ -39254,6 +41815,74 @@
       },
       {
         "kind": "OBJECT",
+        "name": "SkippedObject",
+        "description": "Created in the workflow, but part of something made before it that is not shared: left out",
+        "isOneOf": null,
+        "fields": [
+          {
+            "name": "identifier",
+            "description": "The structure the object is known by",
+            "args": [],
+            "type": {
+              "kind": "SCALAR",
+              "name": "String",
+              "ofType": null
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "object",
+            "description": "The object's id",
+            "args": [],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "ID",
+                "kind": "SCALAR",
+                "ofType": null
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "whole",
+            "description": "The id of what it is part of: put that in, and share the workflow again, to bring it",
+            "args": [],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "ID",
+                "kind": "SCALAR",
+                "ofType": null
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "wholeIdentifier",
+            "description": "The structure of what it is part of",
+            "args": [],
+            "type": {
+              "kind": "SCALAR",
+              "name": "String",
+              "ofType": null
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          }
+        ],
+        "inputFields": null,
+        "interfaces": [],
+        "enumValues": null,
+        "possibleTypes": null
+      },
+      {
+        "kind": "OBJECT",
         "name": "SliderAssignWidget",
         "description": null,
         "isOneOf": null,
@@ -39858,7 +42487,7 @@
       {
         "kind": "OBJECT",
         "name": "State",
-        "description": null,
+        "description": "A state an agent keeps up to date and shares, such as a stage's position.",
         "isOneOf": null,
         "fields": [
           {
@@ -40791,6 +43420,122 @@
       },
       {
         "kind": "INPUT_OBJECT",
+        "name": "StateFilter",
+        "description": "A way to filter states",
+        "isOneOf": false,
+        "fields": null,
+        "inputFields": [
+          {
+            "name": "AND",
+            "description": null,
+            "type": {
+              "kind": "INPUT_OBJECT",
+              "name": "StateFilter",
+              "ofType": null
+            },
+            "defaultValue": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "DISTINCT",
+            "description": null,
+            "type": {
+              "kind": "SCALAR",
+              "name": "Boolean",
+              "ofType": null
+            },
+            "defaultValue": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "NOT",
+            "description": null,
+            "type": {
+              "kind": "INPUT_OBJECT",
+              "name": "StateFilter",
+              "ofType": null
+            },
+            "defaultValue": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "OR",
+            "description": null,
+            "type": {
+              "kind": "INPUT_OBJECT",
+              "name": "StateFilter",
+              "ofType": null
+            },
+            "defaultValue": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "agent",
+            "description": "Only the states of this agent.",
+            "type": {
+              "kind": "SCALAR",
+              "name": "ID",
+              "ofType": null
+            },
+            "defaultValue": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "appIdentifier",
+            "description": "Only the states of the app with this identifier.",
+            "type": {
+              "kind": "SCALAR",
+              "name": "String",
+              "ofType": null
+            },
+            "defaultValue": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "ids",
+            "description": "Filter by IDs",
+            "type": {
+              "kind": "LIST",
+              "name": null,
+              "ofType": {
+                "name": null,
+                "kind": "NON_NULL",
+                "ofType": {
+                  "name": "ID",
+                  "kind": "SCALAR",
+                  "ofType": null
+                }
+              }
+            },
+            "defaultValue": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "search",
+            "description": "Search by interface, key or the agent's name (case-insensitive substring).",
+            "type": {
+              "kind": "SCALAR",
+              "name": "String",
+              "ofType": null
+            },
+            "defaultValue": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          }
+        ],
+        "interfaces": null,
+        "enumValues": null,
+        "possibleTypes": null
+      },
+      {
+        "kind": "INPUT_OBJECT",
         "name": "StateImplementationInput",
         "description": "A state implementation is a blueprint for a state. It is composed of a definition, a list of dependencies, and a list of params.",
         "isOneOf": false,
@@ -40849,6 +43594,42 @@
               "ofType": null
             },
             "defaultValue": "null",
+            "isDeprecated": false,
+            "deprecationReason": null
+          }
+        ],
+        "interfaces": null,
+        "enumValues": null,
+        "possibleTypes": null
+      },
+      {
+        "kind": "INPUT_OBJECT",
+        "name": "StateOrder",
+        "description": null,
+        "isOneOf": true,
+        "fields": null,
+        "inputFields": [
+          {
+            "name": "createdAt",
+            "description": null,
+            "type": {
+              "kind": "ENUM",
+              "name": "Ordering",
+              "ofType": null
+            },
+            "defaultValue": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "updatedAt",
+            "description": null,
+            "type": {
+              "kind": "ENUM",
+              "name": "Ordering",
+              "ofType": null
+            },
+            "defaultValue": null,
             "isDeprecated": false,
             "deprecationReason": null
           }
@@ -42169,7 +44950,7 @@
           },
           {
             "name": "search",
-            "description": "Keep descriptors whose key or description contains this text, or whose description means something close to it. Substring matches rank first, then by similarity; an explicit `ordering` replaces that ranking.",
+            "description": "Keep descriptors whose key or description contains this text, or whose description means something close to it. Ranked: an exact match, then a prefix, then other textual matches by trigram similarity, then by meaning; an explicit `ordering` replaces that ranking.",
             "type": {
               "kind": "SCALAR",
               "name": "String",
@@ -42388,8 +45169,8 @@
                 "ofType": null
               }
             },
-            "isDeprecated": false,
-            "deprecationReason": null
+            "isDeprecated": true,
+            "deprecationReason": "Follow the caller session's `agent:<agent>/tasks` topic on takt (`/session`) instead."
           },
           {
             "name": "agents",
@@ -42400,6 +45181,43 @@
               "name": null,
               "ofType": {
                 "name": "AgentChangeEvent",
+                "kind": "OBJECT",
+                "ofType": null
+              }
+            },
+            "isDeprecated": true,
+            "deprecationReason": "Follow the caller session's `agents:org` topic on takt (`/session`) instead."
+          },
+          {
+            "name": "assets",
+            "description": "The organization's assets as they are stored (only those of `refs`, if given): an agent's declared asset becomes available the moment one with its ref arrives.",
+            "args": [
+              {
+                "name": "refs",
+                "description": null,
+                "type": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "name": null,
+                    "kind": "NON_NULL",
+                    "ofType": {
+                      "name": "String",
+                      "kind": "SCALAR",
+                      "ofType": null
+                    }
+                  }
+                },
+                "defaultValue": "null",
+                "isDeprecated": false,
+                "deprecationReason": null
+              }
+            ],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "AssetChange",
                 "kind": "OBJECT",
                 "ofType": null
               }
@@ -42437,8 +45255,8 @@
                 "ofType": null
               }
             },
-            "isDeprecated": false,
-            "deprecationReason": null
+            "isDeprecated": true,
+            "deprecationReason": "Follow the caller session's `children:<task>` topic on takt (`/session`) instead."
           },
           {
             "name": "implementationChange",
@@ -42552,8 +45370,8 @@
                 "ofType": null
               }
             },
-            "isDeprecated": false,
-            "deprecationReason": null
+            "isDeprecated": true,
+            "deprecationReason": "Follow the caller session's `latest:<agent>/<interface>` topic on takt (`/session`) instead."
           },
           {
             "name": "mytasks",
@@ -42568,8 +45386,8 @@
                 "ofType": null
               }
             },
-            "isDeprecated": false,
-            "deprecationReason": null
+            "isDeprecated": true,
+            "deprecationReason": "Follow the caller session's `tasks:mine` topic on takt (`/session`) instead."
           },
           {
             "name": "probeEvents",
@@ -42601,8 +45419,8 @@
                 "ofType": null
               }
             },
-            "isDeprecated": false,
-            "deprecationReason": null
+            "isDeprecated": true,
+            "deprecationReason": "Follow the caller session's `probe:<probe>` topic on takt (`/session`) instead."
           },
           {
             "name": "schedules",
@@ -42666,8 +45484,65 @@
                 "ofType": null
               }
             },
-            "isDeprecated": false,
-            "deprecationReason": null
+            "isDeprecated": true,
+            "deprecationReason": "Follow the caller session's `state:<agent>/<interface>` topic on takt (`/session`) instead."
+          },
+          {
+            "name": "taskEvents",
+            "description": "One task's events, whoever started it: those already recorded (all, or those newer than `after`), oldest first, then each new one as it is recorded, logs included. Replaces polling a task's event history.",
+            "args": [
+              {
+                "name": "after",
+                "description": null,
+                "type": {
+                  "kind": "SCALAR",
+                  "name": "ID",
+                  "ofType": null
+                },
+                "defaultValue": "null",
+                "isDeprecated": false,
+                "deprecationReason": null
+              },
+              {
+                "name": "afterSeq",
+                "description": null,
+                "type": {
+                  "kind": "SCALAR",
+                  "name": "Int",
+                  "ofType": null
+                },
+                "defaultValue": "null",
+                "isDeprecated": false,
+                "deprecationReason": null
+              },
+              {
+                "name": "task",
+                "description": null,
+                "type": {
+                  "kind": "NON_NULL",
+                  "name": null,
+                  "ofType": {
+                    "name": "ID",
+                    "kind": "SCALAR",
+                    "ofType": null
+                  }
+                },
+                "defaultValue": null,
+                "isDeprecated": false,
+                "deprecationReason": null
+              }
+            ],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "TaskEventChange",
+                "kind": "OBJECT",
+                "ofType": null
+              }
+            },
+            "isDeprecated": true,
+            "deprecationReason": "Follow the caller session's `task:<task>` topic on takt (`/session`) instead."
           },
           {
             "name": "tasks",
@@ -42682,8 +45557,8 @@
                 "ofType": null
               }
             },
-            "isDeprecated": false,
-            "deprecationReason": null
+            "isDeprecated": true,
+            "deprecationReason": "Follow the caller session's `tasks:org` topic on takt (`/session`) instead."
           },
           {
             "name": "triggers",
@@ -42731,8 +45606,8 @@
                 "ofType": null
               }
             },
-            "isDeprecated": false,
-            "deprecationReason": null
+            "isDeprecated": true,
+            "deprecationReason": "Follow the caller session's `states:<agent>` topic on takt (`/session`) instead."
           },
           {
             "name": "watchState",
@@ -42781,6 +45656,66 @@
               "ofType": {
                 "name": "StateSnapshotEventStatePatchEvent",
                 "kind": "UNION",
+                "ofType": null
+              }
+            },
+            "isDeprecated": true,
+            "deprecationReason": "Follow the caller session's `state:<agent>/<interface>` topic on takt (`/session`) instead."
+          }
+        ],
+        "inputFields": null,
+        "interfaces": [],
+        "enumValues": null,
+        "possibleTypes": null
+      },
+      {
+        "kind": "OBJECT",
+        "name": "Supervisor",
+        "description": "An app that provisioned agents of the organization (a plugin engine, a launcher), as lok signed it into their tokens. Its agents are `agents(filters: {supervisor: identifier})`.",
+        "isOneOf": null,
+        "fields": [
+          {
+            "name": "agentCount",
+            "description": "How many of the organization's agents it provisioned (of those the filters keep).",
+            "args": [],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "Int",
+                "kind": "SCALAR",
+                "ofType": null
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "connectedCount",
+            "description": "How many of those have a live connection now.",
+            "args": [],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "Int",
+                "kind": "SCALAR",
+                "ofType": null
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "identifier",
+            "description": "The app's identifier, as the agents carry it in `supervisor` (e.g. 'plugin_engine').",
+            "args": [],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "String",
+                "kind": "SCALAR",
                 "ofType": null
               }
             },
@@ -43081,6 +46016,34 @@
                 "kind": "SCALAR",
                 "ofType": null
               }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "deadmanArmed",
+            "description": "Whether a window's session holds the task's dead man switch (it is armed).",
+            "args": [],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "Boolean",
+                "kind": "SCALAR",
+                "ofType": null
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "deadmanSeconds",
+            "description": "The dead man switch: the task is cancelled when the window holding it has been gone this many seconds. Null: it never depends on a window.",
+            "args": [],
+            "type": {
+              "kind": "SCALAR",
+              "name": "Int",
+              "ofType": null
             },
             "isDeprecated": false,
             "deprecationReason": null
@@ -44345,6 +47308,18 @@
             "deprecationReason": null
           },
           {
+            "name": "taskSeq",
+            "description": "The event's number within its task (1, 2, 3 …) in commit order; the cursor to resume a task's events from.",
+            "args": [],
+            "type": {
+              "kind": "SCALAR",
+              "name": "Int",
+              "ofType": null
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
             "name": "value",
             "description": "EFFECT events: the value the task took (NOW: epoch seconds, RANDOM: hex, SLEEP: deadline). HELD: what waits for a decision ({kind: \"assign\", prompt, action, agent, args, caller_task, caller_agent} for a child an agent asked for, with held: the child's id on its parent and root; {kind: \"self\", prompt, details} for a task's own hold). DECIDED: the decision ({approved, answer, auto, user}). DENIED: {answer, user}. FAILED: {code} when the failure has one the protocol names (STATE_PRECONDITION: the agent's state did not match the task's stateRequires, and nothing of it ran). LOST: what is known about the lost run.",
             "args": [],
@@ -44464,6 +47439,18 @@
                 "kind": "SCALAR",
                 "ofType": null
               }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "taskSeq",
+            "description": "The event's number within its task (1, 2, 3 …) in commit order: resume from it with `afterSeq`, never from the id.",
+            "args": [],
+            "type": {
+              "kind": "SCALAR",
+              "name": "Int",
+              "ofType": null
             },
             "isDeprecated": false,
             "deprecationReason": null
@@ -44933,7 +47920,7 @@
           },
           {
             "name": "caller",
-            "description": "Filter by the caller (client/user/organization) that created the task",
+            "description": "Filter by the caller that created the task: the ID of a Caller row (one client, user and organization), not a user. For a person use `user`.",
             "type": {
               "kind": "SCALAR",
               "name": "ID",
@@ -44980,6 +47967,30 @@
             "deprecationReason": null
           },
           {
+            "name": "createdUnder",
+            "description": "Only what the workflow (its root task id) created",
+            "type": {
+              "kind": "SCALAR",
+              "name": "ID",
+              "ofType": null
+            },
+            "defaultValue": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "humanInduced",
+            "description": "Keep only workflows someone started (true): root tasks no schedule ran and no trigger or signal fired: what a person would share (`shareWorkflow` takes any root task). False keeps every other task",
+            "type": {
+              "kind": "SCALAR",
+              "name": "Boolean",
+              "ofType": null
+            },
+            "defaultValue": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
             "name": "ids",
             "description": "Filter by IDs of the tasks",
             "type": {
@@ -45002,6 +48013,18 @@
           {
             "name": "implementation",
             "description": "Filter by the implementation the task is currently mapped to",
+            "type": {
+              "kind": "SCALAR",
+              "name": "ID",
+              "ofType": null
+            },
+            "defaultValue": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "inCollaboration",
+            "description": "Only what is in this collaboration (its key): put in, or part of what was",
             "type": {
               "kind": "SCALAR",
               "name": "ID",
@@ -45118,6 +48141,18 @@
           {
             "name": "trigger",
             "description": "Keep the runs this trigger fired",
+            "type": {
+              "kind": "SCALAR",
+              "name": "ID",
+              "ofType": null
+            },
+            "defaultValue": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "user",
+            "description": "Filter by the user (their sub) on whose behalf the task was created, whatever client they used.",
             "type": {
               "kind": "SCALAR",
               "name": "ID",
@@ -47421,6 +50456,18 @@
         "fields": null,
         "inputFields": [
           {
+            "name": "consecutiveFailures",
+            "description": null,
+            "type": {
+              "kind": "ENUM",
+              "name": "Ordering",
+              "ofType": null
+            },
+            "defaultValue": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
             "name": "createdAt",
             "description": null,
             "type": {
@@ -49568,6 +52615,138 @@
         "possibleTypes": null
       },
       {
+        "kind": "OBJECT",
+        "name": "WorkflowShare",
+        "description": "What sharing a workflow put in a collaboration here (or, tried, would put in)",
+        "isOneOf": null,
+        "fields": [
+          {
+            "name": "added",
+            "description": "Put in, with what each needs to be seen",
+            "args": [],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": null,
+                "kind": "LIST",
+                "ofType": {
+                  "name": null,
+                  "kind": "NON_NULL",
+                  "ofType": {
+                    "name": "SharedObject",
+                    "kind": "OBJECT",
+                    "ofType": null
+                  }
+                }
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "collaboration",
+            "description": "The collaboration's key",
+            "args": [],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "ID",
+                "kind": "SCALAR",
+                "ofType": null
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "covered",
+            "description": "How many parts came along with their whole, without being put in themselves",
+            "args": [],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "Int",
+                "kind": "SCALAR",
+                "ofType": null
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "dryRun",
+            "description": "Whether nothing was written",
+            "args": [],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "Boolean",
+                "kind": "SCALAR",
+                "ofType": null
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "skipped",
+            "description": "Left out: parts of something made before the workflow and not shared",
+            "args": [],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": null,
+                "kind": "LIST",
+                "ofType": {
+                  "name": null,
+                  "kind": "NON_NULL",
+                  "ofType": {
+                    "name": "SkippedObject",
+                    "kind": "OBJECT",
+                    "ofType": null
+                  }
+                }
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "unknown",
+            "description": "Structures here that cannot say what created their objects: not looked at",
+            "args": [],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": null,
+                "kind": "LIST",
+                "ofType": {
+                  "name": null,
+                  "kind": "NON_NULL",
+                  "ofType": {
+                    "name": "String",
+                    "kind": "SCALAR",
+                    "ofType": null
+                  }
+                }
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          }
+        ],
+        "inputFields": null,
+        "interfaces": [],
+        "enumValues": null,
+        "possibleTypes": null
+      },
+      {
         "kind": "SCALAR",
         "name": "_Any",
         "description": null,
@@ -50780,6 +53959,34 @@
               "ofType": null
             },
             "defaultValue": "\"No longer supported\"",
+            "isDeprecated": false,
+            "deprecationReason": null
+          }
+        ]
+      },
+      {
+        "name": "identified",
+        "description": null,
+        "isRepeatable": false,
+        "isDeprecated": false,
+        "deprecationReason": null,
+        "locations": [
+          "OBJECT"
+        ],
+        "args": [
+          {
+            "name": "by",
+            "description": null,
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "name": "String",
+                "kind": "SCALAR",
+                "ofType": null
+              }
+            },
+            "defaultValue": null,
             "isDeprecated": false,
             "deprecationReason": null
           }

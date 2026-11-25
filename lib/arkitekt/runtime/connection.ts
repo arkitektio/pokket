@@ -95,3 +95,25 @@ export const instantiateConnection = <
     token,
   };
 };
+
+type HeldServices = { serviceMap?: Record<string, unknown>; selfService?: unknown } | undefined;
+
+/**
+ * Close what the services of a replaced connection hold open beyond their
+ * clients (rekuest's session socket), for every service the new connection no
+ * longer carries. A service kept by identity (a connection patched to drop one
+ * service keeps the others) is left alone; one that will not close is logged.
+ */
+export const disposeReplaced = (previous: HeldServices, next: HeldServices) => {
+  if (!previous || previous === next) return;
+  const kept = new Set<unknown>([...Object.values(next?.serviceMap ?? {}), next?.selfService]);
+  const services = [...Object.values(previous.serviceMap ?? {}), previous.selfService] as (Service | undefined)[];
+  for (const service of services) {
+    if (!service || kept.has(service)) continue;
+    try {
+      service.dispose?.();
+    } catch (error) {
+      console.warn("[ArkitektProvider] a service did not close:", error);
+    }
+  }
+};

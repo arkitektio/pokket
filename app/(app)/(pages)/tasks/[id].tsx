@@ -9,14 +9,8 @@ import { Text } from '@/components/ui/text';
 import { Guard } from '@/lib/app/App';
 import { showDetail } from '@/lib/navigation';
 import { actionRoute } from '@/lib/rekuest/assign/runOrAsk';
-import {
-  DetailTaskFragment,
-  useCancelTaskMutation,
-  useDetailTaskQuery,
-  useInterruptTaskMutation,
-  usePauseTaskMutation,
-  useResumeTaskMutation,
-} from '@/lib/rekuest/api/graphql';
+import { DetailTaskFragment, useDetailTaskQuery } from '@/lib/rekuest/api/graphql';
+import { callFailure, useTaskCalls, type TaskControlKind } from '@/lib/rekuest/session/calls';
 import {
   bucketColor,
   formatDuration,
@@ -35,6 +29,7 @@ import { Link, useLocalSearchParams } from 'expo-router';
 import { Ban, CornerLeftUp, LucideIcon, OctagonX, Pause, Play, RotateCw } from 'lucide-react-native';
 import * as React from 'react';
 import { Pressable, RefreshControl, ScrollView, View } from 'react-native';
+import { toast } from 'sonner-native';
 
 /** Descendants get no events on the root stream; poll them while they run. */
 const CHILD_POLL_MS = 3000;
@@ -77,11 +72,14 @@ function ActionButton({
 /** Pause/resume, cancel and interrupt — as the task's state allows. */
 function TaskActions({ task }: { task: DetailTaskFragment }) {
   const dialog = useAlertDialog();
-  const variables = { task: task.id };
-  const [cancel] = useCancelTaskMutation({ variables });
-  const [interrupt] = useInterruptTaskMutation({ variables });
-  const [pause] = usePauseTaskMutation({ variables });
-  const [resume] = useResumeTaskMutation({ variables });
+  // Over the app's caller session; what it does shows on the task as its events arrive.
+  const calls = useTaskCalls();
+  const control = (kind: TaskControlKind, failed: string) => () =>
+    calls.control(kind, task.id).catch((error: unknown) => toast.error(callFailure(error, failed)));
+  const cancel = control('CANCEL', 'The task could not be cancelled');
+  const interrupt = control('INTERRUPT', 'The task could not be interrupted');
+  const pause = control('PAUSE', 'The task could not be paused');
+  const resume = control('RESUME', 'The task could not be resumed');
 
   const confirm = (title: string, message: string, label: string, run: () => unknown) =>
     dialog.show(title, message, [

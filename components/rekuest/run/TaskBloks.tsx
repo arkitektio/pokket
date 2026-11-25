@@ -5,13 +5,13 @@ import {Text} from '@/components/ui/text';
 import {
   TaskBlokRole,
   TaskBlokStatus,
-  useDecideMutation,
   useTaskBloksQuery,
   type TaskBlokFragment,
 } from '@/lib/rekuest/api/graphql';
 import {openAsks, type TaskRootSource} from '@/lib/rekuest/run/taskRoot';
 import {useBlokTravelMoment} from '@/lib/rekuest/travel/context';
 import {HoldCard} from './HoldCard';
+import {useDecide} from './useDecide';
 import {TaskBlokEmbed} from './TaskBlokEmbed';
 
 /** The task as a task blok reads it: its events (for its open asks), and whether it is over. */
@@ -67,14 +67,14 @@ export const TaskBlokView = ({
   blok: TaskBlokFragment;
   onAnswer?: (values: Record<string, unknown>) => unknown;
 }) => {
-  const [decide] = useDecideMutation();
+  const decide = useDecide();
   const host = useTaskBlokHost(task, blok.materializedBlok);
   const asks = blok.role === TaskBlokRole.Ask;
   // The past is not answered.
   const live = useBlokTravelMoment() === null;
   const onReturn = React.useCallback(
     (values: Record<string, unknown>) =>
-      onAnswer ? onAnswer(values) : decide({variables: {input: {task: taskId, approved: true, values}}}),
+      onAnswer ? onAnswer(values) : decide({task: taskId, approved: true, values}),
     [decide, onAnswer, taskId],
   );
   return (

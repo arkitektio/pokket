@@ -2,11 +2,12 @@ import * as React from 'react';
 import {ActivityIndicator, Pressable, TextInput, View} from 'react-native';
 import {Check, Hand, MessageSquarePlus, X} from 'lucide-react-native';
 import {Text} from '@/components/ui/text';
-import {TaskBlokStatus, useDecideMutation} from '@/lib/rekuest/api/graphql';
+import {TaskBlokStatus} from '@/lib/rekuest/api/graphql';
 import type {HoldRequest} from '@/lib/rekuest/run/holds';
 import {useThemeColors} from '@/lib/theme/BrandProvider';
 import {cn} from '@/lib/utils';
 import {TaskBlokEmbedById} from './TaskBlokEmbed';
+import {useDecide} from './useDecide';
 
 const isEmpty = (value: unknown) =>
   value === undefined || value === null || (typeof value === 'object' && Object.keys(value as object).length === 0);
@@ -35,7 +36,7 @@ export const HoldCard = ({
   className?: string;
 }) => {
   const colors = useThemeColors();
-  const [decide] = useDecideMutation();
+  const decide = useDecide();
   const [answer, setAnswer] = React.useState('');
   const [answering, setAnswering] = React.useState(false);
   const [sending, setSending] = React.useState<'approve' | 'deny' | null>(null);
@@ -46,7 +47,7 @@ export const HoldCard = ({
     // Sent, the card stays busy: it goes when the decision comes back as an event. Only a refusal hands the buttons back.
     const sent = onDecide
       ? onDecide(decision)
-      : decide({variables: {input: {task: hold.task, ...decision}}});
+      : decide({task: hold.task, ...decision});
     return sent.catch(() => setSending(null));
   };
   const asksThroughBlok = hold.kind === 'self' && !!hold.blok;

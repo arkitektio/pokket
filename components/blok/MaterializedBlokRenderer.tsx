@@ -39,7 +39,7 @@ import BlokRenderer from './BlokRenderer';
  * A materialized blok: orkestrator's `MaterializedBlokRenderer` without the
  * args page. Live unless a `BlokTravelProvider` around it shows the past.
  *
- * - `deps.<key>.<state>` holds the bound agent's state: live (`WatchState`, one
+ * - `deps.<key>.<state>` holds the bound agent's state: live (`state:` topic, one
  *   shared subscription per agent and state), or at the travel moment (agent
  *   state history); pending until it is known and stale while the agent is
  *   offline;
@@ -228,7 +228,7 @@ const RuntimeSync = (props: {
 type Followed = {observe?: BlokTaskObserver; resolve: () => void};
 
 /**
- * Follows the tasks this blok started on the organization's task stream. A
+ * Follows the tasks this blok started on this user's task stream. A
  * task is known by the reference it was assigned with until its create says
  * which id it got; events that beat the id to us wait for it.
  */
@@ -261,6 +261,20 @@ const useTaskFollower = () => {
 
   useTaskStreamListener(change => {
     if (change.create?.reference) bind(change.create.reference, change.create.id);
+    // Back after a gap: a followed task that ended meanwhile ends here too.
+    const update = change.update;
+    if (update?.isDone) {
+      const followed = byTask.current.get(update.id);
+      if (followed) {
+        deliver(followed, update.id, {
+          __typename: 'TaskEventChange',
+          id: `resync-${update.id}`,
+          task: update.id,
+          kind: update.latestEventKind,
+          createdAt: update.finishedAt ?? update.updatedAt,
+        });
+      }
+    }
     const event = change.event;
     if (!event) return;
     const followed = byTask.current.get(event.task);

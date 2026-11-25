@@ -53,7 +53,7 @@ import {
   onApprovalRequired,
   shouldRefreshToken,
 } from "./runtime/auth";
-import { instantiateConnection, type ServiceMap } from "./runtime/connection";
+import { disposeReplaced, instantiateConnection, type ServiceMap } from "./runtime/connection";
 import {
   buildConfigurationIssues,
   buildModuleStates,
@@ -182,6 +182,16 @@ export const ArkitektProvider = <T extends ServiceBuilderMap, S extends ServiceB
       parkedProfileId: null,
     });
   });
+
+  // A connection is replaced (a sign-in, a profile switch, an alias checked again, a service
+  // dropped after a failed check): what the services it no longer carries hold open is closed.
+  useEffect(
+    () =>
+      store.subscribe((state, previous) => {
+        if (previous.connection !== state.connection) disposeReplaced(previous.connection, state.connection);
+      }),
+    [store],
+  );
 
   /**
    * Every change to the profile book goes through here: applied to the store

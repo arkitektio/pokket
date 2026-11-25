@@ -1,48 +1,43 @@
-import type { ApolloClient } from "@apollo/client";
 import { useCallback, useSyncExternalStore } from "react";
-import {
-  WatchStateDocument,
-  type WatchStateSubscription,
-  type WatchStateSubscriptionVariables,
-} from "../api/graphql";
-import { useRekuestClient } from "../useTaskStream";
+import type { RekuestSession } from "../session/client";
+import { toStatePatchEvent, toStateSnapshotEvent, type StatesSnapshot, type WirePatch } from "../session/frames";
+import { useRekuestSession } from "../session/hooks";
 import { createLiveStateStore, EMPTY_LIVE_STATE } from "./liveStateStore";
 import { latestTaskStore, type LatestTaskState } from "./latestTaskStore";
 
 /**
- * One `WatchState` subscription per `(agentID, interface)` shared by every
- * consumer, patches coalesced to one publish per animation frame — see
- * `./liveStateStore.ts`. A port of orkestrator's `useAgentLiveState`.
+ * One watch per `(agentID, interface)` shared by every consumer, patches
+ * coalesced to one publish per animation frame (`./liveStateStore.ts`), over
+ * the app's caller session (`state:<agent>/<interface>`): the state's snapshot
+ * (its newest checkpoint with the patches after it applied), then each patch;
+ * a resume replays the patches missed. orkestrator's `useAgentLiveState`.
  */
-const agentLiveStateStore = createLiveStateStore<ApolloClient<unknown>>({
-  subscribe: (client, variables, handlers) => {
-    const subscription = client
-      .subscribe<WatchStateSubscription, WatchStateSubscriptionVariables>({
-        query: WatchStateDocument,
-        variables: { agentID: variables.agentID, interface: variables.interface },
-      })
-      .subscribe({
-        next: (result) => {
-          const event = result.data?.watchState;
-          if (event) handlers.next(event);
-        },
-        error: handlers.error,
-      });
-    return () => subscription.unsubscribe();
-  },
+const agentLiveStateStore = createLiveStateStore<RekuestSession>({
+  subscribe: (session, variables, handlers) =>
+    session.watch(`state:${variables.agentID}/${variables.interface}`, {
+      onData: (item) => {
+        const patch = toStatePatchEvent(item as WirePatch);
+        handlers.next({ __typename: "StatePatchEvent", ops: patch.ops, globalRevision: patch.globalRevision });
+      },
+      onResync: (snapshot) => {
+        const event = toStateSnapshotEvent(snapshot as StatesSnapshot, variables.interface);
+        handlers.next({ __typename: "StateSnapshotEvent", value: event?.value ?? null, globalRevision: event?.globalRevision ?? 0 });
+      },
+      onRefused: (error) => handlers.error(new Error(error)),
+    }),
 });
 
 const unwatched = () => () => {};
 
 /** The live value of one state of one agent; `known` once the server has answered. */
 export const useAgentLiveState = ({ agentID, stateInterface }: { agentID?: string; stateInterface?: string }) => {
-  const client = useRekuestClient() as ApolloClient<unknown>;
-  const active = !!agentID && !!stateInterface && !!client;
+  const session = useRekuestSession();
+  const active = !!agentID && !!stateInterface;
 
   const subscribe = useCallback(
     (onStoreChange: () => void) =>
-      active ? agentLiveStateStore.acquire(client, agentID as string, stateInterface as string, onStoreChange) : unwatched(),
-    [active, client, agentID, stateInterface],
+      active ? agentLiveStateStore.acquire(session, agentID as string, stateInterface as string, onStoreChange) : unwatched(),
+    [active, session, agentID, stateInterface],
   );
   const getSnapshot = useCallback(
     () => (active ? agentLiveStateStore.getSnapshot(agentID as string, stateInterface as string) : EMPTY_LIVE_STATE),
@@ -58,13 +53,13 @@ export const useAgentLiveState = ({ agentID, stateInterface }: { agentID?: strin
  * server has answered; from then on it changes only when the task does.
  */
 export const useLatestTask = ({ agentID, name }: { agentID?: string; name?: string }): LatestTaskState | null => {
-  const client = useRekuestClient() as ApolloClient<unknown>;
-  const active = !!agentID && !!name && !!client;
+  const session = useRekuestSession();
+  const active = !!agentID && !!name;
 
   const subscribe = useCallback(
     (onStoreChange: () => void) =>
-      active ? latestTaskStore.acquire(client, agentID as string, name as string, onStoreChange) : unwatched(),
-    [active, agentID, client, name],
+      active ? latestTaskStore.acquire(session, agentID as string, name as string, onStoreChange) : unwatched(),
+    [active, agentID, session, name],
   );
   const getSnapshot = useCallback(
     () => (active ? latestTaskStore.getSnapshot(agentID as string, name as string) : EMPTY_LIVE_STATE),
