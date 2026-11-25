@@ -1,4 +1,4 @@
-import { AgentRow } from '@/components/agents/AgentRow';
+import { AgentCardRow, inPairs } from '@/components/agents/AgentCard';
 import { RekuestUnavailable, TasksEmptyState, TasksLoadingState } from '@/components/tasks/states';
 import { Text } from '@/components/ui/text';
 import { Guard } from '@/lib/app/App';
@@ -27,7 +27,16 @@ function AgentList({ search }: { search: string }) {
     fetchPolicy: 'cache-and-network',
     notifyOnNetworkStatusChange: false,
   });
-  const sections = React.useMemo(() => agentSections(data?.agents ?? []), [data?.agents]);
+  // Tiles two to a row, as orkestrator's agents grid: each section's agents in pairs.
+  const sections = React.useMemo(
+    () =>
+      agentSections(data?.agents ?? []).map((section) => ({
+        ...section,
+        count: section.data.length,
+        data: inPairs(section.data),
+      })),
+    [data?.agents],
+  );
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -45,11 +54,11 @@ function AgentList({ search }: { search: string }) {
   return (
     <SectionList
       sections={sections}
-      keyExtractor={(agent) => agent.id}
-      renderItem={({ item }) => <AgentRow agent={item} />}
+      keyExtractor={(pair) => pair.map((agent) => agent.id).join('|')}
+      renderItem={({ item }) => <AgentCardRow agents={item} />}
       renderSectionHeader={({ section }) => (
-        <Text className="bg-background px-4 pb-1 pt-4 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-          {section.title} · {section.data.length}
+        <Text className="bg-background px-4 pb-2 pt-4 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+          {section.title} · {section.count}
         </Text>
       )}
       stickySectionHeadersEnabled={false}

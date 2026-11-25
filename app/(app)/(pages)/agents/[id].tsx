@@ -1,6 +1,7 @@
 import { ActionLogo } from '@/components/actions/ActionLogo';
 import { AgentLogo } from '@/components/agents/AgentLogo';
-import { agentPresence } from '@/components/agents/AgentRow';
+import { agentPresence, agentStatus, AgentStatusDot } from '@/components/agents/AgentCard';
+import { CardWatermark } from '@/components/ui/card-watermark';
 import { RecentTasks } from '@/components/tasks/RecentTasks';
 import { RekuestUnavailable, TasksLoadingState } from '@/components/tasks/states';
 import { Text } from '@/components/ui/text';
@@ -14,6 +15,7 @@ import { type Href, Link, useLocalSearchParams } from 'expo-router';
 import { Bot, ChevronRight, Play } from 'lucide-react-native';
 import * as React from 'react';
 import { Pressable, RefreshControl, ScrollView, View } from 'react-native';
+import { cn } from '@/lib/utils';
 
 const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
   <View className="gap-2">
@@ -71,7 +73,8 @@ function Agent({ agent, refreshing, onRefresh }: { agent: DetailAgentFragment; r
     () => [...agent.implementations].sort((a, b) => a.action.name.localeCompare(b.action.name)),
     [agent.implementations],
   );
-  const tone = agent.blocked ? 'text-destructive' : agent.connected ? 'text-primary' : 'text-muted-foreground';
+  const status = agentStatus(agent);
+  const tone = agent.blocked ? 'text-destructive' : agent.connected ? 'text-success' : 'text-muted-foreground';
 
   return (
     <ScrollView
@@ -79,16 +82,40 @@ function Agent({ agent, refreshing, onRefresh }: { agent: DetailAgentFragment; r
       contentContainerStyle={{ padding: 16, paddingBottom: 48, gap: 24 }}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
     >
-      <View className="flex-row items-center gap-3">
-        <View className="h-14 w-14 items-center justify-center rounded-2xl bg-muted">
+      {/* Its card, large: the theme colour while connected, its logo faint behind it (as its tile in the list). */}
+      <View
+        className={cn(
+          'flex-row items-center gap-3 overflow-hidden rounded-2xl border p-4',
+          status === 'blocked'
+            ? 'border-destructive/45 bg-destructive/10'
+            : status === 'online'
+              ? 'border-primary/25 bg-primary/10'
+              : 'border-border bg-muted/40',
+        )}
+      >
+        <CardWatermark size="45%">
+          {agent.logo?.blok ? (
+            <AgentLogo agent={agent} className="h-full w-full" />
+          ) : (
+            <View className="h-full w-full items-center justify-center">
+              <Bot size={120} strokeWidth={1.25} color={colors.foreground} />
+            </View>
+          )}
+        </CardWatermark>
+        <View className="h-14 w-14 items-center justify-center rounded-2xl bg-background/70">
           {agent.logo ? <AgentLogo agent={agent} className="h-10 w-10" /> : <Bot size={24} color={colors.mutedForeground} />}
         </View>
         <View className="flex-1 gap-1">
           <Text selectable className="text-xl font-semibold text-foreground">
-            {agent.name}
+            {agent.app.identifier}
           </Text>
+          {agent.name && agent.name !== agent.app.identifier ? (
+            <Text selectable numberOfLines={1} className="text-sm text-muted-foreground">
+              {agent.name}
+            </Text>
+          ) : null}
           <View className="flex-row flex-wrap items-center gap-x-2 gap-y-1">
-            <View className={`h-2 w-2 rounded-full ${agent.blocked ? 'bg-destructive' : agent.connected ? 'bg-primary' : 'bg-muted-foreground/40'}`} />
+            <AgentStatusDot status={status} className="h-2 w-2" />
             <Text className={`text-sm ${tone}`}>{agentPresence(agent)}</Text>
             {/* As orkestrator flags it: the server holds it active without a live connection, or the reverse. */}
             {agent.active !== agent.connected && !agent.blocked ? (
