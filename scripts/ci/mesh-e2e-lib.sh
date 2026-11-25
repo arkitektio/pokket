@@ -32,10 +32,21 @@ start_metro() {
     curl -s -m 2 http://127.0.0.1:8081/status | grep -q running && break
     sleep 1
   done
-  # Build the bundle once up front, so the app's first load does not time out.
-  echo "building the $platform dev bundle…"
-  curl -sf -m 900 -o /dev/null \
-    "http://127.0.0.1:8081/.expo/.virtual-metro-entry.bundle?platform=$platform&dev=true&minify=false" \
+  # Build the bundle once up front, so the app's first load does not time out (iOS gives up
+  # on a request after 60 s; a cold build on a runner takes about as long). It must be the
+  # very bundle the development build will ask for: Metro builds and keeps each variant
+  # apart, and the app's (lazy, Hermes bytecode, router root) is not the plain entry's, so
+  # warming another one left the app's own load cold. The manifest names it.
+  local manifest bundle
+  manifest="$(curl -sf -m 60 -H "expo-platform: $platform" -H "accept: application/expo+json,application/json" \
+    http://127.0.0.1:8081/ || true)"
+  bundle="$(printf '%s' "$manifest" | python3 -c 'import json,sys; print(json.load(sys.stdin)["launchAsset"]["url"])' 2> /dev/null || true)"
+  if [ -z "$bundle" ]; then
+    echo "no launch asset in the manifest; warming the plain entry instead"
+    bundle="http://127.0.0.1:8081/.expo/.virtual-metro-entry.bundle?platform=$platform&dev=true&minify=false"
+  fi
+  echo "building the $platform dev bundle: $bundle"
+  curl -sf -m 900 -o /dev/null -H "expo-platform: $platform" "$bundle" \
     || { echo "Metro did not build the bundle"; tail -n 80 "$work/metro.log"; return 1; }
   echo "dev bundle ready"
 }

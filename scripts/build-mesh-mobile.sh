@@ -14,7 +14,11 @@
 # Android NDK (ANDROID_NDK_HOME, or ANDROID_HOME with an ndk/ inside) for
 # android, and Xcode for ios.
 #
-# Usage: scripts/build-mesh-mobile.sh [android|ios|all]   (default: all)
+# Usage: scripts/build-mesh-mobile.sh [android|ios|all|linkcheck]   (default: all)
+#
+# `linkcheck` links the library for Android the way gomobile does, without the
+# NDK or gomobile (a pure-Go link, so it runs anywhere in a minute): what the
+# linker refuses shows up there before an hour of native builds does.
 set -euo pipefail
 
 target="${1:-all}"
@@ -23,7 +27,26 @@ module="$root/modules/pokket-mesh"
 go_dir="$module/go"
 export GOTOOLCHAIN="${GOTOOLCHAIN:-auto}"
 
+# The Go linker flags of every Android build. `-checklinkname=0`: the media
+# bridge's TURN server (pion/turn -> pion/transport/v4/stdnet) reads Android's
+# interfaces with github.com/wlynxg/anet, which reaches into the standard
+# library by `//go:linkname`; Go 1.23+ refuses that unless told (anet's
+# README asks for exactly this flag). Without it: "invalid reference to
+# net.zoneCache".
+android_ldflags="-s -w -checklinkname=0"
+
 cd "$go_dir"
+
+if [ "$target" = "linkcheck" ]; then
+  # A throwaway main in the module (an `_` directory: never part of `./...`).
+  check="$(mktemp -d "$go_dir/_linkcheck.XXXXXX")"
+  trap 'rm -rf "$check"' EXIT
+  printf 'package main\n\nimport meshmobile "github.com/arkitektio/pokket/modules/pokket-mesh/go"\n\nfunc main() { _ = meshmobile.Version() }\n' >"$check/main.go"
+  # arm64 only: the other ABIs link only through cgo (the NDK). It carries the same Go code.
+  echo "mesh: linking for android/arm64"
+  GOOS=android GOARCH=arm64 CGO_ENABLED=0 go build -trimpath -ldflags "$android_ldflags" -o /dev/null "./$(basename "$check")"
+  exit 0
+fi
 
 # gomobile and gobind at the x/mobile version go.mod pins.
 bin="$(go env GOPATH)/bin"
@@ -43,7 +66,7 @@ build_android() {
   # 16 KB pages: Google Play requires 16 KB-aligned native libraries for apps
   # targeting Android 15+, and older NDKs link with 4 KB alignment.
   gomobile bind -target=android/arm64,android/arm,android/amd64 -androidapi 24 \
-    -trimpath -ldflags "-s -w -extldflags=-Wl,-z,max-page-size=16384" -o "$work/meshmobile.aar" .
+    -trimpath -ldflags "$android_ldflags -extldflags=-Wl,-z,max-page-size=16384" -o "$work/meshmobile.aar" .
 
   # A library module may not depend on a local .aar (AGP refuses to package
   # one into another), so unpack it: the Java classes as a jar, the Go
@@ -92,5 +115,5 @@ case "$target" in
     build_android
     if [ "$(uname)" = "Darwin" ]; then build_ios; else echo "mesh: skipping ios (needs macOS)"; fi
     ;;
-  *) echo "usage: $0 [android|ios|all]" >&2; exit 2 ;;
+  *) echo "usage: $0 [android|ios|all|linkcheck]" >&2; exit 2 ;;
 esac

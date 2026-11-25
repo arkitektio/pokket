@@ -74,6 +74,10 @@ jobs:
         run: |
           GOOS=android GOARCH=arm64 go build ./...
           GOOS=ios GOARCH=arm64 CGO_ENABLED=1 go vet ./...
+      # `go build ./...` compiles a library and links nothing; this links it for Android with
+      # the flags gomobile gets, so a link the linker refuses fails here, not an hour into a build.
+      - name: Link for Android as gomobile does
+        run: ../../../scripts/build-mesh-mobile.sh linkcheck
 
   js:
     runs-on: ubuntu-latest
