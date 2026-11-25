@@ -1,3 +1,10 @@
+## [3.1.1](https://github.com/arkitektio/pokket/compare/v3.1.0...v3.1.1) (2026-11-25)
+
+
+### Bug Fixes
+
+* **mesh:** the Android library links again, and the iOS self-test warms the bundle the app loads ([d971136](https://github.com/arkitektio/pokket/commit/d97113660ee896b3e01492cb12f0bd72d99db3cc))
+
 # [3.1.0](https://github.com/arkitektio/pokket/compare/v3.0.0...v3.1.0) (2026-11-25)
 
 
