@@ -222,6 +222,26 @@ jobs:
       - name: Prebuild
         run: npx expo prebuild --platform ios --no-install --clean
 
+      # Updates are code-signed (app.config.ts), so a development build asks Metro for a
+      # signed manifest, and Metro cannot sign one without the private key, which never
+      # leaves the update server: "Must specify --private-key-path argument to sign
+      # development manifest" (HTTP 500), and the app never loads its JS. The self-test is
+      # about the mesh, not update signing, so this dev build carries no certificate and
+      # asks for no signature. Release builds (and the release variant here) keep it.
+      - name: No update signing in the development build
+        if: matrix.variant == 'dev'
+        run: |
+          expo_plist="$(find ios -path '*/Supporting/Expo.plist' -not -path '*/Pods/*' | head -n1)"
+          test -n "$expo_plist"
+          for key in EXUpdatesCodeSigningCertificate EXUpdatesCodeSigningMetadata; do
+            /usr/libexec/PlistBuddy -c "Delete :$key" "$expo_plist" 2> /dev/null || true
+          done
+          if /usr/libexec/PlistBuddy -c 'Print :EXUpdatesCodeSigningCertificate' "$expo_plist" > /dev/null 2>&1; then
+            echo "::error::$expo_plist still carries a code signing certificate"
+            exit 1
+          fi
+          echo "no update signing in $expo_plist"
+
       - name: Check Info.plist
         run: |
           plist=ios/pokket/Info.plist
