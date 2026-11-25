@@ -22,10 +22,18 @@ mark() {
 # start_metro <platform>: serves the JS to a development build on :8081, with
 # the self-test's parameters inlined, and waits until the bundle is built.
 start_metro() {
-  local platform="$1"
+  local platform="$1" runtime
+  # The runtime version, computed once: Metro would hash the native sources again for every
+  # manifest it serves, and with the prebuilt native project that outlasts the 10 s a
+  # development build waits for its manifest ("The request timed out" on iOS). The same value
+  # the manifest would carry (app.config.ts reads it), so nothing else changes.
+  runtime="$(cd "$root" && npx expo-updates fingerprint:generate --platform "$platform" 2> /dev/null \
+    | python3 -c 'import json,sys; print(json.load(sys.stdin)["hash"])' 2> /dev/null || true)"
+  echo "runtime version: ${runtime:-left to Metro}"
   (
     cd "$root"
     CI=1 EXPO_PUBLIC_MESH_SELFTEST=1 EXPO_PUBLIC_MESH_SELFTEST_AUTORUN="$(cat "$work/query")" \
+      POKKET_RUNTIME_VERSION="$runtime" \
       npx expo start --dev-client --port 8081 > "$work/metro.log" 2>&1
   ) &
   for _ in $(seq 1 120); do
@@ -49,6 +57,9 @@ start_metro() {
   curl -sf -m 900 -o /dev/null -H "expo-platform: $platform" "$bundle" \
     || { echo "Metro did not build the bundle"; tail -n 80 "$work/metro.log"; return 1; }
   echo "dev bundle ready"
+  # What the development build will wait at most 10 s for: said, so a slow one is not a mystery.
+  curl -s -m 60 -o /dev/null -w "manifest served in %{time_total} s\n" \
+    -H "expo-platform: $platform" -H "accept: application/expo+json,application/json" http://127.0.0.1:8081/ || true
 }
 
 # The deep link a development build opens to load its JS from Metro.

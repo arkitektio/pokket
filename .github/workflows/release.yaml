@@ -293,6 +293,23 @@ jobs:
       # workers at once, and memory and disk in the log every minute, to show
       # what runs out if it still does. All set for Gradle here, not in
       # eas.json or the app config, which are part of the native fingerprint.
+      #
+      # It still died now and then ("lost communication with the server", the
+      # log gone with it, 2026-11-20 and -25): the runner running out of
+      # memory. So swap on the runner's large scratch disk too: a peak slows
+      # the build down instead of killing it.
+      - name: More swap for the bundle
+        if: steps.native.outputs.needed == 'true'
+        run: |
+          free -m
+          scratch=/mnt; [ -d "$scratch" ] && [ -w "$scratch" ] || scratch="$(sudo mktemp -d /var/tmp/swap.XXXX)"
+          sudo fallocate -l 12G "$scratch/pokket.swap"
+          sudo chmod 600 "$scratch/pokket.swap"
+          sudo mkswap "$scratch/pokket.swap" > /dev/null
+          sudo swapon "$scratch/pokket.swap"
+          free -m
+          df -h / "$scratch"
+
       - name: Build AAB
         if: steps.native.outputs.needed == 'true'
         env:

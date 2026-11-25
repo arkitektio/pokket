@@ -29,7 +29,11 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     slug: config.slug ?? "pokket",
     version: pkg.version,
     android: { ...config.android, versionCode: major * 1_000_000 + minor * 1_000 + patch },
-    runtimeVersion: { policy: "fingerprint" },
+    // The native fingerprint. `POKKET_RUNTIME_VERSION` hands in that same value computed once
+    // (`expo-updates fingerprint:generate`): Metro otherwise hashes the native sources again for
+    // every manifest it serves, which with a prebuilt ios/ takes longer than the 10 s a
+    // development build waits for one (scripts/ci/mesh-e2e-lib.sh). Never set for a build.
+    runtimeVersion: process.env.POKKET_RUNTIME_VERSION || { policy: "fingerprint" },
     updates: {
       url: "https://updates.arkitekt.live/api/manifest",
       // Check on every launch, apply on the next one (or at once, from the
