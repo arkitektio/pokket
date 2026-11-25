@@ -1,3 +1,10 @@
+## [3.1.2](https://github.com/arkitektio/pokket/compare/v3.1.1...v3.1.2) (2026-11-25)
+
+
+### Bug Fixes
+
+* **ci:** the iOS self-test's manifest comes in time, and the Play bundle gets swap ([65223fa](https://github.com/arkitektio/pokket/commit/65223fa718a67a71791b70836350ecb7cd620605))
+
 ## [3.1.1](https://github.com/arkitektio/pokket/compare/v3.1.0...v3.1.1) (2026-11-25)
 
 
