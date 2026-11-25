@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import { AudioSession, isTrackReference, LiveKitRoom, useTracks, VideoTrack } from '@livekit/react-native';
 import { Track } from 'livekit-client';
 import type { LivekitClient } from '@/lib/livekit/client';
+import { describeMediaPath, useMediaPath } from '@/lib/livekit/useMediaPath';
 import * as React from 'react';
 import { ActivityIndicator, View } from 'react-native';
 
@@ -26,13 +27,27 @@ const Notice = ({ children }: { children: string }) => (
   </View>
 );
 
-/** The stream's track in the joined room: the one its agent publishes under the stream's key. */
+/** The participant an agent publishes its streams as (lovekit mints its token so). */
+export const agentIdentity = (agentId: string) => `agent-${agentId}`;
+
+/**
+ * The stream's track in the joined room: the one its agent publishes under the
+ * stream's key. Only the agent's: a viewer may publish too, and a track of the
+ * same name from anyone else is not the stream.
+ */
 function PublishedTrack({ stream }: { stream: ShownStream }) {
   const audio = stream.kind === StreamKind.Audio;
   const trackRefs = useTracks([audio ? Track.Source.Microphone : Track.Source.Camera], { onlySubscribed: true });
+  const publisher = agentIdentity(stream.agent.id);
   const track = React.useMemo(
-    () => trackRefs.find((trackRef) => isTrackReference(trackRef) && trackRef.publication.trackName === stream.key),
-    [trackRefs, stream.key],
+    () =>
+      trackRefs.find(
+        (trackRef) =>
+          isTrackReference(trackRef) &&
+          trackRef.publication.trackName === stream.key &&
+          trackRef.participant.identity === publisher,
+      ),
+    [trackRefs, stream.key, publisher],
   );
 
   if (!track || !isTrackReference(track)) {
@@ -53,6 +68,7 @@ function PublishedTrack({ stream }: { stream: ShownStream }) {
 export function StreamPlayer({ stream, className }: { stream: ShownStream; className?: string }) {
   const colors = useThemeColors();
   const livekit = App.useService('livekit');
+  const client = livekit.client as LivekitClient;
   const [watchAgent] = useWatchAgentMutation();
   const [token, setToken] = React.useState<string | null>(null);
   const [joinError, setJoinError] = React.useState<string | null>(null);
@@ -61,6 +77,8 @@ export function StreamPlayer({ stream, className }: { stream: ShownStream; class
   const [attempt, setAttempt] = React.useState(0);
   const agentId = stream.agent.id;
   const playable = stream.kind === StreamKind.Video || stream.kind === StreamKind.Audio;
+  // How media gets to LiveKit: asked again with every retry, a restarted mesh has a new bridge.
+  const media = useMediaPath(playable ? client : undefined, attempt);
 
   React.useEffect(() => {
     if (!playable) return;
@@ -107,7 +125,28 @@ export function StreamPlayer({ stream, className }: { stream: ShownStream; class
     );
   }
 
-  if (joining && !token) {
+  const retry = () => {
+    setJoining(true);
+    setJoinError(null);
+    setRoomError(null);
+    setToken(null);
+    setAttempt((previous) => previous + 1);
+  };
+
+  if (media.status === 'error') {
+    return (
+      <Card className="border-border bg-card">
+        <CardContent className="gap-4 py-6">
+          <Text className="text-sm text-destructive">{media.error}</Text>
+          <Button variant="outline" className="self-start rounded-xl border-border" onPress={retry}>
+            <Text className="text-sm font-medium text-foreground">Retry join</Text>
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if ((joining && !token) || media.status === 'pending') {
     return (
       <View className="items-center justify-center py-16">
         <ActivityIndicator size="large" color={colors.primary} />
@@ -121,17 +160,7 @@ export function StreamPlayer({ stream, className }: { stream: ShownStream; class
       <Card className="border-border bg-card">
         <CardContent className="gap-4 py-6">
           <Text className="text-sm text-destructive">{joinError}</Text>
-          <Button
-            variant="outline"
-            className="self-start rounded-xl border-border"
-            onPress={() => {
-              setJoining(true);
-              setJoinError(null);
-              setRoomError(null);
-              setToken(null);
-              setAttempt((previous) => previous + 1);
-            }}
-          >
+          <Button variant="outline" className="self-start rounded-xl border-border" onPress={retry}>
             <Text className="text-sm font-medium text-foreground">Retry join</Text>
           </Button>
         </CardContent>
@@ -144,8 +173,9 @@ export function StreamPlayer({ stream, className }: { stream: ShownStream; class
       <View className={cn('h-80 overflow-hidden rounded-2xl border border-border bg-black', className)}>
         <LiveKitRoom
           token={token ?? undefined}
-          serverUrl={(livekit.client as LivekitClient).url}
+          serverUrl={client.url}
           connect={Boolean(token)}
+          connectOptions={media.connectOptions}
           audio={false}
           video={false}
           onError={(error) => {
@@ -155,7 +185,11 @@ export function StreamPlayer({ stream, className }: { stream: ShownStream; class
           <PublishedTrack stream={stream} />
         </LiveKitRoom>
       </View>
-      {roomError ? <Text className="text-sm text-destructive">{roomError}</Text> : null}
+      {roomError ? (
+        <Text className="text-sm text-destructive">{roomError}</Text>
+      ) : media.path.kind === 'media-bridge' ? (
+        <Text className="text-xs text-muted-foreground">{describeMediaPath(media.path)}</Text>
+      ) : null}
     </View>
   );
 }

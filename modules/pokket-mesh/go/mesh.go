@@ -98,6 +98,10 @@ type node struct {
 	mu       sync.Mutex
 	last     nodeStatus
 	forwards map[string]*forward
+
+	// The media bridge (mediabridge.go), started on the first ask.
+	bridgeMu sync.Mutex
+	bridge   *mediaBridge
 }
 
 // debugLogf receives tsnet's internal log; silent except in tests.
@@ -250,6 +254,7 @@ func Stop(id string) {
 		delete(n.forwards, key)
 	}
 	n.mu.Unlock()
+	n.closeMediaBridge()
 	_ = n.srv.Close()
 	emitStatus(nodeStatus{ID: id, State: "stopped"})
 }

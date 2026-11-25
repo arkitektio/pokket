@@ -7,7 +7,8 @@ import {
   useConnectionState,
   useRoomContext,
 } from "@livekit/react-native";
-import { ConnectionState } from "livekit-client";
+import { ConnectionState, type RoomConnectOptions } from "livekit-client";
+import { connectOptionsFor } from "@/lib/livekit/useMediaPath";
 import * as React from "react";
 import { AppState } from "react-native";
 import { toast } from "sonner-native";
@@ -60,13 +61,41 @@ const RoomBridge = ({ audio }: { audio: boolean }) => {
 /**
  * One connection, from token to hang-up. The audio session and, on Android,
  * the call service (modules/pokket-call) run exactly as long as it does; the
- * room connects only once the session is configured, which LiveKit asks for.
+ * room connects only once the session is configured, which LiveKit asks for,
+ * and once it is known how media reaches LiveKit (direct, or the mesh's media
+ * bridge when LiveKit is only on the mesh).
  */
 const Connection = ({ token, callId, title }: { token: string; callId: string; title: string }) => {
   // The media server the deployment configured, which lovekit needs but does not own.
-  const { url } = App.useService("livekit").client as LivekitClient;
+  const client = App.useService("livekit").client as LivekitClient;
+  const url = client.url;
   const audio = useCallState((state) => state.media.audio);
   const [ready, setReady] = React.useState(false);
+  const [connectOptions, setConnectOptions] = React.useState<RoomConnectOptions | null>(null);
+
+  // Only the connection the store still holds: by the time an old room
+  // reports, another call or a rejoin may have replaced it.
+  const current = () => {
+    const state = callStore.getState();
+    return state.call?.id === callId && state.token === token ? state : null;
+  };
+
+  React.useEffect(() => {
+    let cancelled = false;
+    client
+      .mediaPath()
+      .then((path) => {
+        if (!cancelled) setConnectOptions(connectOptionsFor(path));
+      })
+      .catch((error) => {
+        if (!cancelled) current()?.fail(error instanceof Error ? error.message : String(error));
+      });
+    return () => {
+      cancelled = true;
+    };
+    // Once per connection (the component is keyed by its token).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -94,20 +123,14 @@ const Connection = ({ token, callId, title }: { token: string; callId: string; t
   }, [title, audio]);
   React.useEffect(() => stopCallService, []);
 
-  if (!ready) return null;
-
-  // Only the connection the store still holds: by the time an old room
-  // reports, another call or a rejoin may have replaced it.
-  const current = () => {
-    const state = callStore.getState();
-    return state.call?.id === callId && state.token === token ? state : null;
-  };
+  if (!ready || !connectOptions) return null;
 
   return (
     <LiveKitRoom
       token={token}
       serverUrl={url}
       connect
+      connectOptions={connectOptions}
       audio={false}
       video={false}
       onConnected={() => current()?.connected()}

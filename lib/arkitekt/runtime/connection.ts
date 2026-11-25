@@ -44,6 +44,7 @@ export const buildServiceMap = ({
       manifest,
       // What the client talks to; the stored map keeps the fakts' own alias.
       alias: router ? router.resolve(alias) : alias,
+      origin: alias,
       fakts,
       getToken,
     });
@@ -77,6 +78,7 @@ export const instantiateConnection = <
   const selfService = selfServiceBuilder({
     manifest,
     alias: router ? router.resolve(selfAlias) : selfAlias,
+    origin: selfAlias,
     fakts: storedSession.fakts,
     getToken,
   });

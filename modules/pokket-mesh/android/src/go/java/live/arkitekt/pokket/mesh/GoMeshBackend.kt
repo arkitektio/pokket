@@ -30,4 +30,6 @@ class GoMeshBackend : MeshBackend {
   override fun stop(id: String) = Meshmobile.stop(id)
 
   override fun status(id: String): String = Meshmobile.status(id)
+
+  override fun mediaBridge(id: String, hostsCsv: String): String = Meshmobile.mediaBridge(id, hostsCsv)
 }

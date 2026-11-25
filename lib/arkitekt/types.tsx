@@ -116,7 +116,10 @@ export type GetToken = (options?: {
 
 export type ServiceBuilder<T extends Service = Service> = (options: {
   manifest: Manifest;
+  /** What the client talks to: the router's stand-in (a loopback forward) for an alias on the mesh. */
   alias: Alias;
+  /** The fakts' own alias, before the router: where the service really is (e.g. for live media). */
+  origin?: Alias;
   fakts: ActiveFakts;
   getToken: GetToken;
 }) => T;

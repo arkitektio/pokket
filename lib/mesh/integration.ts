@@ -3,7 +3,7 @@ import type { FaktsEndpoint } from "@/lib/arkitekt/fakts/endpointSchema";
 import type { ActiveFakts, Alias } from "@/lib/arkitekt/fakts/faktsSchema";
 import type { GrantedMesh } from "@/lib/arkitekt/fakts/meshGrant";
 import type { AliasRouter, MeshIntegration } from "@/lib/arkitekt/types";
-import { meshNative } from "@/modules/pokket-mesh";
+import { meshNative, parseMediaBridge } from "@/modules/pokket-mesh";
 import { nodeHostname } from "./hostname";
 import { meshNeeded, onMesh } from "./meshNeed";
 import {
@@ -45,7 +45,36 @@ const JOIN_AND_PARK_TIMEOUT_MS = 30_000;
 
 const aliasKey = (alias: Alias) => `${alias.host}|${alias.port ?? 0}|${alias.ssl}`;
 
+/**
+ * How live media (WebRTC, LiveKit) reaches a media server: straight there over
+ * UDP, or through the mesh's media bridge when the server is only on the mesh.
+ * The signalling goes through the alias' loopback forward like any request,
+ * but WebRTC's media is UDP to the addresses the server hands out, which the
+ * phone has no route to. So for a server on the mesh WebRTC is handed the
+ * bridge (a TURN server on 127.0.0.1 whose traffic goes over the mesh,
+ * modules/pokket-mesh/go/mediabridge.go) as its ICE server. It keeps its own
+ * direct candidates too: where a direct UDP path works it is used. Same as
+ * orkestrator's `core/connection/mesh/mediaBridge.ts`.
+ */
+export type MediaPath =
+  | { kind: "direct" }
+  | { kind: "media-bridge"; meshLabel: string; rtcConfig: RTCConfiguration };
+
+/** Why live media from a mesh-only server cannot be had on this phone, as a sentence. */
+export class MediaBridgeError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "MediaBridgeError";
+  }
+}
+
 export type MeshController = MeshIntegration & {
+  /**
+   * The path live media takes to the media server at `host` (the fakts' own
+   * host, never the loopback stand-in). Throws a `MediaBridgeError` when the
+   * server is on the mesh and no bridge can be had.
+   */
+  mediaPathFor: (host: string) => Promise<MediaPath>;
   /** The active login's mesh, for the Mesh screen; null when it has none. */
   record: () => MeshRecord | null;
   subscribeRecord: (listener: () => void) => () => void;
@@ -208,8 +237,64 @@ export const createMeshIntegration = (): MeshController => {
     },
   };
 
+  /** Asks in flight, so rooms joining at once share one. Nothing is kept past the answer:
+   *  after a node restart the next ask gets the new bridge. */
+  const asking = new Map<string, Promise<MediaPath>>();
+
+  const mediaPathFor = (host: string): Promise<MediaPath> => {
+    const mesh = activeMesh();
+    if (!mesh || !onMesh(host, mesh)) return Promise.resolve({ kind: "direct" });
+    const key = `${mesh.id}|${host}`;
+    const inFlight = asking.get(key);
+    if (inFlight) return inFlight;
+
+    const ask = (async (): Promise<MediaPath> => {
+      const native = meshNative();
+      if (!native?.mediaBridge) {
+        throw new MediaBridgeError(
+          `Live media from this hub goes through the ${mesh.label} mesh, and this build of pokket has no media bridge (update it).`,
+        );
+      }
+      if (nodeStatus(mesh.id)?.state !== "running") {
+        await start(mesh);
+        if (!(await waitForRunning(mesh.id, { timeoutMs: PREPARE_TIMEOUT_MS }))) {
+          throw new MediaBridgeError(`Live media from this hub goes through the ${mesh.label} mesh, which is not connected.`);
+        }
+      }
+      let bridge;
+      try {
+        bridge = parseMediaBridge(await native.mediaBridge(mesh.id, [host]));
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : String(error);
+        throw new MediaBridgeError(
+          `Live media from this hub goes through the ${mesh.label} mesh, and its media bridge could not start: ${reason}.`,
+        );
+      }
+      if (!bridge) {
+        throw new MediaBridgeError(`Live media from this hub goes through the ${mesh.label} mesh, and it started no media bridge.`);
+      }
+      return {
+        kind: "media-bridge",
+        meshLabel: mesh.label,
+        rtcConfig: {
+          iceServers: [{ urls: bridge.urls, username: bridge.username, credential: bridge.credential }],
+          // WebRTC still offers its direct candidates: a direct UDP path wins where there is one.
+          iceTransportPolicy: "all",
+        },
+      };
+    })();
+    asking.set(key, ask);
+    const done = () => {
+      if (asking.get(key) === ask) asking.delete(key);
+    };
+    ask.then(done, done);
+    return ask;
+  };
+
   return {
     router,
+
+    mediaPathFor,
 
     record: () => record,
 

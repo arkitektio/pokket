@@ -7,10 +7,11 @@ export const livekitServiceDefinition: ServiceDefinition = {
     service: "io.livekit.livekit",
     optional: true,
     omitchallenge: true,
-    builder: ({ alias }) => {
+    builder: ({ alias, origin }) => {
       return {
         client: createLivekitClient({
           url: aliasToWsPath(alias, ""),
+          host: (origin ?? alias).host,
         }),
         alias
       };

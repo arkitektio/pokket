@@ -45,6 +45,18 @@ export const createFakeMeshNative = () => {
     }),
     status: jest.fn(async () => null),
     refreshNetwork: jest.fn(async () => {}),
+    /** What `mediaBridge` answers; tests may make it throw. */
+    mediaBridgeError: null as string | null,
+    mediaBridge: jest.fn(async (id: string, hosts: string[]) => {
+      calls.push(["mediaBridge", id, hosts]);
+      if (fake.mediaBridgeError) throw new Error(fake.mediaBridgeError);
+      return JSON.stringify({
+        urls: ["turn:127.0.0.1:41000?transport=udp"],
+        username: "u",
+        credential: "c",
+        allowed: ["100.64.0.7"],
+      });
+    }),
     /** Simulate iOS reclaiming the loopback sockets while suspended. */
     rebindAll: () => {
       for (const key of ports.keys()) ports.set(key, nextPort++);

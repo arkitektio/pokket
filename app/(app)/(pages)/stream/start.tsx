@@ -19,8 +19,9 @@ import {
     VideoTrack,
 } from '@livekit/react-native';
 import { Link, Stack } from 'expo-router';
-import { ConnectionState, Track } from 'livekit-client';
+import { ConnectionState, Track, type RoomConnectOptions } from 'livekit-client';
 import type { LivekitClient } from '@/lib/livekit/client';
+import { connectOptionsFor } from '@/lib/livekit/useMediaPath';
 import * as React from 'react';
 import { ActivityIndicator, ScrollView, TextInput, View } from 'react-native';
 import { useThemeColors } from '@/lib/theme/BrandProvider';
@@ -120,6 +121,7 @@ function PublishCamera({ onError }: { onError: (message: string) => void }) {
 function BroadcasterRoom({
   stream,
   token,
+  connectOptions,
   startedAt,
   roomError,
   onRoomError,
@@ -127,6 +129,8 @@ function BroadcasterRoom({
 }: {
   stream: StreamFragment;
   token: string;
+  /** How media reaches LiveKit: the mesh's media bridge when LiveKit is only on the mesh. */
+  connectOptions: RoomConnectOptions;
   startedAt: number | null;
   roomError: string | null;
   onRoomError: (message: string) => void;
@@ -177,6 +181,7 @@ function BroadcasterRoom({
         token={token}
         serverUrl={(livekit.client as LivekitClient).url}
         connect
+        connectOptions={connectOptions}
         video={false}
         onError={(error) => {
           onRoomError(error.message);
@@ -224,6 +229,8 @@ function StartStreamContent() {
   const colors = useThemeColors();
   const [declareStreams] = useDeclareStreamsMutation();
   const [publisherConnection] = usePublisherConnectionMutation();
+  const livekit = App.useService('livekit');
+  const [connectOptions, setConnectOptions] = React.useState<RoomConnectOptions>({});
   const [title, setTitle] = React.useState("This phone's camera");
   const [stream, setStream] = React.useState<StreamFragment | null>(null);
   const [token, setToken] = React.useState<string | null>(null);
@@ -252,6 +259,10 @@ function StartStreamContent() {
       }
       setStream(nextStream);
 
+      // How media reaches LiveKit; a LiveKit only on the mesh needs the mesh's media bridge.
+      const path = await (livekit.client as LivekitClient).mediaPath();
+      setConnectOptions(connectOptionsFor(path));
+
       const connection = (await publisherConnection()).data?.publisherConnection;
       if (!connection) {
         throw new Error('Lovekit handed out no connection');
@@ -267,7 +278,7 @@ function StartStreamContent() {
     } finally {
       setSubmitting(false);
     }
-  }, [declareStreams, publisherConnection, title]);
+  }, [declareStreams, publisherConnection, title, livekit]);
 
   const handleStop = React.useCallback(() => {
     setToken(null);
@@ -283,6 +294,7 @@ function StartStreamContent() {
         <BroadcasterRoom
           stream={stream}
           token={token}
+          connectOptions={connectOptions}
           startedAt={startedAt}
           roomError={roomError}
           onRoomError={setRoomError}

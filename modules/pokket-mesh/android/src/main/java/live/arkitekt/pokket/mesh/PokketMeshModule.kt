@@ -164,6 +164,12 @@ class PokketMeshModule : Module() {
       backend?.status(id)
     }
 
+    // A TURN server on 127.0.0.1 whose traffic goes over the mesh, relaying only to `hosts`
+    // (the media server's): what WebRTC uses to reach a LiveKit that is only on the mesh.
+    AsyncFunction("mediaBridge") { id: String, hosts: List<String> ->
+      requireBackend().mediaBridge(id, hosts.joinToString(","))
+    }
+
     AsyncFunction("refreshNetwork") {
       backend?.let { pushInterfaces(it) }
     }

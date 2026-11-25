@@ -151,6 +151,21 @@ public final class PokketMeshModule: Module {
       #endif
     }
 
+    // A TURN server on 127.0.0.1 whose traffic goes over the mesh, relaying only to `hosts`
+    // (the media server's): what WebRTC uses to reach a LiveKit that is only on the mesh.
+    AsyncFunction("mediaBridge") { (id: String, hosts: [String]) throws -> String in
+      #if canImport(Meshmobile)
+      var error: NSError?
+      let bridge = MeshmobileMediaBridge(id, hosts.joined(separator: ","), &error)
+      if let error = error {
+        throw MeshGoException(error.localizedDescription)
+      }
+      return bridge
+      #else
+      throw MeshUnavailableException()
+      #endif
+    }
+
     // iOS lets tsnet see interfaces itself; nothing to push.
     AsyncFunction("refreshNetwork") {}
   }

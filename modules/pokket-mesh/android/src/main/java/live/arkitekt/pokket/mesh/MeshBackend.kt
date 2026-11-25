@@ -14,4 +14,6 @@ interface MeshBackend {
   fun forward(id: String, host: String, port: Long, tls: Boolean): Long
   fun stop(id: String)
   fun status(id: String): String
+  /** The node's media bridge (go/mediabridge.go) for these hosts, as JSON. */
+  fun mediaBridge(id: String, hostsCsv: String): String
 }

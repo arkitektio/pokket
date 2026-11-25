@@ -68,7 +68,38 @@ declare class PokketMeshModule extends NativeModule<PokketMeshEvents> {
   status(id: string): Promise<string | null>;
   /** Re-hand the device's interfaces to tsnet (Android; a no-op on iOS). */
   refreshNetwork(): Promise<void>;
+  /**
+   * The node's media bridge, relaying to `hosts` (the media server's, `host` or
+   * `host:port`), as JSON (`MeshMediaBridge`): a TURN server on 127.0.0.1 whose
+   * traffic goes over the mesh. Absent from a native build made before it.
+   */
+  mediaBridge?(id: string, hosts: string[]): Promise<string>;
 }
+
+/** The media bridge as one ICE server (go/mediabridge.go `mediaBridgeInfo`). */
+export type MeshMediaBridge = {
+  urls: string[];
+  username: string;
+  credential: string;
+  /** The mesh addresses it relays to. */
+  allowed: string[];
+};
+
+export const parseMediaBridge = (json: string | null | undefined): MeshMediaBridge | null => {
+  if (!json) return null;
+  try {
+    const parsed = JSON.parse(json);
+    return parsed &&
+      Array.isArray(parsed.urls) &&
+      parsed.urls.length > 0 &&
+      typeof parsed.username === "string" &&
+      typeof parsed.credential === "string"
+      ? { urls: parsed.urls, username: parsed.username, credential: parsed.credential, allowed: parsed.allowed ?? [] }
+      : null;
+  } catch {
+    return null;
+  }
+};
 
 const native = requireOptionalNativeModule<PokketMeshModule>("PokketMesh");
 
