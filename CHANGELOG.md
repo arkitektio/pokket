@@ -1,3 +1,10 @@
+# [3.1.0](https://github.com/arkitektio/pokket/compare/v3.0.0...v3.1.0) (2026-11-25)
+
+
+### Features
+
+* **agents:** agents as tiles with their logo large and faint behind them ([a7e9d7d](https://github.com/arkitektio/pokket/commit/a7e9d7d17fea2385afb4a6061b27d15ee15a880b))
+
 # [3.0.0](https://github.com/arkitektio/pokket/compare/v2.5.0...v3.0.0) (2026-11-25)
 
 
