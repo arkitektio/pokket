@@ -1,3 +1,18 @@
+# [3.0.0](https://github.com/arkitektio/pokket/compare/v2.5.0...v3.0.0) (2026-11-25)
+
+
+* feat(rekuest)!: the caller session on takt is the only live path ([e2b66af](https://github.com/arkitektio/pokket/commit/e2b66af3d35b06eaf13b0131116186457f7eb656))
+
+
+### BREAKING CHANGES
+
+* the WatchTasks, WatchChildTasks, WatchState and
+WatchLatestTask subscriptions and the call mutations are gone. A hub whose
+gateway does not route `/rekuest/session` to takt has no live updates, and
+tasks cannot be started or steered from the app there.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
 # [2.5.0](https://github.com/arkitektio/pokket/compare/v2.4.1...v2.5.0) (2026-11-25)
 
 
