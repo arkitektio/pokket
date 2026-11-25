@@ -1,3 +1,15 @@
+# [2.5.0](https://github.com/arkitektio/pokket/compare/v2.4.1...v2.5.0) (2026-11-25)
+
+
+### Bug Fixes
+
+* **mesh:** a media bridge whose socket was taken away is made again ([9435e0b](https://github.com/arkitektio/pokket/commit/9435e0b5f6b5dbc883af3ee37713fcdb9ab340dc))
+
+
+### Features
+
+* **mesh:** a media bridge carries live media to a LiveKit only on the mesh ([6860e80](https://github.com/arkitektio/pokket/commit/6860e808ae78087de5ade67046b4eda2a84cede5))
+
 ## [2.4.1](https://github.com/arkitektio/pokket/compare/v2.4.0...v2.4.1) (2026-11-21)
 
 # [2.4.0](https://github.com/arkitektio/pokket/compare/v2.3.0...v2.4.0) (2026-11-21)
