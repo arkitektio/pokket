@@ -1,0 +1,27 @@
+subscription WatchStreams {
+  streams {
+    create {
+      ...ListStream
+    }
+    update {
+      ...ListStream
+    }
+    delete
+    # Its agent's own `live` comes along, read at the same moment: the cache
+    # updates every mounted agent without asking again.
+    live {
+      ...ListStream
+      agent {
+        id
+        live
+      }
+    }
+    offline {
+      ...ListStream
+      agent {
+        id
+        live
+      }
+    }
+  }
+}

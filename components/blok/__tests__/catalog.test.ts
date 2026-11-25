@@ -53,7 +53,7 @@ describe('the blok catalog', () => {
       const shape = definition.schema.shape as Record<string, z.ZodTypeAny>;
       for (const prop of spec.props) {
         if (!(prop.key in shape)) props.push(`${definition.name}.${prop.key}`);
-        else if (prop.kind === 'CALLBACK' && !isActionSchema(shape[prop.key])) callbacks.push(`${definition.name}.${prop.key}`);
+        else if (prop.port.kind === 'CALLBACK' && !isActionSchema(shape[prop.key])) callbacks.push(`${definition.name}.${prop.key}`);
       }
     }
     expect({extra, props, callbacks}).toEqual({extra: [], props: [], callbacks: []});

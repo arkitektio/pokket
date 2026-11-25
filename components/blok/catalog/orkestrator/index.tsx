@@ -20,6 +20,7 @@ import {
 import {
   columnHistogramSchema,
   columnStatSchema,
+  MIKRO_SCENE_BINDS,
   MIKRO_SCENE_EVENTS,
   MIKRO_SCENE_PANELS,
   MIKRO_SERVICE,
@@ -27,9 +28,12 @@ import {
   mikroSceneSchema,
   mikroSceneViewportSchema,
   tableColumnsSchema,
+  readerRecord,
+  TABLE_READ,
   tableRowsSchema,
 } from './schemas';
 import {ColumnHistogramRender, ColumnStatRender, TableColumnsRender, TableRowsRender} from './tables';
+import {LIVE_BLOKS} from './live';
 
 /**
  * The Orkestrator's catalog (`https://arkitekt.live/catalogs/orkestrator/v1`),
@@ -68,7 +72,7 @@ export const MikroSceneBlok = createBlokComponent(
     acceptsChildren: true,
     placement: {notDownstreamOf: ['MikroScene']},
     events: MIKRO_SCENE_EVENTS,
-    bindKinds: {bind: 'ANY', bindWorld: 'STRING'},
+    bindKinds: MIKRO_SCENE_BINDS,
     schema: mikroSceneSchema,
   },
   guarded(MikroSceneRender),
@@ -89,8 +93,15 @@ export const MikroSceneLayersBlok = panel('MikroSceneLayers', MikroSceneLayersRe
 export const MikroSceneAnnotationsBlok = panel('MikroSceneAnnotations', MikroSceneAnnotationsRender);
 export const MikroSceneProbeBlok = panel('MikroSceneProbe', MikroSceneProbeRender);
 
-const reader = (name: string, schema: Parameters<typeof createBlokComponent>[0]['schema'], Render: React.ComponentType<BlokRenderArgs>) =>
-  createBlokComponent({name, schema, service: MIKRO_SERVICE, writesRecordTo: 'bind'}, guarded(Render));
+const reader = (
+  name: keyof typeof TABLE_READ,
+  schema: Parameters<typeof createBlokComponent>[0]['schema'],
+  Render: React.ComponentType<BlokRenderArgs>,
+) =>
+  createBlokComponent(
+    {name, schema, service: MIKRO_SERVICE, writesRecordTo: 'bind', bindKinds: {bind: readerRecord(TABLE_READ[name])}},
+    guarded(Render),
+  );
 
 export const TableColumnsBlok = reader('TableColumns', tableColumnsSchema, TableColumnsRender);
 export const ColumnStatBlok = reader('ColumnStat', columnStatSchema, ColumnStatRender);
@@ -107,6 +118,8 @@ export const ORKESTRATOR_BLOKS: readonly BlokComponentDefinition[] = [
   ColumnStatBlok,
   ColumnHistogramBlok,
   TableRowsBlok,
+  // The plot and live lovekit streams mounted in a Scene or a Plot (`./live.tsx`).
+  ...LIVE_BLOKS,
 ];
 
 /** The Orkestrator's catalog as pokket implements it: claimed whole (`orkestrator@1`). */

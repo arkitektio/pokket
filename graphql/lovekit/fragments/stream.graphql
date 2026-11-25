@@ -28,6 +28,21 @@ fragment DataFormat on DataFormat {
   }
 }
 
+fragment VideoFormat on VideoFormat {
+  shape
+  reference
+  axes {
+    name
+    type
+  }
+  calibration {
+    axis
+    unit
+    scale
+    offset
+  }
+}
+
 fragment Stream on Stream {
   id
   key
@@ -37,6 +52,9 @@ fragment Stream on Stream {
   live
   format {
     ...DataFormat
+  }
+  videoFormat {
+    ...VideoFormat
   }
   agent {
     ...StreamAgent

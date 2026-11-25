@@ -23,6 +23,16 @@ export type Scalars = {
   _Any: { input: any; output: any; }
 };
 
+/** Objects to put in a collaboration at once: all of them, or none */
+export type AddManyToCollaborationInput = {
+  /** The collaboration's key (lok's) */
+  collaboration: Scalars['ID']['input'];
+  /** The collaboration's name, kept here when these are the first things put in */
+  name?: InputMaybe<Scalars['String']['input']>;
+  /** What to put in; a whole before its parts */
+  objects: Array<CollaborationObjectRef>;
+};
+
 /** What a call is now also about */
 export type AddToCallInput = {
   about: Array<StructureInput>;
@@ -62,7 +72,11 @@ export type AgentFilter = {
   OR?: InputMaybe<AgentFilter>;
   /** Agents running as this client (its OAuth client id), as rekuest knows it too. */
   clientId?: InputMaybe<Scalars['String']['input']>;
+  /** Only what the workflow (its root task id) created */
+  createdUnder?: InputMaybe<Scalars['ID']['input']>;
   ids?: InputMaybe<Array<Scalars['ID']['input']>>;
+  /** Only what is in this collaboration (its key): put in, or part of what was */
+  inCollaboration?: InputMaybe<Scalars['ID']['input']>;
   search?: InputMaybe<Scalars['String']['input']>;
   /** Agents running for this user (the `sub` their token carries). */
   userSub?: InputMaybe<Scalars['String']['input']>;
@@ -130,6 +144,8 @@ export type Call = {
   about: Array<Structure>;
   createdAt: Scalars['DateTime']['output'];
   creator?: Maybe<User>;
+  /** When the call's room last closed, everyone gone; null while it is live (or was never seen to end) */
+  endedAt?: Maybe<Scalars['DateTime']['output']>;
   id: Scalars['ID']['output'];
   /** How many are in the call right now. */
   participantCount: Scalars['Int']['output'];
@@ -140,11 +156,15 @@ export type Call = {
   title: Scalars['String']['output'];
 };
 
-/** A call starting in your organization, or changing what it is about */
+/** A call starting in your organization, changing what it is about, ending, or coming back */
 export type CallEvent = {
   __typename?: 'CallEvent';
   /** A call someone else just started, which you can join */
   create?: Maybe<Call>;
+  /** A call whose room closed: everyone left. `endedAt` says when */
+  ended?: Maybe<Call>;
+  /** A call that had ended and is live again: someone joined it */
+  resumed?: Maybe<Call>;
   /** A call that turned to something else; what it was about before is still in `about` */
   update?: Maybe<Call>;
 };
@@ -193,6 +213,15 @@ export type CallParticipant = {
   name: Scalars['String']['output'];
 };
 
+/** Someone joining or leaving a call */
+export type CallParticipantEvent = {
+  __typename?: 'CallParticipantEvent';
+  /** Who just joined the call */
+  joined?: Maybe<CallParticipant>;
+  /** Who just left the call */
+  left?: Maybe<CallParticipant>;
+};
+
 export type Client = {
   __typename?: 'Client';
   clientId: Scalars['String']['output'];
@@ -206,9 +235,26 @@ export type Collaboration = {
   createdAt: Scalars['DateTime']['output'];
   description?: Maybe<Scalars['String']['output']>;
   id: Scalars['ID']['output'];
-  /** What is in the collaboration; what is part of these is in it too */
+  /** How many objects are in the collaboration: all of them, or (`brought`) only those put in by hand (false) or only those that came along with one (true) */
+  itemCount: Scalars['Int']['output'];
+  /** What is in the collaboration, oldest first; what is part of these is in it too. `brought` keeps what was put in by hand (false) or only what came along with it (true) */
   items: Array<CollaborationItem>;
+  /** The collaboration's key across the hub: what lok grants, and what names it in every service */
+  key: Scalars['ID']['output'];
   name: Scalars['String']['output'];
+};
+
+
+/** What a guest granted it sees of the organization: the objects put in it, and what is part of them. */
+export type CollaborationItemCountArgs = {
+  brought?: InputMaybe<Scalars['Boolean']['input']>;
+};
+
+
+/** What a guest granted it sees of the organization: the objects put in it, and what is part of them. */
+export type CollaborationItemsArgs = {
+  brought?: InputMaybe<Scalars['Boolean']['input']>;
+  pagination?: InputMaybe<OffsetPaginationInput>;
 };
 
 /** One object in a collaboration: put there, or brought along with one that needs it to be seen. */
@@ -226,7 +272,18 @@ export type CollaborationItem = {
 
 /** An object to put in, or take out of, a collaboration */
 export type CollaborationObjectInput = {
+  /** The collaboration's key (lok's) */
   collaboration: Scalars['ID']['input'];
+  /** The structure the object is known by: @mikro/scene */
+  identifier: Scalars['String']['input'];
+  /** The collaboration's name, kept here when this is the first thing put in */
+  name?: InputMaybe<Scalars['String']['input']>;
+  /** The object's id */
+  object: Scalars['ID']['input'];
+};
+
+/** An object, by its structure and id */
+export type CollaborationObjectRef = {
   /** The structure the object is known by: @mikro/scene */
   identifier: Scalars['String']['input'];
   /** The object's id */
@@ -239,12 +296,6 @@ export type Connection = {
   /** What lets the caller in: for LIVEKIT, the access token of its room */
   credential: Scalars['String']['output'];
   transport: Transport;
-};
-
-/** A new collaboration */
-export type CreateCollaborationInput = {
-  description?: InputMaybe<Scalars['String']['input']>;
-  name: Scalars['String']['input'];
 };
 
 /** What every frame of a data stream holds */
@@ -308,15 +359,15 @@ export type JoinCallInput = {
 
 export type Mutation = {
   __typename?: 'Mutation';
+  /** Put several agents in a collaboration (by its key) at once, each with every stream it offers: all of them, or none */
+  addManyToCollaboration: Collaboration;
   /** Turn a call to these structures: they become what it is about last, and what it was about stays */
   addToCall: Call;
-  /** Put an agent or a stream in a collaboration: an agent brings every stream it offers */
+  /** Put an agent in a collaboration (lok's, by its key): it brings every stream it offers. The collaboration's row here is made the first time something is put in */
   addToCollaboration: Collaboration;
-  /** Create an empty collaboration, to put agents and streams in and grant a guest */
-  createCollaboration: Collaboration;
   /** Offer exactly these streams as the caller's agent: undeclared ones are removed, unchanged ones untouched */
   declareStreams: Array<Stream>;
-  /** Delete a collaboration: whoever was granted it sees nothing of it any more */
+  /** Take everything lovekit put in a collaboration (by its key) out of it: whoever was granted it sees nothing of it here any more. lok's collaboration, and its grants, stay */
   deleteCollaboration: Scalars['ID']['output'];
   /** Put an invitation away, on every device */
   dismissCallInvite: Scalars['ID']['output'];
@@ -328,12 +379,19 @@ export type Mutation = {
   joinCall: Connection;
   /** What the caller's agent publishes its streams with; a newer connection replaces an older one */
   publisherConnection: Connection;
-  /** Take an agent or a stream out of a collaboration */
+  /** Take an agent out of a collaboration (by its key), and its streams with it */
   removeFromCollaboration: Collaboration;
+  /** Put what a workflow (its root task) created in lovekit in a collaboration. Nothing here says which workflow made it: an agent and its streams are the app's, across workflows, so the report lists them as unknown and puts nothing in. `dryRun` only says what would be put in */
+  shareWorkflow: WorkflowShare;
   /** What every stream of an agent is watched with. A guest needs the agent in one of their collaborations */
   watchAgent: Connection;
   /** What a stream is watched with: its agent's room, where it is the track named by its key. A guest needs the agent in one of their collaborations */
   watchStream: Connection;
+};
+
+
+export type MutationAddManyToCollaborationArgs = {
+  input: AddManyToCollaborationInput;
 };
 
 
@@ -347,18 +405,13 @@ export type MutationAddToCollaborationArgs = {
 };
 
 
-export type MutationCreateCollaborationArgs = {
-  input: CreateCollaborationInput;
-};
-
-
 export type MutationDeclareStreamsArgs = {
   input: DeclareStreamsInput;
 };
 
 
 export type MutationDeleteCollaborationArgs = {
-  id: Scalars['ID']['input'];
+  key: Scalars['ID']['input'];
 };
 
 
@@ -384,6 +437,11 @@ export type MutationJoinCallArgs = {
 
 export type MutationRemoveFromCollaborationArgs = {
   input: CollaborationObjectInput;
+};
+
+
+export type MutationShareWorkflowArgs = {
+  input: ShareWorkflowInput;
 };
 
 
@@ -429,7 +487,7 @@ export type Query = {
   call: Call;
   /** The organization's calls; filter `live` for the ones in progress */
   calls: Array<Call>;
-  /** Get a single collaboration by ID */
+  /** Get a single collaboration by its key (lok's): what was put in it here */
   collaboration: Collaboration;
   /** List the organization's collaborations: what a guest granted one sees of it (a guest: the collaborations granted to them) */
   collaborations: Array<Collaboration>;
@@ -471,7 +529,12 @@ export type QueryCallsArgs = {
 
 
 export type QueryCollaborationArgs = {
-  id: Scalars['ID']['input'];
+  key: Scalars['ID']['input'];
+};
+
+
+export type QueryCollaborationsArgs = {
+  pagination?: InputMaybe<OffsetPaginationInput>;
 };
 
 
@@ -493,6 +556,40 @@ export type Release = {
   version: Scalars['String']['output'];
 };
 
+/** Put what a workflow created in a collaboration, as it is now */
+export type ShareWorkflowInput = {
+  /** The collaboration's key (lok's) */
+  collaboration: Scalars['ID']['input'];
+  /** Only say what would be put in, and what left out */
+  dryRun?: Scalars['Boolean']['input'];
+  /** The collaboration's name, kept here when this puts the first things in */
+  name?: InputMaybe<Scalars['String']['input']>;
+  /** The workflow: the id of the task a person started, the root of every task it caused */
+  rootTask: Scalars['ID']['input'];
+};
+
+/** An object, by its structure and id */
+export type SharedObject = {
+  __typename?: 'SharedObject';
+  /** The structure the object is known by: @mikro/scene */
+  identifier?: Maybe<Scalars['String']['output']>;
+  /** The object's id */
+  object: Scalars['ID']['output'];
+};
+
+/** Created in the workflow, but part of something made before it that is not shared: left out */
+export type SkippedObject = {
+  __typename?: 'SkippedObject';
+  /** The structure the object is known by */
+  identifier?: Maybe<Scalars['String']['output']>;
+  /** The object's id */
+  object: Scalars['ID']['output'];
+  /** The id of what it is part of: put that in, and share the workflow again, to bring it */
+  whole: Scalars['ID']['output'];
+  /** The structure of what it is part of */
+  wholeIdentifier?: Maybe<Scalars['String']['output']>;
+};
+
 /** One live source an agent offers: a camera, a detector, a microphone, a spectrometer */
 export type Stream = {
   __typename?: 'Stream';
@@ -510,6 +607,8 @@ export type Stream = {
   /** Whether the agent publishes this stream right now: LiveKit's answer, asked when read. */
   live: Scalars['Boolean']['output'];
   title: Scalars['String']['output'];
+  /** Where a frame's pixels are; only a video stream that declared it has one. */
+  videoFormat?: Maybe<VideoFormat>;
 };
 
 /** One stream an agent offers */
@@ -524,15 +623,21 @@ export type StreamDeclarationInput = {
   kind?: StreamKind;
   /** What the stream is called; the key when not given */
   title?: InputMaybe<Scalars['String']['input']>;
+  /** Where a frame's pixels are: optional for a video stream, refused for any other */
+  videoFormat?: InputMaybe<VideoFormatInput>;
 };
 
-/** A stream an agent of your organization declared, changed or no longer offers */
+/** A stream an agent of your organization declared, changed, no longer offers, or started or stopped publishing */
 export type StreamEvent = {
   __typename?: 'StreamEvent';
   /** A stream an agent declared for the first time */
   create?: Maybe<Stream>;
   /** A stream its agent no longer offers */
   delete?: Maybe<Scalars['ID']['output']>;
+  /** A stream its agent started publishing: it is live now */
+  live?: Maybe<Stream>;
+  /** A stream its agent stopped publishing, or whose agent left: it is not live now */
+  offline?: Maybe<Stream>;
   /** A stream whose title, kind or description changed */
   update?: Maybe<Stream>;
 };
@@ -547,7 +652,11 @@ export type StreamFilter = {
   agent?: InputMaybe<Scalars['ID']['input']>;
   /** Streams of the agent running as this client (its OAuth client id), as rekuest knows it too. */
   clientId?: InputMaybe<Scalars['String']['input']>;
+  /** Only what the workflow (its root task id) created */
+  createdUnder?: InputMaybe<Scalars['ID']['input']>;
   ids?: InputMaybe<Array<Scalars['ID']['input']>>;
+  /** Only what is in this collaboration (its key): put in, or part of what was */
+  inCollaboration?: InputMaybe<Scalars['ID']['input']>;
   /** Only streams their agent publishes right now (true), or does not (false). */
   live?: InputMaybe<Scalars['Boolean']['input']>;
   search?: InputMaybe<Scalars['String']['input']>;
@@ -583,10 +692,17 @@ export type Subscription = {
   __typename?: 'Subscription';
   /** Your invitations to calls as they arrive and go away */
   callInvites: CallInviteEvent;
-  /** The calls others start in your organization as they start, and any call's new topics */
+  /** Who joins and leaves one call, as they do */
+  callParticipants: CallParticipantEvent;
+  /** The calls others start in your organization as they start, any call's new topics, and calls ending and coming back */
   calls: CallEvent;
   /** Streams your organization's agents declare, change and drop, as they do */
   streams: StreamEvent;
+};
+
+
+export type SubscriptionCallParticipantsArgs = {
+  call: Scalars['ID']['input'];
 };
 
 /** How a stream is carried from its agent to whoever watches */
@@ -616,6 +732,30 @@ export type User = {
   zoneinfo?: Maybe<Scalars['String']['output']>;
 };
 
+/** Where a video stream's pixels are: its axes, their calibration and the space they are in */
+export type VideoFormat = {
+  __typename?: 'VideoFormat';
+  /** The axes of a frame in its order */
+  axes: Array<Axis>;
+  calibration: Array<Calibration>;
+  /** The space the axes are in, named as mikro names a coordinate system's reference */
+  reference?: Maybe<Scalars['String']['output']>;
+  /** The size of a frame; none when known only from the first frame */
+  shape?: Maybe<Array<Scalars['Int']['output']>>;
+};
+
+/** Where a video stream's pixels are: its axes, their calibration and the space they are in */
+export type VideoFormatInput = {
+  /** The axes of a frame in its order, e.g. y, x, c */
+  axes: Array<AxisInput>;
+  /** The axes that measure something, and what */
+  calibration?: Array<CalibrationInput>;
+  /** The space the axes are in, named as mikro names a coordinate system's reference */
+  reference?: InputMaybe<Scalars['String']['input']>;
+  /** The size of a frame, one value per axis; none when it is known only from the first frame */
+  shape?: InputMaybe<Array<Scalars['Int']['input']>>;
+};
+
 /** The agent whose streams to watch */
 export type WatchAgentInput = {
   agent: Scalars['ID']['input'];
@@ -624,6 +764,23 @@ export type WatchAgentInput = {
 /** The stream to watch */
 export type WatchStreamInput = {
   stream: Scalars['ID']['input'];
+};
+
+/** What sharing a workflow put in a collaboration here (or, tried, would put in) */
+export type WorkflowShare = {
+  __typename?: 'WorkflowShare';
+  /** Put in, with what each needs to be seen */
+  added: Array<SharedObject>;
+  /** The collaboration's key */
+  collaboration: Scalars['ID']['output'];
+  /** How many parts came along with their whole, without being put in themselves */
+  covered: Scalars['Int']['output'];
+  /** Whether nothing was written */
+  dryRun: Scalars['Boolean']['output'];
+  /** Left out: parts of something made before the workflow and not shared */
+  skipped: Array<SkippedObject>;
+  /** Structures here that cannot say what created their objects: not looked at */
+  unknown: Array<Scalars['String']['output']>;
 };
 
 export type _Entity = App | Client | Organization | Release | User;
@@ -649,7 +806,9 @@ export type StreamAgentFragment = { __typename?: 'Agent', id: string, name: stri
 
 export type DataFormatFragment = { __typename?: 'DataFormat', dtype: string, shape: Array<number>, unit?: string | null, axes: Array<{ __typename?: 'Axis', name: string, type: AxisType }>, calibration: Array<{ __typename?: 'Calibration', axis: string, unit: string, scale: number, offset: number }> };
 
-export type StreamFragment = { __typename?: 'Stream', id: string, key: string, title: string, kind: StreamKind, description?: string | null, live: boolean, format?: { __typename?: 'DataFormat', dtype: string, shape: Array<number>, unit?: string | null, axes: Array<{ __typename?: 'Axis', name: string, type: AxisType }>, calibration: Array<{ __typename?: 'Calibration', axis: string, unit: string, scale: number, offset: number }> } | null, agent: { __typename?: 'Agent', id: string, name: string, user: { __typename?: 'User', id: string, sub: string, preferredUsername: string }, client: { __typename?: 'Client', id: string, clientId: string } } };
+export type VideoFormatFragment = { __typename?: 'VideoFormat', shape?: Array<number> | null, reference?: string | null, axes: Array<{ __typename?: 'Axis', name: string, type: AxisType }>, calibration: Array<{ __typename?: 'Calibration', axis: string, unit: string, scale: number, offset: number }> };
+
+export type StreamFragment = { __typename?: 'Stream', id: string, key: string, title: string, kind: StreamKind, description?: string | null, live: boolean, format?: { __typename?: 'DataFormat', dtype: string, shape: Array<number>, unit?: string | null, axes: Array<{ __typename?: 'Axis', name: string, type: AxisType }>, calibration: Array<{ __typename?: 'Calibration', axis: string, unit: string, scale: number, offset: number }> } | null, videoFormat?: { __typename?: 'VideoFormat', shape?: Array<number> | null, reference?: string | null, axes: Array<{ __typename?: 'Axis', name: string, type: AxisType }>, calibration: Array<{ __typename?: 'Calibration', axis: string, unit: string, scale: number, offset: number }> } | null, agent: { __typename?: 'Agent', id: string, name: string, user: { __typename?: 'User', id: string, sub: string, preferredUsername: string }, client: { __typename?: 'Client', id: string, clientId: string } } };
 
 export type ListStreamFragment = { __typename?: 'Stream', id: string, key: string, title: string, kind: StreamKind, live: boolean, agent: { __typename?: 'Agent', id: string, name: string, user: { __typename?: 'User', id: string, sub: string, preferredUsername: string }, client: { __typename?: 'Client', id: string, clientId: string } } };
 
@@ -686,7 +845,7 @@ export type DeclareStreamsMutationVariables = Exact<{
 }>;
 
 
-export type DeclareStreamsMutation = { __typename?: 'Mutation', declareStreams: Array<{ __typename?: 'Stream', id: string, key: string, title: string, kind: StreamKind, description?: string | null, live: boolean, format?: { __typename?: 'DataFormat', dtype: string, shape: Array<number>, unit?: string | null, axes: Array<{ __typename?: 'Axis', name: string, type: AxisType }>, calibration: Array<{ __typename?: 'Calibration', axis: string, unit: string, scale: number, offset: number }> } | null, agent: { __typename?: 'Agent', id: string, name: string, user: { __typename?: 'User', id: string, sub: string, preferredUsername: string }, client: { __typename?: 'Client', id: string, clientId: string } } }> };
+export type DeclareStreamsMutation = { __typename?: 'Mutation', declareStreams: Array<{ __typename?: 'Stream', id: string, key: string, title: string, kind: StreamKind, description?: string | null, live: boolean, format?: { __typename?: 'DataFormat', dtype: string, shape: Array<number>, unit?: string | null, axes: Array<{ __typename?: 'Axis', name: string, type: AxisType }>, calibration: Array<{ __typename?: 'Calibration', axis: string, unit: string, scale: number, offset: number }> } | null, videoFormat?: { __typename?: 'VideoFormat', shape?: Array<number> | null, reference?: string | null, axes: Array<{ __typename?: 'Axis', name: string, type: AxisType }>, calibration: Array<{ __typename?: 'Calibration', axis: string, unit: string, scale: number, offset: number }> } | null, agent: { __typename?: 'Agent', id: string, name: string, user: { __typename?: 'User', id: string, sub: string, preferredUsername: string }, client: { __typename?: 'Client', id: string, clientId: string } } }> };
 
 export type PublisherConnectionMutationVariables = Exact<{ [key: string]: never; }>;
 
@@ -739,7 +898,7 @@ export type GetStreamQueryVariables = Exact<{
 }>;
 
 
-export type GetStreamQuery = { __typename?: 'Query', stream: { __typename?: 'Stream', id: string, key: string, title: string, kind: StreamKind, description?: string | null, live: boolean, format?: { __typename?: 'DataFormat', dtype: string, shape: Array<number>, unit?: string | null, axes: Array<{ __typename?: 'Axis', name: string, type: AxisType }>, calibration: Array<{ __typename?: 'Calibration', axis: string, unit: string, scale: number, offset: number }> } | null, agent: { __typename?: 'Agent', id: string, name: string, user: { __typename?: 'User', id: string, sub: string, preferredUsername: string }, client: { __typename?: 'Client', id: string, clientId: string } } } };
+export type GetStreamQuery = { __typename?: 'Query', stream: { __typename?: 'Stream', id: string, key: string, title: string, kind: StreamKind, description?: string | null, live: boolean, format?: { __typename?: 'DataFormat', dtype: string, shape: Array<number>, unit?: string | null, axes: Array<{ __typename?: 'Axis', name: string, type: AxisType }>, calibration: Array<{ __typename?: 'Calibration', axis: string, unit: string, scale: number, offset: number }> } | null, videoFormat?: { __typename?: 'VideoFormat', shape?: Array<number> | null, reference?: string | null, axes: Array<{ __typename?: 'Axis', name: string, type: AxisType }>, calibration: Array<{ __typename?: 'Calibration', axis: string, unit: string, scale: number, offset: number }> } | null, agent: { __typename?: 'Agent', id: string, name: string, user: { __typename?: 'User', id: string, sub: string, preferredUsername: string }, client: { __typename?: 'Client', id: string, clientId: string } } } };
 
 export type SearchStreamsQueryVariables = Exact<{
   search?: InputMaybe<Scalars['String']['input']>;
@@ -755,7 +914,7 @@ export type ListStreamsQueryVariables = Exact<{
 }>;
 
 
-export type ListStreamsQuery = { __typename?: 'Query', streams: Array<{ __typename?: 'Stream', id: string, key: string, title: string, kind: StreamKind, description?: string | null, live: boolean, format?: { __typename?: 'DataFormat', dtype: string, shape: Array<number>, unit?: string | null, axes: Array<{ __typename?: 'Axis', name: string, type: AxisType }>, calibration: Array<{ __typename?: 'Calibration', axis: string, unit: string, scale: number, offset: number }> } | null, agent: { __typename?: 'Agent', id: string, name: string, user: { __typename?: 'User', id: string, sub: string, preferredUsername: string }, client: { __typename?: 'Client', id: string, clientId: string } } }> };
+export type ListStreamsQuery = { __typename?: 'Query', streams: Array<{ __typename?: 'Stream', id: string, key: string, title: string, kind: StreamKind, description?: string | null, live: boolean, format?: { __typename?: 'DataFormat', dtype: string, shape: Array<number>, unit?: string | null, axes: Array<{ __typename?: 'Axis', name: string, type: AxisType }>, calibration: Array<{ __typename?: 'Calibration', axis: string, unit: string, scale: number, offset: number }> } | null, videoFormat?: { __typename?: 'VideoFormat', shape?: Array<number> | null, reference?: string | null, axes: Array<{ __typename?: 'Axis', name: string, type: AxisType }>, calibration: Array<{ __typename?: 'Calibration', axis: string, unit: string, scale: number, offset: number }> } | null, agent: { __typename?: 'Agent', id: string, name: string, user: { __typename?: 'User', id: string, sub: string, preferredUsername: string }, client: { __typename?: 'Client', id: string, clientId: string } } }> };
 
 export type WatchCallInvitesSubscriptionVariables = Exact<{ [key: string]: never; }>;
 
@@ -766,6 +925,11 @@ export type WatchCallsSubscriptionVariables = Exact<{ [key: string]: never; }>;
 
 
 export type WatchCallsSubscription = { __typename?: 'Subscription', calls: { __typename?: 'CallEvent', create?: { __typename?: 'Call', id: string, title: string, roomName: string, createdAt: string, participantCount: number, creator?: { __typename?: 'User', id: string, sub: string, preferredUsername: string } | null, about: Array<{ __typename?: 'Structure', identifier: string, object: number }> } | null, update?: { __typename?: 'Call', id: string, title: string, roomName: string, createdAt: string, participantCount: number, creator?: { __typename?: 'User', id: string, sub: string, preferredUsername: string } | null, about: Array<{ __typename?: 'Structure', identifier: string, object: number }> } | null } };
+
+export type WatchStreamsSubscriptionVariables = Exact<{ [key: string]: never; }>;
+
+
+export type WatchStreamsSubscription = { __typename?: 'Subscription', streams: { __typename?: 'StreamEvent', delete?: string | null, create?: { __typename?: 'Stream', id: string, key: string, title: string, kind: StreamKind, live: boolean, agent: { __typename?: 'Agent', id: string, name: string, user: { __typename?: 'User', id: string, sub: string, preferredUsername: string }, client: { __typename?: 'Client', id: string, clientId: string } } } | null, update?: { __typename?: 'Stream', id: string, key: string, title: string, kind: StreamKind, live: boolean, agent: { __typename?: 'Agent', id: string, name: string, user: { __typename?: 'User', id: string, sub: string, preferredUsername: string }, client: { __typename?: 'Client', id: string, clientId: string } } } | null, live?: { __typename?: 'Stream', id: string, key: string, title: string, kind: StreamKind, live: boolean, agent: { __typename?: 'Agent', id: string, live: boolean, name: string, user: { __typename?: 'User', id: string, sub: string, preferredUsername: string }, client: { __typename?: 'Client', id: string, clientId: string } } } | null, offline?: { __typename?: 'Stream', id: string, key: string, title: string, kind: StreamKind, live: boolean, agent: { __typename?: 'Agent', id: string, live: boolean, name: string, user: { __typename?: 'User', id: string, sub: string, preferredUsername: string }, client: { __typename?: 'Client', id: string, clientId: string } } } | null } };
 
 export const CallStructureFragmentDoc = gql`
     fragment CallStructure on Structure {
@@ -854,6 +1018,22 @@ export const DataFormatFragmentDoc = gql`
   }
 }
     `;
+export const VideoFormatFragmentDoc = gql`
+    fragment VideoFormat on VideoFormat {
+  shape
+  reference
+  axes {
+    name
+    type
+  }
+  calibration {
+    axis
+    unit
+    scale
+    offset
+  }
+}
+    `;
 export const StreamAgentFragmentDoc = gql`
     fragment StreamAgent on Agent {
   id
@@ -880,11 +1060,15 @@ export const StreamFragmentDoc = gql`
   format {
     ...DataFormat
   }
+  videoFormat {
+    ...VideoFormat
+  }
   agent {
     ...StreamAgent
   }
 }
     ${DataFormatFragmentDoc}
+${VideoFormatFragmentDoc}
 ${StreamAgentFragmentDoc}`;
 export const ListStreamFragmentDoc = gql`
     fragment ListStream on Stream {
@@ -1481,3 +1665,52 @@ export function useWatchCallsSubscription(baseOptions?: ApolloReactHooks.Subscri
       }
 export type WatchCallsSubscriptionHookResult = ReturnType<typeof useWatchCallsSubscription>;
 export type WatchCallsSubscriptionResult = Apollo.SubscriptionResult<WatchCallsSubscription>;
+export const WatchStreamsDocument = gql`
+    subscription WatchStreams {
+  streams {
+    create {
+      ...ListStream
+    }
+    update {
+      ...ListStream
+    }
+    delete
+    live {
+      ...ListStream
+      agent {
+        id
+        live
+      }
+    }
+    offline {
+      ...ListStream
+      agent {
+        id
+        live
+      }
+    }
+  }
+}
+    ${ListStreamFragmentDoc}`;
+
+/**
+ * __useWatchStreamsSubscription__
+ *
+ * To run a query within a React component, call `useWatchStreamsSubscription` and pass it any options that fit your needs.
+ * When your component renders, `useWatchStreamsSubscription` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the subscription, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useWatchStreamsSubscription({
+ *   variables: {
+ *   },
+ * });
+ */
+export function useWatchStreamsSubscription(baseOptions?: ApolloReactHooks.SubscriptionHookOptions<WatchStreamsSubscription, WatchStreamsSubscriptionVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return ApolloReactHooks.useSubscription<WatchStreamsSubscription, WatchStreamsSubscriptionVariables>(WatchStreamsDocument, options);
+      }
+export type WatchStreamsSubscriptionHookResult = ReturnType<typeof useWatchStreamsSubscription>;
+export type WatchStreamsSubscriptionResult = Apollo.SubscriptionResult<WatchStreamsSubscription>;

@@ -1,5 +1,13 @@
 import * as z from 'zod';
-import {actionProp, bindSchema, boolSchema, classNameSchema, sizeSchema, structureValueSchema} from '@arkitektio/bsx/catalogs';
+import {
+  actionProp,
+  bindSchema,
+  boolSchema,
+  classNameSchema,
+  sizeSchema,
+  structureValueSchema,
+  type SpecPort,
+} from '@arkitektio/bsx/catalogs';
 import {markBindSchema} from '@arkitektio/bsx/runtime';
 import {ROW_OPS, ROWS_LIMIT_DEFAULT, ROWS_LIMIT_MAX} from '@/lib/mikro/tables/rows';
 
@@ -49,30 +57,108 @@ export const mikroSceneSchema = z
     'One mikro scene and its stores, shared by the MikroScene parts inside it. One per blok is the supported case: a second scene\'s viewport also hears the window\'s keyboard.',
   );
 
+/* ------------------------------------------------------------------ ports */
+
+/** What a part hands its callbacks and writes to its binds, as rekuest ports (bsx 7). */
+const field = (key: string, port: SpecPort) => ({key, ...port});
+const scalar = (kind: string, nullable = false): SpecPort => ({kind, nullable});
+const listOf = (item: SpecPort, nullable = false): SpecPort => ({kind: 'LIST', nullable, children: [field('...', item)]});
+const model = (fields: Record<string, SpecPort>, nullable = false): SpecPort => ({
+  kind: 'MODEL',
+  nullable,
+  children: Object.entries(fields).map(([key, port]) => field(key, port)),
+});
+/** A reader's record of its read, `data` being what it read. */
+export const readerRecord = (data: SpecPort): SpecPort => ({
+  kind: 'MODEL',
+  children: [
+    field('status', scalar('STRING')),
+    ...['loading', 'ready', 'failed', 'empty', 'stale'].map(key => field(key, scalar('BOOL'))),
+    field('error', scalar('STRING', true)),
+    field('data', data),
+  ],
+});
+
+const ANNOTATION: SpecPort = {kind: 'STRUCTURE', identifier: '@mikro/annotation'};
+const LENS: SpecPort = {kind: 'STRUCTURE', identifier: '*'};
+const SCENE_LIST = (item: SpecPort): SpecPort => ({kind: 'LIST', children: [{key: '...', ...item}]});
+const LAYERS = SCENE_LIST({kind: 'STRUCTURE', identifier: '*'});
+const DESCRIPTORS: SpecPort = {
+  kind: 'DICT',
+  nullable: true,
+  children: [{key: '...', kind: 'UNION', children: ['STRING', 'FLOAT', 'BOOL'].map((kind, index) => ({key: String(index), kind}))}],
+};
+const CELL: SpecPort = {
+  kind: 'UNION',
+  nullable: true,
+  children: ['STRING', 'FLOAT', 'BOOL'].map((kind, index) => field(String(index), {kind})),
+};
+
 /** What each callback hands its action (`event.<field>`), as the spec publishes it. */
 export const MIKRO_SCENE_EVENTS = {
   onAnnotation: [
-    {key: 'annotation', kind: 'DICT', description: 'The drawn shape, as a structure reference.'},
-    {key: 'kind', kind: 'STRING', description: 'The kind of shape.'},
-    {key: 'lens', kind: 'DICT', description: 'The lens under the probe, or null.'},
-    {key: 'descriptors', kind: 'ANY', description: "The shape's descriptors, or null."},
+    {key: 'annotation', port: ANNOTATION, description: 'The drawn shape, as a structure reference.'},
+    {key: 'kind', port: {kind: 'STRING'}, description: 'The kind of shape.'},
+    {key: 'lens', port: {...LENS, nullable: true}, description: 'The lens under the probe, or null.'},
+    {key: 'descriptors', port: DESCRIPTORS, description: "The shape's descriptors, or null."},
   ],
   onLayersChange: [
-    {key: 'layers', kind: 'LIST', description: 'The layers now drawn.'},
-    {key: 'added', kind: 'LIST', description: 'The layers that are new.'},
+    {key: 'layers', port: LAYERS, description: 'The layers now drawn.'},
+    {key: 'added', port: LAYERS, description: 'The layers that are new.'},
   ],
   onPick: [
-    {key: 'layer', kind: 'STRING', description: 'The layer read.'},
-    {key: 'world', kind: 'LIST', description: 'The world point, or null.'},
-    {key: 'voxel', kind: 'LIST', description: 'The voxel read.'},
-    {key: 'lens', kind: 'DICT', description: 'The lens, or null.'},
+    {key: 'layer', port: {kind: 'STRING'}, description: 'The layer read.'},
+    {key: 'world', port: {...SCENE_LIST({kind: 'FLOAT'}), nullable: true}, description: 'The world point, or null.'},
+    {key: 'voxel', port: SCENE_LIST({kind: 'INT'}), description: 'The voxel read.'},
+    {key: 'lens', port: {...LENS, nullable: true}, description: 'The lens, or null.'},
   ],
   onSelect: [
-    {key: 'annotation', kind: 'DICT', description: 'The selected annotation.'},
-    {key: 'annotations', kind: 'LIST', description: 'Every selected annotation.'},
-    {key: 'lens', kind: 'DICT', description: 'The lens under the probe, or null.'},
+    {key: 'annotation', port: ANNOTATION, description: 'The selected annotation.'},
+    {key: 'annotations', port: SCENE_LIST(ANNOTATION), description: 'Every selected annotation.'},
+    {key: 'lens', port: {...LENS, nullable: true}, description: 'The lens under the probe, or null.'},
   ],
-} as const;
+};
+
+/** What MikroScene writes to its binds. */
+export const MIKRO_SCENE_BINDS: Record<string, SpecPort> = {
+  bind: {
+    kind: 'MODEL',
+    nullable: true,
+    children: [
+      {key: 'annotation', ...ANNOTATION, nullable: true},
+      {key: 'lens', ...LENS, nullable: true},
+    ],
+  },
+  bindWorld: {kind: 'STRUCTURE', identifier: '@mikro/coordinatesystem'},
+};
+
+const COLUMN = model({
+  name: scalar('STRING'),
+  longName: scalar('STRING', true),
+  description: scalar('STRING', true),
+  dtype: scalar('STRING'),
+  role: scalar('STRING', true),
+  unit: scalar('STRING', true),
+  axisType: scalar('STRING', true),
+});
+
+/** What each table reader reads, as its record's `data`. */
+export const TABLE_READ = {
+  TableColumns: listOf(COLUMN, true),
+  ColumnStat: model(
+    {
+      rows: scalar('INT'),
+      nonNull: scalar('INT'),
+      min: scalar('FLOAT', true),
+      max: scalar('FLOAT', true),
+      mean: scalar('FLOAT', true),
+      distinct: scalar('INT', true),
+    },
+    true,
+  ),
+  ColumnHistogram: model({domain: model({min: scalar('FLOAT'), max: scalar('FLOAT')}), bins: listOf(scalar('INT'))}, true),
+  TableRows: model({rows: listOf({kind: 'DICT', children: [field('...', CELL)]}), total: scalar('INT')}, true),
+} satisfies Record<string, SpecPort>;
 
 export const mikroSceneViewportSchema = z
   .object({
@@ -156,7 +242,7 @@ export const columnHistogramSchema = z
 const conditionSchema = z.object({
   column: z.string(),
   op: z.enum(ROW_OPS).optional(),
-  value: z.unknown().optional(),
+  value: z.union([z.string(), z.number(), z.boolean(), z.array(z.union([z.string(), z.number()]))]).optional(),
 });
 
 export const tableRowsSchema = z
